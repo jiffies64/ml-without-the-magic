@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <script>try{var t=localStorage.getItem("z2h-ml-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Backpropagation by Hand · ML Without the Magic</title>
+  <meta name="description" content="Backprop is just the chain rule with good bookkeeping. We compute every gradient in a real two-layer network by hand, with actual numbers, forward and backward." />
+  <link rel="stylesheet" href="../assets/vendor/fonts/fonts.css" />
+  <link rel="stylesheet" href="../assets/course.css" />
+  <link rel="stylesheet" href="../assets/vendor/katex/katex.min.css" />
+</head>
+<body data-slug="10-backprop">
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="nav-scrim"></div>
+  <div class="layout">
+    <aside class="sidebar" aria-label="Course navigation">
+      <div class="brand">
+        <div class="brand__kicker">Machine Learning</div>
+        <h1 class="brand__title"><a href="../index.html">Without the Magic</a></h1>
+      </div>
+      <div class="progress">
+        <div class="progress__track"><div class="progress__fill" data-progress-fill></div></div>
+        <div class="progress__label" data-progress-label></div>
+      </div>
+      <nav class="nav" data-nav aria-label="Sections"></nav>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <button class="iconbtn menubtn" data-menu aria-label="Open navigation">☰</button>
+        <div class="topbar__spacer"></div>
+        <span class="topbar__meta">Part 3 · Neural Nets from Scratch</span>
+        <button class="iconbtn" data-theme-toggle aria-label="Toggle theme">☾</button>
+      </div>
+
+      <main id="main" class="reading">
+        <header class="lesson-head">
+          <p class="lesson-eyebrow">Part 3 · Neural Nets from Scratch <span class="dot"></span> Section 10</p>
+          <h1 class="lesson-title">Backpropagation by Hand</h1>
+          <p class="lesson-standfirst">Backprop is just the chain rule with good bookkeeping. We'll compute every gradient in a real network by hand, with actual numbers — nothing left as “it can be shown.”</p>
+          <div class="lesson-meta">
+            <span><b>34 min</b> read</span>
+            <span><b>You'll learn:</b> the computational graph · the chain rule flowing backward · a full worked numerical example · the local-gradient rule</span>
+          </div>
+        </header>
+
+        <div class="prose">
+          <p class="lead">A neural network learns by nudging its weights in the direction that lowers
+          the loss. To nudge a weight the right way, we need one number for it: the <strong>gradient</strong>
+          — how much the loss would change if we wiggled that weight a hair. A real network has millions
+          of weights, so we need millions of these numbers, and we need them fast, over and over.
+          <strong>Backpropagation</strong> is the algorithm that computes all of them in a single sweep
+          backward through the network. This is the engine room of deep learning: once it clicks, most of what
+          follows is variations on this one idea.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> The one idea to hold onto</div>
+            <p>Backprop is the <a href="02-calculus.html">chain rule from Section 2</a> applied to a graph,
+            with the intermediate results <strong>stored and reused</strong> instead of recomputed. That
+            reuse is the whole trick: it turns “millions of expensive experiments” into “one cheap backward
+            pass.” Everything below is just careful bookkeeping of that idea.</p>
+          </div>
+
+          <!-- ===================== THE GOAL ===================== -->
+          <h2><span class="h-num">1</span>The goal, and why the obvious method fails</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>Suppose you want to know how each weight affects the loss. The most obvious idea:
+          <em>try it</em>. Take one weight, add a tiny amount to it, run the whole network again, and see
+          how much the loss moved. Divide the change in loss by the change in weight — that ratio is
+          (approximately) the gradient for that one weight. Then put the weight back and do the next one.
+          It works, and it needs no calculus at all. The problem is speed.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Imagine a mixing desk with a million volume sliders feeding one final loudspeaker, and you
+            want to know how much each slider affects the total loudness. The brute-force way: nudge slider
+            one, replay the whole song, measure the loudness, write it down, reset. Then slider two. Replay
+            the <em>entire</em> song again. A million replays for one reading of the desk. You'd never
+            finish. Backprop is the sound engineer who, in a single playthrough, works out every slider's
+            influence at once — by listening backward from the speaker to each source.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>Write the loss as $L$ (a single number telling us how wrong the network is) and a weight as
+          $w$. The brute-force (“finite difference”) estimate of the gradient is:</p>
+          $$ \frac{\partial L}{\partial w} \;\approx\; \frac{L(w+\varepsilon) - L(w)}{\varepsilon} $$
+          <p class="gloss"><b>In words:</b> $\partial L/\partial w$ means “how fast the loss $L$ changes as
+          we change the weight $w$.” We estimate it by adding a tiny bump $\varepsilon$ (epsilon, a small
+          number like $10^{-5}$) to the weight, seeing how much $L$ moves, and dividing. The catch:
+          computing $L(w+\varepsilon)$ means running the <em>entire</em> forward pass of the network.</p>
+
+          <p>Now count the cost. If the network has $P$ weights, and one forward pass costs $C$ units of
+          work, then estimating every gradient this way costs about:</p>
+          $$ P \times C \quad\text{units of work.} $$
+          <p class="gloss"><b>In words:</b> one full forward pass <em>per weight</em>. For a small model
+          with a million weights ($P = 10^{6}$), that is a million forward passes just to take a single
+          learning step. Modern models have billions of weights and take hundreds of thousands of steps.
+          The brute-force method is not slow — it is impossible.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> What backprop buys you</div>
+            <p>Backprop computes <strong>all</strong> $P$ gradients in the cost of roughly <strong>one</strong>
+            extra pass — a backward one — no matter how many weights there are. It does this by reusing
+            partial results: the gradient at a later layer is built from work already done, so nothing is
+            recomputed from scratch. This is a classic case of <dfn>dynamic programming</dfn> (solving a big
+            problem by storing and reusing the answers to smaller overlapping pieces).</p>
+          </div>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">A network has 5 million weights and one forward pass takes 2 milliseconds. Roughly how long does one gradient step cost with brute force, versus with backprop?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p><strong>Brute force:</strong> one forward pass per weight, so
+                $5{,}000{,}000 \times 2\text{ ms} = 10{,}000{,}000$ ms $\approx$ <strong>2.8 hours</strong>
+                for a single learning step — and you need thousands of steps.
+                <strong>Backprop:</strong> one forward pass plus one backward pass, roughly
+                $2 \times 2\text{ ms} = $ <strong>4 ms</strong>. That is the difference between “trains
+                overnight” and “never finishes.” Same gradients, wildly different cost, because backprop
+                reuses intermediate results instead of throwing them away.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== COMPUTATIONAL GRAPH ===================== -->
+          <h2><span class="h-num">2</span>The computational graph</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>To organise the bookkeeping we draw the network as a <strong>computational graph</strong>: a
+          diagram of little boxes (called <dfn>nodes</dfn>), one per simple operation — multiply, add,
+          apply the sigmoid, and so on. Arrows (the <dfn>edges</dfn>) carry numbers from one box into the
+          next. Feeding the input in and letting numbers flow left-to-right is the <strong>forward
+          pass</strong> — it produces the prediction and the loss. Then we go right-to-left, and that
+          return trip is the <strong>backward pass</strong> — it produces the gradients.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>A dish comes out too salty, and the head chef wants to assign blame up the kitchen chain.
+            The final saltiness is the loss. Working backward: the plating cook barely touched the salt,
+            so little blame flows to them; the cook who poured the stock added most of it, so most of the
+            blame flows there; and whoever <em>measured</em> the stock's saltiness in the first place
+            inherits blame in proportion to how much the stock mattered. Each station receives blame equal
+            to (blame passed down from above) × (how much this station actually influenced the next step).
+            That single rule, applied station by station backward through the kitchen, <strong>is</strong>
+            backprop.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>Here is the exact graph we will compute with. One input $x$ flows through two layers. Each
+          layer does a <em>linear step</em> (multiply by a weight, add a bias) and then a <em>nonlinear
+          step</em> (the sigmoid, written $\sigma$). The final node compares the output to the target $y$
+          and produces the loss $L$:</p>
+          $$ x \;\longrightarrow\; \underbrace{z_1 = w_1 x + b_1}_{\text{linear}} \;\longrightarrow\;
+             \underbrace{a_1 = \sigma(z_1)}_{\text{nonlinear}} \;\longrightarrow\;
+             \underbrace{z_2 = w_2 a_1 + b_2}_{\text{linear}} \;\longrightarrow\;
+             \underbrace{a_2 = \sigma(z_2)}_{\text{nonlinear}} \;\longrightarrow\;
+             \underbrace{L = \tfrac12 (a_2 - y)^2}_{\text{loss}} $$
+          <p class="gloss"><b>In words:</b> $x$ is the input number. $w_1, b_1$ are the first layer's weight
+          and bias; $z_1$ is its raw output (the <dfn>pre-activation</dfn>) and $a_1$ is that value squashed
+          by the sigmoid into the range $(0,1)$ (the <dfn>activation</dfn>). $w_2, b_2, z_2, a_2$ are the
+          same for the second layer, and $a_2$ is the network's final prediction. $y$ is the target we wish
+          $a_2$ equalled, and $L$ is the squared-error loss — half the squared gap. The $\tfrac12$ is a
+          convenience that cancels when we differentiate.</p>
+
+          <div class="callout definition">
+            <div class="callout__label">Definition</div>
+            <p>The <dfn>forward pass</dfn> runs the graph left-to-right, computing and <strong>storing</strong>
+            every intermediate value ($z_1, a_1, z_2, a_2, L$). The <dfn>backward pass</dfn> runs it
+            right-to-left, computing the gradient of $L$ with respect to every stored value and every weight.
+            The forward pass must happen first because the backward pass <em>reuses</em> those stored values —
+            that is exactly where the speed comes from.</p>
+          </div>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">Why must we keep the forward-pass values in memory instead of discarding them once we have the loss?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Because the backward pass needs them. As we'll see, the gradient for $w_2$ turns out to be
+                $\delta_2 \cdot a_1$ — it literally multiplies by the stored activation $a_1$. If we threw
+                $a_1$ away, we'd have to recompute it, defeating the purpose. This is why training uses far
+                more memory than just running a model for predictions (<dfn>inference</dfn>): training must
+                hold the whole forward pass in memory, ready for the return trip.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== THE CORE RULE ===================== -->
+          <h2><span class="h-num">3</span>The core rule at every node</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>Every node in the graph obeys the same tiny rule, and once you see it you have seen all of
+          backprop. A node receives, from the node just downstream of it, a number that says “here is how
+          much the final loss cares about <em>my</em> output.” The node then knows one purely local fact:
+          “how much does my output change when my input changes?” Multiply those two together and you get
+          “how much the final loss cares about my <em>input</em>” — which is exactly the message to pass one
+          step further back.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Money changing hands down a supply chain. The shop tells the wholesaler “each extra unit you
+            send raises my profit by 2 dollars” (the gradient flowing in). The wholesaler knows a purely local
+            fact: “for every extra kilo of raw material I buy, I can make 3 units” (the local gradient).
+            So the wholesaler tells the farmer “each extra kilo you grow is worth \(2 \times 3 = 6\) dollars to the
+            final profit.” Nobody needs the full picture — each link only multiplies the message from
+            downstream by its own local conversion rate and passes it on.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>This is the chain rule, stated as a rule you can apply mechanically. Consider any node computing
+          an output $u$ from an input $t$. Let the loss be $L$. Then:</p>
+          $$ \underbrace{\frac{\partial L}{\partial t}}_{\text{gradient sent to input}}
+             \;=\;
+             \underbrace{\frac{\partial L}{\partial u}}_{\text{gradient from above}}
+             \;\times\;
+             \underbrace{\frac{\partial u}{\partial t}}_{\text{local gradient}} $$
+          <p class="gloss"><b>In words:</b> (gradient the loss has for my output) × (how my output responds
+          to my input) = (gradient the loss has for my input). The middle term, $\partial u/\partial t$, is
+          the <strong>local gradient</strong> — it depends only on what <em>this</em> node does, and can be
+          worked out without knowing anything about the rest of the network. That locality is why backprop
+          is modular: each operation just needs to know its own derivative.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> The local-gradient rule</div>
+            <p style="text-align:center; font-weight:600;">gradient&nbsp;in&nbsp;(from&nbsp;above) &nbsp;×&nbsp; local&nbsp;gradient &nbsp;=&nbsp; gradient&nbsp;out&nbsp;(to&nbsp;inputs)</p>
+            <p>Every node applies exactly this. Backprop is nothing more than starting at the loss (whose
+            gradient with respect to itself is $1$) and applying this rule, node by node, all the way back
+            to the weights. If a value feeds <em>several</em> nodes, its gradient is the <strong>sum</strong>
+            of the messages coming back from each of them — blame from multiple children adds up.</p>
+          </div>
+
+          <p>We will lean on the local gradients of the three operations in our graph. Two are immediate;
+          the third is the sigmoid, whose derivative has a famously tidy form:</p>
+          $$ \begin{aligned}
+             \text{multiply } u = wt &: \quad \frac{\partial u}{\partial t} = w, \qquad \frac{\partial u}{\partial w} = t \\[4pt]
+             \text{add } u = t + b   &: \quad \frac{\partial u}{\partial t} = 1, \qquad \frac{\partial u}{\partial b} = 1 \\[4pt]
+             \text{sigmoid } a = \sigma(z) &: \quad \frac{\partial a}{\partial z} = \sigma(z)\bigl(1-\sigma(z)\bigr) = a(1-a)
+             \end{aligned} $$
+          <p class="gloss"><b>In words:</b> a multiply node passes gradient through scaled by the
+          <em>other</em> input (so $z_2 = w_2 a_1$ sends gradient to $a_1$ scaled by $w_2$, and to $w_2$
+          scaled by $a_1$). An add node passes gradient through unchanged (local gradient $1$). And the
+          sigmoid's local gradient is just $a(1-a)$ — computed straight from the activation $a$ we already
+          stored on the forward pass. No re-evaluating exponentials on the way back.</p>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">At a node <code>u = w·t</code>, the gradient arriving from above is <code>∂L/∂u = −3</code>, and the stored inputs are <code>w = 2</code>, <code>t = 5</code>. What gradients does the node send to <code>t</code> and to <code>w</code>?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Apply the rule twice. To the input $t$: local gradient is $w = 2$, so
+                $\partial L/\partial t = -3 \times 2 = \mathbf{-6}$. To the weight $w$: local gradient is
+                $t = 5$, so $\partial L/\partial w = -3 \times 5 = \mathbf{-15}$. Notice the multiply node
+                “swaps” its inputs on the way back — each branch is scaled by the <em>other</em> value.
+                That swap is worth memorising; it is the single most common node in any network.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== THE WORKED EXAMPLE ===================== -->
+          <h2><span class="h-num">4</span>The centrepiece: a full network, by hand</h2>
+
+          <p>Now we do the real thing. We take the two-layer graph above, plug in concrete numbers, and
+          compute <strong>every</strong> value forward and <strong>every</strong> gradient backward. Nothing
+          is skipped; you can reproduce each number with a calculator. Here are the fixed ingredients:</p>
+
+          <div class="scroll-x">
+          <table>
+            <thead>
+              <tr><th>Symbol</th><th>Meaning</th><th>Value</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>$x$</td><td>the single input</td><td>$1.0$</td></tr>
+              <tr><td>$w_1,\; b_1$</td><td>layer-1 weight and bias</td><td>$0.5,\; 0.5$</td></tr>
+              <tr><td>$w_2,\; b_2$</td><td>layer-2 weight and bias</td><td>$1.5,\; -1.0$</td></tr>
+              <tr><td>$y$</td><td>the target we want $a_2$ to hit</td><td>$1.0$</td></tr>
+            </tbody>
+          </table>
+          </div>
+          <p style="margin-top:.6rem;">We round every result to four decimal places. The sigmoid is
+          $\sigma(z) = 1/(1+e^{-z})$.</p>
+
+          <h3>Forward pass — compute and store every value</h3>
+
+          <p class="beat beat--math">Now the math</p>
+          <p><strong>Node 1 — first linear step.</strong> Multiply the input by $w_1$ and add $b_1$:</p>
+          $$ z_1 = w_1 x + b_1 = (0.5)(1.0) + 0.5 = \mathbf{1.0000} $$
+
+          <p><strong>Node 2 — first sigmoid.</strong> Squash $z_1$ into $(0,1)$:</p>
+          $$ a_1 = \sigma(1.0) = \frac{1}{1 + e^{-1.0}} = \frac{1}{1 + 0.3679} = \mathbf{0.7311} $$
+
+          <p><strong>Node 3 — second linear step.</strong> Multiply the activation by $w_2$ and add $b_2$:</p>
+          $$ z_2 = w_2 a_1 + b_2 = (1.5)(0.7311) + (-1.0) = 1.0966 - 1.0 = \mathbf{0.0966} $$
+
+          <p><strong>Node 4 — second sigmoid.</strong> This is the network's prediction:</p>
+          $$ a_2 = \sigma(0.0966) = \frac{1}{1 + e^{-0.0966}} = \frac{1}{1 + 0.9079} = \mathbf{0.5241} $$
+
+          <p><strong>Node 5 — the loss.</strong> Compare the prediction $a_2$ to the target $y = 1.0$:</p>
+          $$ L = \tfrac12 (a_2 - y)^2 = \tfrac12 (0.5241 - 1.0)^2 = \tfrac12 (-0.4759)^2 = \tfrac12(0.2265) = \mathbf{0.1132} $$
+          <p class="gloss"><b>In words:</b> the network currently predicts $0.5241$ but we wanted $1.0$, so
+          it is off by $0.4759$, and the loss is $0.1132$. Every one of these five numbers is now stored;
+          the backward pass will reuse them.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>The forward pass is like following a recipe end to end and tasting the final dish: too bland,
+            a “wrongness” score of $0.1132$. We wrote down the state after every step — how salty the stock
+            was, how it tasted after simmering — precisely so that, when the dish disappoints, we can walk
+            back through our notes and see which step to blame. That walk back is next.</p>
+          </div>
+
+          <h3>Backward pass — send the gradient back, node by node</h3>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>We start at the loss and apply the local-gradient rule repeatedly. It helps to name the
+          gradient arriving at each pre-activation; the standard name is $\delta$ (delta). So
+          $\delta_2 = \partial L / \partial z_2$ and $\delta_1 = \partial L / \partial z_1$. Watch how each
+          step reuses a stored forward value.</p>
+
+          <p><strong>Step A — through the loss node.</strong> Differentiate $L = \tfrac12(a_2 - y)^2$ with
+          respect to $a_2$. The $\tfrac12$ cancels the power's $2$:</p>
+          $$ \frac{\partial L}{\partial a_2} = (a_2 - y) = 0.5241 - 1.0 = \mathbf{-0.4759} $$
+          <p class="gloss"><b>In words:</b> the loss wants $a_2$ to <em>increase</em> (the gradient is
+          negative, and moving <em>against</em> a negative gradient means increasing $a_2$) — which makes
+          sense, since $0.5241$ is below the target $1.0$.</p>
+
+          <p><strong>Step B — through the second sigmoid.</strong> The local gradient is $a_2(1-a_2)$,
+          built from the stored $a_2$. Multiply it by the gradient from above to get $\delta_2$:</p>
+          $$ \begin{aligned}
+             \frac{\partial a_2}{\partial z_2} &= a_2(1-a_2) = (0.5241)(0.4759) = 0.2494 \\[4pt]
+             \delta_2 = \frac{\partial L}{\partial z_2} &= \frac{\partial L}{\partial a_2}\cdot\frac{\partial a_2}{\partial z_2}
+                = (-0.4759)(0.2494) = \mathbf{-0.1187}
+             \end{aligned} $$
+          <p class="gloss"><b>In words:</b> we took the message $-0.4759$ and scaled it by the sigmoid's
+          local gradient $0.2494$. That $0.2494$ came for free from the stored $a_2$ — no exponentials
+          recomputed. $\delta_2$ is now the gradient of the loss with respect to the layer-2 pre-activation.</p>
+
+          <p><strong>Step C — the layer-2 weight and bias.</strong> Recall $z_2 = w_2 a_1 + b_2$. The
+          multiply node sends gradient to $w_2$ scaled by the <em>other</em> input $a_1$ (stored!); the add
+          node sends gradient to $b_2$ unchanged:</p>
+          $$ \begin{aligned}
+             \frac{\partial L}{\partial w_2} &= \delta_2 \cdot \frac{\partial z_2}{\partial w_2} = \delta_2 \cdot a_1 = (-0.1187)(0.7311) = \mathbf{-0.0868} \\[4pt]
+             \frac{\partial L}{\partial b_2} &= \delta_2 \cdot \frac{\partial z_2}{\partial b_2} = \delta_2 \cdot 1 = \mathbf{-0.1187}
+             \end{aligned} $$
+          <p class="gloss"><b>In words:</b> two of our four weight gradients are already done. The weight
+          gradient reused the stored activation $a_1 = 0.7311$; the bias gradient is just $\delta_2$ itself,
+          because adding a bias passes gradient through untouched.</p>
+
+          <p><strong>Step D — back into layer 1.</strong> The multiply node also sends gradient to its
+          <em>other</em> input $a_1$, scaled by $w_2$:</p>
+          $$ \frac{\partial L}{\partial a_1} = \delta_2 \cdot \frac{\partial z_2}{\partial a_1} = \delta_2 \cdot w_2 = (-0.1187)(1.5) = \mathbf{-0.1780} $$
+          <p class="gloss"><b>In words:</b> we have crossed from layer 2 into layer 1. The blame for the
+          loss has been handed to $a_1$, the first layer's activation. Now we push it through the first
+          sigmoid, exactly as we did the second.</p>
+
+          <p><strong>Step E — through the first sigmoid.</strong> Same rule as Step B, now with the stored
+          $a_1$:</p>
+          $$ \begin{aligned}
+             \frac{\partial a_1}{\partial z_1} &= a_1(1-a_1) = (0.7311)(0.2689) = 0.1966 \\[4pt]
+             \delta_1 = \frac{\partial L}{\partial z_1} &= \frac{\partial L}{\partial a_1}\cdot\frac{\partial a_1}{\partial z_1}
+                = (-0.1780)(0.1966) = \mathbf{-0.0350}
+             \end{aligned} $$
+          <p class="gloss"><b>In words:</b> $\delta_1$ is the gradient of the loss with respect to the
+          layer-1 pre-activation. Notice it is much smaller than $\delta_2$ — the signal shrank as it
+          passed back through the sigmoid (whose local gradient is at most $0.25$). Stack many sigmoid
+          layers and the signal keeps shrinking; that is the <dfn>vanishing gradient</dfn> problem in one
+          glance.</p>
+
+          <p><strong>Step F — the layer-1 weight and bias.</strong> Recall $z_1 = w_1 x + b_1$. Same
+          pattern as Step C, now with the stored input $x$:</p>
+          $$ \begin{aligned}
+             \frac{\partial L}{\partial w_1} &= \delta_1 \cdot \frac{\partial z_1}{\partial w_1} = \delta_1 \cdot x = (-0.0350)(1.0) = \mathbf{-0.0350} \\[4pt]
+             \frac{\partial L}{\partial b_1} &= \delta_1 \cdot \frac{\partial z_1}{\partial b_1} = \delta_1 \cdot 1 = \mathbf{-0.0350}
+             \end{aligned} $$
+          <p class="gloss"><b>In words:</b> all four weight gradients are done. We swept from the loss back
+          to the very first weight, and at each node we did nothing but “gradient from above × local
+          gradient,” reusing stored values. That entire sweep is one backward pass.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> All four gradients, in one place</div>
+            <p style="margin-bottom:.4rem;">These are the numbers we came for — the slope of the loss along
+            each weight:</p>
+            <div class="scroll-x">
+            <table>
+              <thead><tr><th>$\dfrac{\partial L}{\partial w_1}$</th><th>$\dfrac{\partial L}{\partial b_1}$</th><th>$\dfrac{\partial L}{\partial w_2}$</th><th>$\dfrac{\partial L}{\partial b_2}$</th></tr></thead>
+              <tbody><tr><td>$-0.0350$</td><td>$-0.0350$</td><td>$-0.0868$</td><td>$-0.1187$</td></tr></tbody>
+            </table>
+            </div>
+            <p style="margin-top:.5rem;">Every one is negative, meaning: increasing any of these weights
+            would <em>lower</em> the loss. So the update will increase them all.</p>
+          </div>
+
+          <h3>One gradient-descent step — and the loss really drops</h3>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>Gradient descent moves each weight a small step <em>against</em> its gradient (downhill on the
+          loss). The step size is the <dfn>learning rate</dfn> $\alpha$ (alpha). Take $\alpha = 1.0$. The update
+          rule for any weight is $w \leftarrow w - \alpha\,\partial L/\partial w$:</p>
+          $$ \begin{aligned}
+             w_1 &\leftarrow 0.5 - (1.0)(-0.0350) = \mathbf{0.5350} \\
+             b_1 &\leftarrow 0.5 - (1.0)(-0.0350) = \mathbf{0.5350} \\
+             w_2 &\leftarrow 1.5 - (1.0)(-0.0868) = \mathbf{1.5868} \\
+             b_2 &\leftarrow -1.0 - (1.0)(-0.1187) = \mathbf{-0.8813}
+             \end{aligned} $$
+          <p class="gloss"><b>In words:</b> subtracting a negative gradient means <em>adding</em> — every
+          weight grew slightly, exactly as the signs predicted. Now the honest test: does the loss actually
+          fall? Run the forward pass again with the new weights.</p>
+
+          <p>New forward pass:</p>
+          $$ \begin{aligned}
+             z_1 &= (0.5350)(1.0) + 0.5350 = 1.0700, & a_1 &= \sigma(1.0700) = 0.7446 \\
+             z_2 &= (1.5868)(0.7446) + (-0.8813) = 0.3002, & a_2 &= \sigma(0.3002) = 0.5745 \\
+             L_{\text{new}} &= \tfrac12(0.5745 - 1.0)^2 = \tfrac12(0.1811) = \mathbf{0.0905}
+             \end{aligned} $$
+          <p class="gloss"><b>In words:</b> the loss fell from $0.1132$ to $\mathbf{0.0905}$, and the
+          prediction rose from $0.5241$ toward the target — from $0.5241$ to $0.5745$. One backward pass,
+          one step, and the network is measurably less wrong. Repeat this loop thousands of times and you
+          have training.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>You are hiking down a foggy hill and can only feel the slope under your feet. The gradient is
+            that felt slope; the learning rate is your stride length. You take one step straight downhill,
+            re-feel the slope, and step again. You never see the whole valley, yet step by step you reach
+            the bottom. Backprop is what tells you the slope; gradient descent is the step.</p>
+          </div>
+
+          <p class="beat beat--code">The same thing in PyTorch (manual, no autograd)</p>
+          <p class="codecap">reproduces every number above by hand</p>
+          <pre><code class="language-python">import torch
+
+def sigmoid(z):
+    return 1.0 / (1.0 + torch.exp(-z))
+
+# fixed ingredients
+x  = torch.tensor(1.0)
+w1, b1 = torch.tensor(0.5), torch.tensor(0.5)
+w2, b2 = torch.tensor(1.5), torch.tensor(-1.0)
+y  = torch.tensor(1.0)
+
+# ---- forward pass: compute and keep every value ----
+z1 = w1 * x + b1        # 1.0000
+a1 = sigmoid(z1)        # 0.7311
+z2 = w2 * a1 + b2       # 0.0966
+a2 = sigmoid(z2)        # 0.5241
+L  = 0.5 * (a2 - y)**2  # 0.1132
+
+# ---- backward pass: gradient in x local gradient, node by node ----
+dL_da2 = (a2 - y)               # -0.4759
+d2     = dL_da2 * a2 * (1 - a2) # delta2 = -0.1187
+dL_dw2 = d2 * a1                # -0.0868
+dL_db2 = d2                     # -0.1187
+dL_da1 = d2 * w2                # -0.1780
+d1     = dL_da1 * a1 * (1 - a1) # delta1 = -0.0350
+dL_dw1 = d1 * x                 # -0.0350
+dL_db1 = d1                     # -0.0350
+
+print(dL_dw1, dL_db1, dL_dw2, dL_db2)
+
+# ---- one gradient-descent step (learning rate 1.0) ----
+alpha = 1.0
+w1, b1 = w1 - alpha*dL_dw1, b1 - alpha*dL_db1
+w2, b2 = w2 - alpha*dL_dw2, b2 - alpha*dL_db2
+
+a2_new = sigmoid(w2 * sigmoid(w1*x + b1) + b2)
+print(0.5 * (a2_new - y)**2)    # 0.0905  -> loss dropped</code></pre>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">Why is <code>∂L/∂b₁</code> equal to <code>∂L/∂w₁</code> here (both −0.0350), and would they still be equal if the input <code>x</code> were 2.0 instead of 1.0?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Both are $\delta_1$ times a local gradient. For the bias the local gradient is $1$
+                (adding passes gradient through), giving $\partial L/\partial b_1 = \delta_1$. For the weight
+                the local gradient is the input $x$, giving $\partial L/\partial w_1 = \delta_1 \cdot x$.
+                They are equal here only because $x = 1.0$, so multiplying by it changes nothing. With
+                $x = 2.0$ the weight gradient would double to $\delta_1 \cdot 2 = -0.0700$ while the bias
+                gradient would stay $-0.0350$. A weight's gradient always scales with the input feeding it;
+                a bias's never does.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== VECTORIZED ===================== -->
+          <h2><span class="h-num">5</span>The same rules for a whole layer at once</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>Real layers have many neurons, so weights form a matrix $\mathbf{W}$ and activations form
+          vectors. The good news: the rules do not change at all. “Multiply node swaps its inputs” becomes
+          “multiply by the transpose of the matrix.” The scalar $\delta$ becomes a vector $\boldsymbol{\delta}$,
+          one entry per neuron. Everything you just did by hand now runs on whole layers in one matrix
+          operation — which is exactly what a GPU is built to do fast.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Doing the whole payroll at once instead of one employee at a time. The per-person rule
+            (hours × rate) never changed — you just stacked everyone into a table and ran the arithmetic in
+            one sweep. Vectorising backprop is the same move: identical rule, applied to the entire layer in
+            a single matrix multiply.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>For a layer $\mathbf{z} = \mathbf{W}\mathbf{x} + \mathbf{b}$ followed by an activation
+          $\mathbf{a} = f(\mathbf{z})$, let $\boldsymbol{\delta} = \partial L / \partial \mathbf{z}$ be the
+          gradient arriving at the layer's pre-activations. Then the three gradients we need are:</p>
+          $$ \begin{aligned}
+             \frac{\partial L}{\partial \mathbf{W}} &= \boldsymbol{\delta}\,\mathbf{x}^{\top}
+                &&\text{(gradient for the weight matrix)} \\[4pt]
+             \frac{\partial L}{\partial \mathbf{b}} &= \boldsymbol{\delta}
+                &&\text{(gradient for the bias vector)} \\[4pt]
+             \frac{\partial L}{\partial \mathbf{x}} &= \mathbf{W}^{\top}\boldsymbol{\delta}
+                &&\text{(gradient to send to the previous layer)}
+             \end{aligned} $$
+          <p class="gloss"><b>In words:</b> $\mathbf{x}^{\top}$ is the input row-vector (the little
+          $\top$ means <dfn>transpose</dfn> — flip a column into a row). These are the exact scalar rules
+          from Step C and Step D, wearing matrix clothes: the weight gradient is “$\delta$ times the stored
+          input,” the bias gradient is “just $\delta$,” and the gradient handed to the previous layer is
+          “$\delta$ scaled by the weights,” now with a transpose so the shapes line up.</p>
+
+          <p>To keep the chain going one more layer back, push that returned gradient through the previous
+          layer's activation — multiply by its local gradient $f'$, element by element:</p>
+          $$ \boldsymbol{\delta}_{\text{prev}} = \bigl(\mathbf{W}^{\top}\boldsymbol{\delta}\bigr) \odot f'(\mathbf{z}_{\text{prev}}) $$
+          <p class="gloss"><b>In words:</b> $\odot$ means multiply matching entries (the
+          <dfn>element-wise</dfn> product). So each neuron's incoming gradient gets scaled by its own local
+          slope $f'$. This one line, repeated layer to layer, <strong>is</strong> the backward pass for a
+          deep network — the same “gradient in × local gradient = gradient out” you did by hand, vectorised.</p>
+
+          <p class="beat beat--code">The same thing in PyTorch (vectorized layer)</p>
+          <pre><code class="language-python">import torch
+
+# a layer: W is (out=3, in=4), one input vector x of length 4
+W = torch.randn(3, 4)
+x = torch.randn(4)
+delta = torch.randn(3)        # gradient arriving at this layer's z
+
+dL_dW = torch.outer(delta, x) # delta @ x^T  -> shape (3, 4), matches W
+dL_db = delta                 # -> shape (3,)
+dL_dx = W.T @ delta           # -> shape (4,), sent to the previous layer
+
+print(dL_dW.shape, dL_db.shape, dL_dx.shape)  # (3,4) (3,) (4,)</code></pre>
+
+          <div class="callout pitfall">
+            <div class="callout__label"><span class="ic">▲</span> Watch out</div>
+            <p>The transposes are not decoration — they are what makes the shapes fit. $\partial L/\partial
+            \mathbf{W}$ must have the <em>same shape</em> as $\mathbf{W}$ itself (you subtract it from
+            $\mathbf{W}$ during the update), and $\partial L/\partial \mathbf{x}$ must match $\mathbf{x}$.
+            If a backward pass throws a shape error, a misplaced transpose is the first suspect. When stuck,
+            print shapes on every line, exactly as in <a href="01-linear-algebra.html">Section 1</a>.</p>
+          </div>
+
+          <!-- ===================== SANITY CHECK ===================== -->
+          <h2><span class="h-num">6</span>Trust, but verify: gradient checking</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>Hand-derived gradients are easy to get subtly wrong — a dropped transpose, a sign flip. There
+          is a dead-simple way to catch it: compare your fancy backprop gradient against the crude
+          brute-force estimate from the start of this section. If they agree to several decimals, your backprop is almost
+          certainly correct. This is the <strong>numerical gradient check</strong>, and it has saved more
+          from-scratch networks than any other single trick.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>You add up a long shopping bill in your head, then also run it through the till. If both give
+            \$47.30, you trust your arithmetic. If they disagree, you know there is a bug <em>somewhere</em>
+            before you rely on the total. The till is slow, so you don't use it for every bill — just to
+            confirm your method once.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>Use the <strong>centred</strong> difference — bump the weight both up and down by $\varepsilon$.
+          It is far more accurate than the one-sided version we opened with:</p>
+          $$ \frac{\partial L}{\partial w} \;\approx\; \frac{L(w+\varepsilon) - L(w-\varepsilon)}{2\varepsilon} $$
+          <p class="gloss"><b>In words:</b> nudge the weight up, nudge it down, and take the average slope
+          between. With $\varepsilon = 10^{-5}$ this typically matches the true gradient to $6$–$8$ decimal
+          places. It is far too slow to <em>train</em> with (one forward pass per weight — the very problem
+          backprop solves), but it is perfect as a one-off check that backprop is wired correctly.</p>
+
+          <p class="beat beat--code">Checking our example's gradient for $w_1$</p>
+          <pre><code class="language-python">import torch
+
+def loss(w1, b1, w2, b2, x=torch.tensor(1.0), y=torch.tensor(1.0)):
+    a1 = 1/(1 + torch.exp(-(w1*x + b1)))
+    a2 = 1/(1 + torch.exp(-(w2*a1 + b2)))
+    return 0.5 * (a2 - y)**2
+
+w1, b1, w2, b2 = (torch.tensor(v) for v in (0.5, 0.5, 1.5, -1.0))
+eps = 1e-5
+num_grad_w1 = (loss(w1+eps, b1, w2, b2) - loss(w1-eps, b1, w2, b2)) / (2*eps)
+
+print(num_grad_w1)   # tensor(-0.0350)  -- matches our hand-computed delta1 * x</code></pre>
+          <p class="gloss"><b>In words:</b> the numerical estimate lands on $-0.0350$, the same value we
+          derived by hand in Step&nbsp;F. That agreement is the proof our backward pass is correct. We build
+          this into a proper debugging habit in <a href="15-debugging.html">Section 15</a>.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> You will never write this by hand again</div>
+            <p>Deriving gradients by hand is how you <em>understand</em> backprop — but in practice a library
+            does it for you. <a href="13-tensors-autograd.html">Autograd (Section 13)</a> records the
+            computational graph as your forward code runs, then applies the exact local-gradient rule you
+            just used at every node, automatically. And in <a href="11-mlp-numpy.html">Section 11</a> we
+            code a full multi-layer network's backward pass from scratch in NumPy, so you see there is no
+            magic — only the bookkeeping you now understand.</p>
+          </div>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">Your backprop gradient for some weight is <code>0.4000</code>, but the centred numerical check gives <code>−0.4000</code>. What kind of bug does that specific mismatch point to?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>A <strong>sign error</strong>. When the magnitudes match but the signs are opposite, you
+                have almost certainly flipped a subtraction somewhere — a $y - a$ written as $a - y$, or a
+                gradient added where it should be subtracted (or vice-versa) in the update. It is one of the
+                most common backprop bugs, and gradient checking catches it instantly. If instead the
+                <em>magnitudes</em> were wildly different, suspect a missing local-gradient factor (forgot
+                to multiply by $a(1-a)$) or a transpose in the vectorized form.</p>
+              </div>
+            </details>
+          </div>
+
+          <hr />
+
+          <h2><span class="h-num">7</span>What to carry forward</h2>
+          <ul>
+            <li>Training needs $\partial L/\partial w$ for every weight; brute force costs one forward pass
+            <em>per weight</em> and is hopeless. Backprop gets them <strong>all</strong> in one backward
+            pass by reusing stored forward values — dynamic programming.</li>
+            <li>The <strong>computational graph</strong> is the network as nodes (operations) and edges
+            (values). Forward computes and stores values; backward computes gradients.</li>
+            <li>The <strong>local-gradient rule</strong> at every node: <em>gradient in (from above) × local
+            gradient = gradient out (to inputs)</em>. If a value feeds several nodes, sum the incoming
+            gradients.</li>
+            <li>Handy local gradients: multiply swaps its inputs; add passes gradient through unchanged;
+            sigmoid's is $a(1-a)$, free from the stored activation.</li>
+            <li>We computed a whole two-layer network by hand: forward to $L = 0.1132$, backward to four
+            gradients, one step, and the loss fell to $0.0905$ — verified in code.</li>
+            <li>Vectorized, the same rules read $\partial L/\partial\mathbf{W} = \boldsymbol{\delta}\,\mathbf{x}^{\top}$,
+            $\partial L/\partial\mathbf{b} = \boldsymbol{\delta}$, $\partial L/\partial\mathbf{x} = \mathbf{W}^{\top}\boldsymbol{\delta}$.</li>
+            <li><strong>Gradient checking</strong> — compare to $(L(w+\varepsilon)-L(w-\varepsilon))/2\varepsilon$
+            — is your safety net; a sign flip or dropped factor shows up at once.</li>
+          </ul>
+          <p>Next, in <a href="11-mlp-numpy.html">Section 11</a>, we stop doing it by hand and build a full
+          multi-layer network — forward and backward — from scratch in NumPy. You already know the one rule
+          it runs on.</p>
+
+          <div class="complete-bar" data-complete>
+            <span class="complete-bar__text">Finished this section? Mark it done to fill your progress bar.</span>
+            <button class="btn btn--primary">Mark section complete</button>
+          </div>
+
+          <nav class="pager" data-pager aria-label="Section navigation"></nav>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script defer src="../assets/vendor/katex/katex.min.js"></script>
+  <script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+  <script src="../assets/vendor/highlight/highlight.min.js"></script>
+  <script src="../assets/search-index.js"></script>
+  <script src="../assets/course.js"></script>
+</body>
+</html>

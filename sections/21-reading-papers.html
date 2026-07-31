@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <script>try{var t=localStorage.getItem("z2h-ml-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reading a Paper Like an Engineer · ML Without the Magic</title>
+  <meta name="description" content="A practical, three-pass method for extracting engineering value from a research paper — and how to apply it to the Mixture-of-Experts and Switch Transformer papers before we implement one from scratch." />
+  <link rel="stylesheet" href="../assets/vendor/fonts/fonts.css" />
+  <link rel="stylesheet" href="../assets/course.css" />
+  <link rel="stylesheet" href="../assets/vendor/katex/katex.min.css" />
+</head>
+<body data-slug="21-reading-papers">
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="nav-scrim"></div>
+  <div class="layout">
+    <aside class="sidebar" aria-label="Course navigation">
+      <div class="brand">
+        <div class="brand__kicker">Machine Learning</div>
+        <h1 class="brand__title"><a href="../index.html">Without the Magic</a></h1>
+      </div>
+      <div class="progress">
+        <div class="progress__track"><div class="progress__fill" data-progress-fill></div></div>
+        <div class="progress__label" data-progress-label></div>
+      </div>
+      <nav class="nav" data-nav aria-label="Sections"></nav>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <button class="iconbtn menubtn" data-menu aria-label="Open navigation">☰</button>
+        <div class="topbar__spacer"></div>
+        <span class="topbar__meta">Part 6 · Capstone: Paper from Scratch</span>
+        <button class="iconbtn" data-theme-toggle aria-label="Toggle theme">☾</button>
+      </div>
+
+      <main id="main" class="reading">
+        <header class="lesson-head">
+          <p class="lesson-eyebrow">Part 6 · Capstone: Paper from Scratch <span class="dot"></span> Section 21</p>
+          <h1 class="lesson-title">Reading a Paper Like an Engineer</h1>
+          <p class="lesson-standfirst">You don't need to read every word of a research paper to steal everything useful from it — you need a method, and about twenty minutes.</p>
+          <div class="lesson-meta">
+            <span><b>22 min</b> read</span>
+            <span><b>You'll learn:</b> the three-pass reading method · what to extract from any paper · dissecting an MoE / Switch Transformer paper · habits that make it stick</span>
+          </div>
+        </header>
+
+        <div class="prose">
+          <p class="lead">Most people try to read a paper the way they read a novel: start at the
+          top, plough through every sentence, and hope understanding arrives by the last page. It
+          doesn't, and worse, it's slow — you'll burn two hours on a paper's tenth-most-important
+          paragraph before you even know if the paper is relevant. Engineers read papers
+          differently: in passes, each one deeper than the last, extracting only what that pass is
+          for. This section gives you that method, then applies it to the exact papers behind our
+          capstone project.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> The one idea to hold onto</div>
+            <p>You never read a paper start to finish, once. You read it in <strong>increasing
+            passes of depth</strong> — skim, then structure, then reproduce — and you stop as soon
+            as the pass you're on has given you what you needed.</p>
+          </div>
+
+          <!-- ===================== THREE-PASS METHOD ===================== -->
+          <h2><span class="h-num">1</span>The three-pass method</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>This method has a name in the research world — it's close to what computer scientist
+          S. Keshav called "How to Read a Paper" (2007), and practicing engineers converge on
+          something like it independently. The idea: do three passes over the same document, each
+          one asking a different question and costing more time than the last. You're allowed to
+          stop after pass one if the paper turns out not to matter to you.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>You don't understand a recipe by reading it — you understand it by cooking it once.
+            Reading it first tells you what dish it is and roughly what's involved (pass one).
+            Reading it again slowly tells you the one step that will make or break the dish — say,
+            the exact moment you add the egg (pass two). Actually cooking it, once, is the only way
+            you truly learn why that step matters (pass three). Skipping straight to "make it
+            fifty times" without ever reading the recipe wastes ingredients; reading it fifty times
+            without cooking teaches you nothing your hands will remember.</p>
+          </div>
+
+          <ol>
+            <li><strong>Pass 1 — skim (about 5 minutes).</strong> Read only the title, the
+            <dfn>abstract</dfn> (the short paragraph at the top summarizing the whole paper),
+            every figure and its caption, and the conclusion. Skip the method section entirely.
+            Goal: decide what the paper claims and whether it's relevant to you at all. If you
+            can't state the paper's one-sentence claim after this pass, either the paper is poorly
+            written or you're not its intended reader — in either case, that's useful information
+            before you invest more time.</li>
+            <li><strong>Pass 2 — structure and the one key equation (30–60 minutes).</strong> Now
+            read the body, in order, but don't chase every citation or verify every derivation.
+            Note the structure: what problem section 1 sets up, what section 3 proposes, what
+            section 4 measures. Find the <em>one</em> equation that is actually load-bearing for
+            the paper's claim — usually there's a single formula everything else exists to justify
+            — and find the main architecture or results figure. Redraw that figure from memory on
+            paper; if you can't, you haven't understood it yet.</li>
+            <li><strong>Pass 3 — reproduce (hours to days, only for papers you're building on).</strong>
+            Re-derive the key equation yourself, line by line, and implement the smallest unit of
+            the method in code. Not the whole system — the one component that carries the paper's
+            actual idea. This is the pass that turns "I read it" into "I understand it," because
+            code and math don't let you fool yourself the way a nodding-along read-through does.</li>
+          </ol>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">You finish a 5-minute pass-1 skim of a paper and still can't state its main claim in one sentence. What should you do next?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Don't jump into a full pass-2 read hoping it clicks. First re-check the pass-1
+                material specifically for the claim: reread the abstract's last sentence and the
+                conclusion's first paragraph, since that's almost always where it's stated plainly.
+                If it's still unclear, that's a signal the paper may be poorly scoped for you right
+                now — check whether it assumes background you don't have, or whether it simply
+                isn't the paper you need. Either way, deciding this in 5 minutes is the entire
+                point of pass one: it's far cheaper than discovering the same thing after an hour
+                of pass two.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== WHAT TO EXTRACT ===================== -->
+          <h2><span class="h-num">2</span>What to extract from any paper</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>Regardless of the field, almost every research paper is answering the same six
+          questions. If you extract clean answers to these six, you've captured the paper's
+          engineering value even if you never touch the surrounding prose again.</p>
+
+          <ul>
+            <li><strong>The problem.</strong> What specifically didn't work before, in one
+            sentence? Not "language models are hard" — something falsifiable, like "dense models
+            need a proportional increase in compute for every increase in parameters."</li>
+            <li><strong>The key idea, in one sentence.</strong> If you can't compress the
+            contribution to one sentence, you haven't found it yet — you're still describing the
+            paper's title.</li>
+            <li><strong>The central equation.</strong> The formula that, if you deleted it, would
+            make the rest of the paper meaningless. Usually there's exactly one.</li>
+            <li><strong>The architecture diagram.</strong> The picture that shows data flowing
+            through the proposed system. If the paper has no diagram, draw one yourself from the
+            method section — it will expose anything you glossed over.</li>
+            <li><strong>The ablations</strong> — what they tell you the idea is <em>for</em>.</li>
+            <li><strong>What they don't tell you</strong> — what the idea <em>costs</em>.</li>
+          </ul>
+
+          <div class="callout definition">
+            <div class="callout__label">Definition</div>
+            <p>An <dfn>ablation</dfn> is an experiment where the authors remove or swap out one
+            single piece of their system and re-measure performance, to prove that piece was
+            actually necessary rather than incidental. ("Ablate" literally means to cut away.)</p>
+          </div>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Back to the recipe: if you want to prove the yeast is what makes bread rise, you
+            bake one loaf with yeast and one identical loaf without it, changing nothing else. The
+            flat second loaf is your ablation — it's proof, not assertion. A paper's ablation table
+            is doing exactly this: baking the same model over and over with one ingredient removed
+            each time, so you can see which ingredients were load-bearing.</p>
+          </div>
+
+          <div class="callout pitfall">
+            <div class="callout__label"><span class="ic">▲</span> Watch out</div>
+            <p>Papers report what worked. They rarely headline what it cost to get there: how many
+            failed runs preceded the reported one, how much hyperparameter tuning was needed, what
+            hardware and how much wall-clock time the "efficient" method actually used, or which
+            results didn't reproduce on a different dataset. Read the "Limitations" section if
+            there is one — it's often the most honest paragraph in the paper. If there isn't one,
+            assume the costs exist and were left out, and go looking for them in the appendix or
+            the released code.</p>
+          </div>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">A paper proposes a new component X and reports one number: "model with X gets 91% accuracy." No ablation table. What's missing, and why does it matter?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Missing is the number for "model without X, everything else identical" — without
+                that baseline, 91% tells you nothing about whether X caused it. Maybe a bigger
+                learning rate or three extra epochs would have gotten 91% anyway. An ablation isn't
+                a nice-to-have footnote; it's the actual evidence for the paper's claim. A single
+                headline number with no matched baseline is a marketing figure, not an engineering
+                one — treat it with real skepticism until you find the ablation, or run it
+                yourself.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== MOE / SWITCH ===================== -->
+          <h2><span class="h-num">3</span>Dissecting the MoE / Switch Transformer papers</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>A <strong>Mixture of Experts</strong> (MoE) model replaces one big feed-forward layer
+          with many smaller feed-forward layers, called <dfn>experts</dfn>, plus a small decision
+          maker called the <dfn>router</dfn> that picks which one or two experts handle each token.
+          The point is to grow a model's total number of parameters — its capacity to store
+          knowledge — without growing the compute spent on every single token, since each token
+          only visits a few experts instead of one enormous layer.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>A large call center has dozens of specialists — billing, technical support, returns,
+            legal — but a caller never talks to all of them. A receptionist (the router) listens to
+            the first sentence of your call and sends you to the one or two specialists (the
+            experts) most likely to solve your problem. The building can grow enormous specialist
+            capacity while any single call still only occupies one or two people's time. That
+            receptionist's judgment call is precisely what the router is learning to make.</p>
+          </div>
+
+          <p>Two papers define almost all the vocabulary you'll meet here: Shazeer et al., 2017,
+          <em>"Outrageously Large Neural Networks: The Sparsely-Gated Mixture-of-Experts Layer"</em>
+          (the modern MoE layer, with top-2 routing), and Fedus, Zoph & Shazeer, 2021,
+          <em>"Switch Transformers: Scaling to Trillion Parameter Models with Simple and Efficient
+          Sparsity"</em> (simplifies routing to top-1 and scales it into a Transformer). Four
+          things to hunt for specifically when you open either one:</p>
+
+          <div class="callout definition">
+            <div class="callout__label">Definition</div>
+            <p>The <dfn>router</dfn> is a small learned layer (usually just one linear layer plus a
+            softmax) that looks at a token's vector and outputs a probability for every expert:
+            "how suited is this token to expert 1, to expert 2, ..." Those probabilities decide
+            routing and also weight the expert's output.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>The one equation worth re-deriving from the Switch Transformer paper is the
+          <strong>auxiliary load-balancing loss</strong> — added on top of the normal training
+          loss to stop the router from lazily sending every token to the same one or two experts:</p>
+          $$ L_{\text{aux}} = \alpha \cdot N \sum_{i=1}^{N} f_i \, P_i $$
+          <p class="gloss"><b>In words:</b> <b>N</b> is the number of experts. <b>f_i</b> is the
+          fraction of tokens in the batch that actually got dispatched to expert <b>i</b>. <b>P_i</b>
+          is the average router probability the router assigned to expert <b>i</b> across the whole
+          batch (a smooth, differentiable stand-in for the routing decision, since "which expert
+          got picked" itself isn't differentiable). <b>α</b> is a small weighting constant (0.01 in
+          the paper). Multiplying two probability-like vectors this way and summing is minimized
+          exactly when both are spread evenly across experts — so minimizing this loss <em>is</em>
+          minimizing imbalance.</p>
+
+          <p>You can see why with two clean cases. With 4 experts and perfectly even routing,
+          <span style="white-space:nowrap">$f_i = P_i = 0.25$</span> for every expert:
+          <span style="white-space:nowrap">$\sum f_iP_i = 4\times(0.25\times0.25)=0.25$</span>, so
+          <span style="white-space:nowrap">$L_{\text{aux}} = \alpha\times4\times0.25 = \alpha$</span>.
+          If instead everything piles onto expert 1
+          (<span style="white-space:nowrap">$f_1=P_1=1$</span>, the rest zero):
+          <span style="white-space:nowrap">$\sum f_iP_i = 1$</span>, so
+          <span style="white-space:nowrap">$L_{\text{aux}} = \alpha\times4\times1 = 4\alpha$</span>
+          — four times higher, purely as a penalty for imbalance.</p>
+
+          <div class="callout definition">
+            <div class="callout__label">Definition</div>
+            <p>The <dfn>capacity factor</dfn> sets how many tokens each expert is allowed to
+            process in one batch: <span style="white-space:nowrap">expert capacity = (tokens per batch × experts-per-token k ÷ number of experts) × capacity factor</span>.
+            A factor of 1.0 gives each expert exactly its fair share with no slack; tokens that
+            arrive after an expert is full <em>overflow</em> — they skip that expert and pass
+            through unchanged via a residual connection instead. A higher factor (say 1.25) buys
+            headroom against uneven routing, at the cost of reserved, sometimes-wasted compute.</p>
+          </div>
+
+          <div class="callout definition">
+            <div class="callout__label">Definition</div>
+            <p><dfn>Top-k routing</dfn> means each token is sent to its <b>k</b> highest-scoring
+            experts, and their outputs are combined weighted by the router's probabilities.
+            Shazeer et al.'s original MoE layer and the GShard paper (Lepikhin et al., 2020) use
+            top-2. Switch Transformer's central bet was that <b>top-1</b> — one expert per token —
+            keeps quality nearly identical while roughly halving the compute and cross-device
+            communication, which was assumed necessary at the time.</p>
+          </div>
+
+          <p>Concrete questions to ask when you open one of these papers:</p>
+          <ul>
+            <li>How many experts, and how does the compute per token compare to a dense model with
+            the same total number of parameters?</li>
+            <li>What is <b>k</b> — top-1, top-2, more — and what's the argument for that choice?</li>
+            <li>What is the capacity factor, and what happens to tokens that overflow it?</li>
+            <li>How is <b>α</b> (the auxiliary loss weight) chosen, and what happens in their
+            ablation when it's set to zero?</li>
+            <li>Do they report dropped-token rate or routing collapse anywhere — a sign the load
+            balancing wasn't fully solved?</li>
+            <li>Is the router trained end to end with the rest of the model, or does it use any
+            fixed heuristic (e.g. hashing tokens to experts)?</li>
+          </ul>
+
+          <p>In <a href="22-moe.html">Section 22</a> we implement exactly this: a router, a small
+          set of expert feed-forward networks, and this load-balancing loss, from scratch in
+          PyTorch — so keep these six questions close, because the next section answers each one
+          in code.</p>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">With <code>N = 4</code> experts and <code>α = 0.01</code>, routing gives <code>f = P = [0.70, 0.10, 0.10, 0.10]</code>. Compute the auxiliary loss and compare it to the perfectly balanced case above.</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p><code>Σ f_i·P_i = 0.70² + 3×(0.10²) = 0.49 + 0.03 = 0.52</code>. So
+                <code>L_aux = 0.01 × 4 × 0.52 = 0.0208</code>. Compare that to the perfectly
+                balanced case computed above, <code>L_aux = α = 0.01</code>: this lopsided routing
+                costs roughly double the loss. The more concentrated the routing, the larger this
+                term grows, which is exactly the pressure that pushes the router back toward
+                spreading tokens across all four experts during training.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== HABITS ===================== -->
+          <h2><span class="h-num">4</span>Practical habits that make it stick</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>The method above tells you how to read; these three habits are what actually make the
+          understanding stay with you afterward.</p>
+
+          <ul>
+            <li><strong>Read the code alongside the paper.</strong> Most major papers now release
+            code, or a faithful reimplementation exists (search the paper's title plus "github").
+            When the prose says "we route tokens to their top-1 expert," find the three lines of
+            code that do it — code can't be vague the way prose can.</li>
+            <li><strong>Reproduce the smallest unit, not the whole system.</strong> You don't need
+            to train a trillion-parameter Switch Transformer to understand it; you need to
+            implement one router choosing among four tiny experts on made-up data. If that ten-line
+            version behaves the way the paper predicts, you've actually understood the mechanism.</li>
+            <li><strong>Keep a running note per paper</strong>: one line for the key idea, the
+            central equation copied out by hand (not pasted), and one open question you still
+            can't answer. Revisit the open questions after you've read the next paper in the
+            area — they often answer each other.</li>
+          </ul>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>If a recipe calls for a beurre blanc sauce you've never made, you don't first
+            attempt the whole seven-course dinner — you make just the sauce, once, in a small pan,
+            until you understand why it splits if the butter's too cold. Same discipline here:
+            build the router alone, on toy data, before you build the model it belongs to.</p>
+          </div>
+
+          <p class="beat beat--code">The same discipline in PyTorch</p>
+          <p class="codecap">the smallest reproducible unit: a bare top-1 router</p>
+          <pre><code class="language-python">import torch
+
+num_experts = 4
+d_model = 8
+
+router = torch.nn.Linear(d_model, num_experts)   # the whole "decision maker"
+tokens = torch.randn(5, d_model)                 # 5 toy tokens, nothing real
+
+logits = router(tokens)              # (5, 4) — one score per expert, per token
+probs = torch.softmax(logits, dim=-1)
+chosen_expert = probs.argmax(dim=-1) # (5,) — top-1 routing decision
+print(chosen_expert)                 # e.g. tensor([2, 0, 2, 3, 1])
+
+# this is the entire mechanism the papers spend pages describing —
+# section 22 wraps it with real experts and the load-balancing loss</code></pre>
+
+          <hr />
+
+          <h2><span class="h-num">5</span>What to carry forward</h2>
+          <ul>
+            <li><strong>Three passes, increasing depth</strong>: skim for relevance, read structure
+            and the one key equation, then reproduce the smallest unit to actually understand it.</li>
+            <li>Extract six things from any paper: the <strong>problem</strong>, the <strong>key
+            idea</strong> in one sentence, the <strong>central equation</strong>, the
+            <strong>architecture diagram</strong>, the <strong>ablations</strong>, and what it
+            doesn't tell you.</li>
+            <li>An <strong>ablation</strong> proves a component matters by removing it and
+            re-measuring — a headline number with no matched baseline proves nothing.</li>
+            <li>MoE vocabulary: a <strong>router</strong> scores tokens against experts, the
+            <strong>capacity factor</strong> caps how many tokens each expert can take, and
+            <strong>top-k routing</strong> (top-1 in Switch Transformer, top-2 in GShard) decides
+            how many experts see each token. The <strong>load-balancing loss</strong> penalizes
+            uneven routing.</li>
+          </ul>
+          <p>You now have the method and the vocabulary. <a href="22-moe.html">Section 22</a> is
+          where we stop reading about a Mixture of Experts and build one.</p>
+
+          <div class="complete-bar" data-complete>
+            <span class="complete-bar__text">Finished this section? Mark it done to fill your progress bar.</span>
+            <button class="btn btn--primary">Mark section complete</button>
+          </div>
+
+          <nav class="pager" data-pager aria-label="Section navigation"></nav>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script defer src="../assets/vendor/katex/katex.min.js"></script>
+  <script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+  <script src="../assets/vendor/highlight/highlight.min.js"></script>
+  <script src="../assets/search-index.js"></script>
+  <script src="../assets/course.js"></script>
+</body>
+</html>

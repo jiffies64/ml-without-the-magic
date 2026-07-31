@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <script>try{var t=localStorage.getItem("z2h-ml-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Logistic Regression · ML Without the Magic</title>
+  <meta name="description" content="The sigmoid function, decision boundaries, and binary cross-entropy — how a linear score becomes a probability, and how logistic regression learns from it." />
+  <link rel="stylesheet" href="../assets/vendor/fonts/fonts.css" />
+  <link rel="stylesheet" href="../assets/course.css" />
+  <link rel="stylesheet" href="../assets/vendor/katex/katex.min.css" />
+</head>
+<body data-slug="06-logistic-regression">
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="nav-scrim"></div>
+  <div class="layout">
+    <aside class="sidebar" aria-label="Course navigation">
+      <div class="brand">
+        <div class="brand__kicker">Machine Learning</div>
+        <h1 class="brand__title"><a href="../index.html">Without the Magic</a></h1>
+      </div>
+      <div class="progress">
+        <div class="progress__track"><div class="progress__fill" data-progress-fill></div></div>
+        <div class="progress__label" data-progress-label></div>
+      </div>
+      <nav class="nav" data-nav aria-label="Sections"></nav>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <button class="iconbtn menubtn" data-menu aria-label="Open navigation">☰</button>
+        <div class="topbar__spacer"></div>
+        <span class="topbar__meta">Part 2 · Classical ML</span>
+        <button class="iconbtn" data-theme-toggle aria-label="Toggle theme">☾</button>
+      </div>
+
+      <main id="main" class="reading">
+        <header class="lesson-head">
+          <p class="lesson-eyebrow">Part 2 · Classical ML <span class="dot"></span> Section 6</p>
+          <h1 class="lesson-title">Logistic Regression</h1>
+          <p class="lesson-standfirst">One S-shaped curve turns a raw number into a probability, and one loss function turns wrong probabilities into a clean, learnable signal.</p>
+          <div class="lesson-meta">
+            <span><b>24 min</b> read</span>
+            <span><b>You'll learn:</b> sigmoid · probabilities · decision boundaries · binary cross-entropy</span>
+          </div>
+        </header>
+
+        <div class="prose">
+          <p class="lead">Linear regression predicts a number: a price, a temperature, a score.
+          Plenty of real questions instead want a category: spam or not spam, will this patient
+          relapse or not, does this photo contain a cat. Logistic regression takes almost the exact
+          same machinery as linear regression and bends it, with one extra ingredient, into a
+          probability.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> The one idea to hold onto</div>
+            <p>Compute a plain linear score, same as linear regression. Then squash that score
+            through a curve that only ever outputs numbers between 0 and 1, so it can be read as
+            "probability of class 1." Everything else in this section is either building that curve
+            or building the loss that teaches it.</p>
+          </div>
+
+          <!-- ===================== CLASSIFICATION VS REGRESSION ===================== -->
+          <h2><span class="h-num">1</span>Classification vs. regression</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p><strong>Regression</strong> predicts a continuous number — anything on a sliding scale.
+          <strong>Classification</strong> predicts which of a fixed set of categories something
+          belongs to. The output isn't "how much," it's "which one."</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>A weather forecast does both jobs side by side. "Tomorrow's high will be 22°C" is
+            regression — a number on a continuous scale, and being off by half a degree is a small
+            mistake. "Will it rain tomorrow: yes or no" is classification — there is no
+            "half a rain," just one of two buckets, and the model's job is to say which bucket is
+            more likely.</p>
+          </div>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">Is "will this email be marked as spam?" a regression or a classification problem, and why?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Classification — the answer is one of two discrete categories (spam / not spam),
+                not a number on a continuous scale. Logistic regression is built exactly for this
+                two-category ("binary") case.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== SIGMOID ===================== -->
+          <h2><span class="h-num">2</span>The sigmoid: turning any number into a probability</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>A linear score $wx+b$ can be any real number — huge, tiny, negative, whatever the data
+          demands. But a probability has to live strictly between 0 and 1. The <strong>sigmoid
+          function</strong> is a squashing curve that takes any real number in and always returns a
+          number in that range, so we can hand it a raw linear score and get back something we're
+          allowed to call "probability."</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Think of it as a dimmer switch built to never quite reach fully off or fully on — the
+            light can get extremely dim or extremely bright, but it always stays a real, positive
+            amount of light. Or picture a student's chance of passing an exam as study hours climb:
+            near zero hours, the chance sits near 0%; past some point, a few extra hours barely move
+            the needle because it's already close to 100%. The chance rises in a smooth S-shape, never
+            quite touching 0% or 100%.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>Given any real number $z$ (called the <dfn>logit</dfn>), the sigmoid is:</p>
+          $$ \sigma(z) = \frac{1}{1+e^{-z}} $$
+          <p class="gloss"><b>In words:</b> $e^{-z}$ shrinks toward 0 as $z$ grows large and blows up
+          toward infinity as $z$ becomes very negative. So the whole fraction crawls toward
+          $1/(1+0)=1$ for large positive $z$, and toward $1/(1+\infty)\approx 0$ for very negative $z$
+          — exactly the squashing behavior we wanted.</p>
+
+          <p>Two properties worth deriving, because we'll lean on both later. First, the midpoint:</p>
+          $$ \sigma(0) = \frac{1}{1+e^{0}} = \frac{1}{1+1} = \frac12 $$
+          <p class="gloss"><b>In words:</b> a logit of exactly zero maps to a probability of exactly
+          one-half — total uncertainty, the tipping point of the curve.</p>
+
+          <p>Second, the sigmoid's derivative — needed later to derive the cross-entropy gradient.
+          Rewrite $\sigma(z)=(1+e^{-z})^{-1}$ and apply the chain rule:</p>
+          $$
+          \begin{aligned}
+          \frac{d\sigma}{dz} &= -(1+e^{-z})^{-2}\cdot(-e^{-z}) \\
+          &= \frac{e^{-z}}{(1+e^{-z})^2} \\
+          &= \frac{1}{1+e^{-z}}\cdot\frac{e^{-z}}{1+e^{-z}} \\
+          &= \sigma(z)\big(1-\sigma(z)\big)
+          \end{aligned}
+          $$
+          <p class="gloss"><b>In words:</b> the last line uses the fact that
+          $1-\sigma(z) = \tfrac{e^{-z}}{1+e^{-z}}$ (subtract the fraction from 1 and simplify). So the
+          slope of the sigmoid at any point is just $\sigma(z)$ times $(1-\sigma(z))$ — a tidy
+          self-referential formula that's largest at $z=0$ (where the curve is steepest) and shrinks
+          toward 0 at either extreme (where the curve is nearly flat).</p>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <pre><code class="language-python">import torch
+
+z = torch.tensor([-5.0, 0.0, 5.0])
+print(torch.sigmoid(z))   # tensor([0.0067, 0.5000, 0.9933])</code></pre>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">What is σ(0), and why does that make it the natural cutoff for the decision boundary?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>σ(0) = 0.5 exactly. Since a probability of 0.5 is the point of maximum
+                uncertainty (equally likely to be either class), the logit value that produces it —
+                z = 0 — is the natural line between "lean toward class 1" and "lean toward class 0."</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== DECISION BOUNDARY ===================== -->
+          <h2><span class="h-num">3</span>From logit to probability to decision boundary</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>Logistic regression computes the same linear score as linear regression, then passes it
+          through the sigmoid. The point where the model flips from predicting "class 0" to
+          predicting "class 1" turns out to be a perfectly straight line (or flat plane, in higher
+          dimensions) — nothing curvy about where the decision itself is made.</p>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>The score, called the logit, is exactly linear regression's formula:</p>
+          $$ z = \mathbf{w}^\top\mathbf{x} + b $$
+          <p>Pass it through the sigmoid to get a probability of belonging to class 1:</p>
+          $$ p = \sigma(z) = \frac{1}{1+e^{-(\mathbf{w}^\top\mathbf{x}+b)}} $$
+          <p class="gloss"><b>In words:</b> $z$ can be any real number depending on $x$; $p$ is that
+          number squashed into a genuine probability between 0 and 1.</p>
+
+          <p>The prediction rule is: predict class 1 when $p\ge 0.5$. Because
+          $\sigma'(z)=\sigma(z)(1-\sigma(z))\ge 0$ everywhere, the sigmoid is non-decreasing —
+          it never turns downward — and we showed $\sigma(0)=\tfrac12$. Combining those two facts:</p>
+          $$ p \ge \tfrac12 \iff \sigma(z)\ge\sigma(0) \iff z\ge 0 \iff \mathbf{w}^\top\mathbf{x}+b\ge 0 $$
+          <p class="gloss"><b>In words:</b> because the sigmoid only ever goes up (or stays flat) as
+          $z$ increases, and it crosses exactly one-half at $z=0$, asking "is the probability at least
+          a half" is exactly the same question as "is the raw logit non-negative." The messy curved
+          probability threshold reduces to a simple straight-line threshold on the underlying score.</p>
+
+          <p>The boundary itself — where the model is perfectly on the fence, $p$ exactly $0.5$ — is
+          the set of points where $\mathbf{w}^\top\mathbf{x}+b=0$. With two features $x_1,x_2$ this
+          rearranges into the equation of a straight line:</p>
+          $$ w_1x_1+w_2x_2+b=0 \;\;\Longrightarrow\;\; x_2 = -\frac{w_1}{w_2}x_1 - \frac{b}{w_2} $$
+          <p class="gloss"><b>In words:</b> that's just $y=mx+c$ in disguise, with slope
+          $-w_1/w_2$ and intercept $-b/w_2$. With three features it would be a flat plane instead of a
+          line; with more, a flat <em>hyperplane</em> — but always flat, never curved, no matter how
+          curved the probability surface around it looks.</p>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">With w = [2, −1] and b = −3, is the point x = [2, 1] on the decision boundary, and which class does it favor?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>z = (2)(2) + (−1)(1) + (−3) = 4 − 1 − 3 = 0. Since z = 0, this point sits exactly
+                on the decision boundary — σ(0) = 0.5, so the model is perfectly torn between the two
+                classes, favoring neither.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== LOSS ===================== -->
+          <h2><span class="h-num">4</span>The loss: binary cross-entropy</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>You might guess we'd reuse Mean Squared Error on the probability output — predicted
+          probability minus true label, squared. It turns out that choice quietly breaks
+          optimization. Instead, classification uses <strong>binary cross-entropy</strong>, a loss
+          built specifically for comparing probabilities.</p>
+
+          <div class="callout definition">
+            <div class="callout__label">Definition</div>
+            <p>A function is <dfn>convex</dfn> when its graph is bowl-shaped: exactly one lowest point,
+            with the surface sloping downward toward it from every direction and no other dips or flat
+            plateaus to get stuck in. Gradient descent is guaranteed to find the true minimum of a
+            convex loss; on a non-convex loss it can stall on a flat shelf or a false valley.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>Here is exactly why squared error misbehaves on top of a sigmoid. Let
+          $L_{sq}=(\hat y - y)^2$ with $\hat y=\sigma(z)$. By the chain rule (Section 2), using
+          the sigmoid's own derivative $\sigma'(z)=\hat y(1-\hat y)$ from earlier in this section:</p>
+          $$ \frac{\partial L_{sq}}{\partial z} = 2(\hat y-y)\,\sigma'(z) = 2(\hat y - y)\,\hat y(1-\hat y) $$
+          <p class="gloss"><b>In words:</b> the gradient carries a factor of $\hat y(1-\hat y)$, the
+          sigmoid's own slope. Suppose the true label is $y=1$ but the model is confidently — and
+          badly — wrong, predicting $\hat y\approx 0$ (a very negative logit). Then
+          $\hat y(1-\hat y)\approx 0\times 1 = 0$, so the <em>entire gradient collapses to nearly
+          zero</em> — right when the model most needs a large correction. That vanishing signal on
+          confidently-wrong predictions is what makes squared error's loss surface here riddled with
+          near-flat shelves instead of one clean bowl: exactly the non-convexity described above.</p>
+
+          <p>Binary cross-entropy fixes this. For a true label $y\in\{0,1\}$ and predicted probability
+          $\hat y=\sigma(z)$ (see <a href="04-information-theory.html">Section 4</a> for where
+          cross-entropy comes from more generally):</p>
+          $$ L(\hat y, y) = -\big[y\log \hat y + (1-y)\log(1-\hat y)\big] $$
+          <p class="gloss"><b>In words:</b> exactly one of the two bracketed terms is "active" for any
+          given example — if $y=1$ the loss is $-\log\hat y$ (small when $\hat y$ is close to 1, and
+          shoots toward infinity as $\hat y\to 0$); if $y=0$ it's $-\log(1-\hat y)$ (small when $\hat y$
+          is close to 0, exploding as $\hat y\to 1$). Being confidently wrong is now punished by an
+          unboundedly growing loss, not a shrinking gradient.</p>
+
+          <p>Now derive its gradient with respect to the logit $z$, step by step. First differentiate
+          with respect to $\hat y$:</p>
+          $$
+          \begin{aligned}
+          \frac{\partial L}{\partial \hat y} &= -\frac{y}{\hat y} + \frac{1-y}{1-\hat y} \\
+          &= \frac{-y(1-\hat y) + (1-y)\hat y}{\hat y(1-\hat y)} \\
+          &= \frac{-y+y\hat y+\hat y-y\hat y}{\hat y(1-\hat y)} \\
+          &= \frac{\hat y - y}{\hat y(1-\hat y)}
+          \end{aligned}
+          $$
+          <p>Then apply the chain rule through $\hat y=\sigma(z)$, using $\partial\hat y/\partial z=\hat y(1-\hat y)$:</p>
+          $$ \frac{\partial L}{\partial z} = \frac{\partial L}{\partial \hat y}\cdot\frac{\partial \hat y}{\partial z}
+             = \frac{\hat y-y}{\hat y(1-\hat y)}\cdot \hat y(1-\hat y) = \hat y - y $$
+          <p class="gloss"><b>In words:</b> the messy $\hat y(1-\hat y)$ terms cancel exactly, leaving
+          the cleanest possible gradient: predicted probability minus true label. No vanishing, no
+          exploding — just a signal directly proportional to how wrong the prediction is.</p>
+
+          <p>Finally, since $z=\mathbf{w}^\top\mathbf{x}+b$, we have $\partial z/\partial w_j = x_j$, so
+          by the chain rule one more time:</p>
+          $$ \frac{\partial L}{\partial \mathbf{w}} = (\hat y - y)\,\mathbf{x}, \qquad \frac{\partial L}{\partial b} = \hat y - y $$
+          <p class="gloss"><b>In words:</b> the gradient with respect to each weight is (error) ×
+          (that feature's value) — the exact same clean shape as linear regression's gradient, even
+          though we started from a completely different loss. This is why logistic regression's
+          training loop looks almost identical to linear regression's.</p>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">True label y = 1, model predicts ŷ = 0.2 (confidently wrong). What is ∂L/∂z, and which direction does gradient descent push the logit?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>∂L/∂z = ŷ − y = 0.2 − 1 = −0.8. Gradient descent updates z (indirectly, through w
+                and b) by subtracting a positive multiple of this gradient, so z moves by
+                −(−0.8)·(something positive) = a positive amount — the logit is pushed <em>up</em>,
+                which pushes ŷ toward 1, correcting the mistake. A more confidently wrong prediction
+                (say ŷ = 0.01) gives an even larger-magnitude gradient (−0.99), a bigger correction —
+                exactly the opposite of the vanishing-gradient problem squared error had.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== CODE ===================== -->
+          <h2><span class="h-num">5</span>Training logistic regression in PyTorch</h2>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <pre><code class="language-python">import torch
+import torch.nn as nn
+
+X = torch.tensor([[2.0], [4.0], [6.0], [8.0]])   # hours studied
+y = torch.tensor([0., 0., 1., 1.])                # failed / passed
+
+w = torch.zeros(1, requires_grad=True)
+b = torch.zeros(1, requires_grad=True)
+lr = 0.1
+
+# BCEWithLogitsLoss combines sigmoid + binary cross-entropy in one numerically
+# stable call -- computing log(sigmoid(z)) directly avoids log(0) errors
+loss_fn = nn.BCEWithLogitsLoss()
+
+for step in range(1000):
+    z = X.squeeze() * w + b        # the logit -- do NOT apply sigmoid before this loss
+    loss = loss_fn(z, y)
+
+    loss.backward()
+    with torch.no_grad():
+        w -= lr * w.grad
+        b -= lr * b.grad
+        w.grad.zero_()
+        b.grad.zero_()
+
+probs = torch.sigmoid(X.squeeze() * w + b)   # convert logits to probabilities for reporting
+print(probs, loss.item())</code></pre>
+
+          <div class="callout pitfall">
+            <div class="callout__label"><span class="ic">▲</span> Watch out</div>
+            <p>Don't apply <code>torch.sigmoid</code> yourself and then feed the result into
+            <code>nn.BCELoss</code> if you can instead use <code>nn.BCEWithLogitsLoss</code> directly on
+            the raw logit — the combined version is numerically stable (it never actually computes
+            $\log(0)$ even when the sigmoid saturates near 0 or 1), while doing the two steps separately
+            can silently produce <code>nan</code> losses on confidently wrong predictions.</p>
+          </div>
+
+          <hr />
+
+          <h2><span class="h-num">6</span>What to carry forward</h2>
+          <ul>
+            <li><strong>Classification</strong> predicts a category, not a number; logistic
+            regression handles the two-category case.</li>
+            <li>The <strong>sigmoid</strong> $\sigma(z)=1/(1+e^{-z})$ squashes any real logit into a
+            valid probability, with $\sigma(0)=0.5$ and derivative $\sigma(z)(1-\sigma(z))$.</li>
+            <li>The <strong>decision boundary</strong> ($p=0.5$) is exactly where the logit
+            $\mathbf{w}^\top\mathbf{x}+b$ crosses zero — always flat, a line or hyperplane.</li>
+            <li><strong>Binary cross-entropy</strong> replaces squared error because squared error's
+            gradient vanishes on confidently-wrong predictions; cross-entropy's gradient simplifies
+            cleanly to $(\hat y-y)\mathbf{x}$.</li>
+          </ul>
+          <p>Back in <a href="05-linear-regression.html">Section 5</a> we solved a regression
+          problem two ways; here we saw the same hypothesis-loss-optimization triad reused for
+          classification, just with a squashing function and a different loss.</p>
+
+          <div class="complete-bar" data-complete>
+            <span class="complete-bar__text">Finished this section? Mark it done to fill your progress bar.</span>
+            <button class="btn btn--primary">Mark section complete</button>
+          </div>
+
+          <nav class="pager" data-pager aria-label="Section navigation"></nav>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script defer src="../assets/vendor/katex/katex.min.js"></script>
+  <script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+  <script src="../assets/vendor/highlight/highlight.min.js"></script>
+  <script src="../assets/search-index.js"></script>
+  <script src="../assets/course.js"></script>
+</body>
+</html>

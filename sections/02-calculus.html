@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <script>try{var t=localStorage.getItem("z2h-ml-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calculus for ML · ML Without the Magic</title>
+  <meta name="description" content="Derivatives, partial derivatives, the gradient, gradient descent, and the chain rule — the calculus that powers backpropagation and lets a model learn." />
+  <link rel="stylesheet" href="../assets/vendor/fonts/fonts.css" />
+  <link rel="stylesheet" href="../assets/course.css" />
+  <link rel="stylesheet" href="../assets/vendor/katex/katex.min.css" />
+</head>
+<body data-slug="02-calculus">
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="nav-scrim"></div>
+  <div class="layout">
+    <aside class="sidebar" aria-label="Course navigation">
+      <div class="brand">
+        <div class="brand__kicker">Machine Learning</div>
+        <h1 class="brand__title"><a href="../index.html">Without the Magic</a></h1>
+      </div>
+      <div class="progress">
+        <div class="progress__track"><div class="progress__fill" data-progress-fill></div></div>
+        <div class="progress__label" data-progress-label></div>
+      </div>
+      <nav class="nav" data-nav aria-label="Sections"></nav>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <button class="iconbtn menubtn" data-menu aria-label="Open navigation">☰</button>
+        <div class="topbar__spacer"></div>
+        <span class="topbar__meta">Part 1 · Math Foundations</span>
+        <button class="iconbtn" data-theme-toggle aria-label="Toggle theme">☾</button>
+      </div>
+
+      <main id="main" class="reading">
+        <header class="lesson-head">
+          <p class="lesson-eyebrow">Part 1 · Math Foundations <span class="dot"></span> Section 2</p>
+          <h1 class="lesson-title">Calculus for ML</h1>
+          <p class="lesson-standfirst">The chain rule is not a dusty calculus footnote. It <em>is</em> backpropagation — the exact rule that lets a network of millions of numbers figure out how to improve itself.</p>
+          <div class="lesson-meta">
+            <span><b>32 min</b> read</span>
+            <span><b>You'll learn:</b> derivatives · partial derivatives · gradients · the chain rule</span>
+          </div>
+        </header>
+
+        <div class="prose">
+          <p class="lead">Last section we learned to <em>represent</em> data as vectors and to push it
+          through matrices. But a model that never changes is useless. Learning means nudging the numbers
+          inside those matrices, over and over, in the direction that makes the model a little less wrong.
+          Calculus is the mathematics of <strong>change</strong> — it is the tool that tells us which way,
+          and how hard, to nudge. This one section contains the single most important idea in the whole
+          course, so we'll go slowly and derive everything.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> The one idea to hold onto</div>
+            <p>A <strong>derivative</strong> tells you which way to push a number to make an output go up or
+            down. A neural network learns by asking, for every one of its numbers, “if I wiggle you a tiny
+            bit, does the error get better or worse?” — then wiggling accordingly. That question is a
+            derivative, and answering it efficiently for millions of numbers at once is the entire trick
+            behind training. Everything below builds to that.</p>
+          </div>
+
+          <!-- ===================== DERIVATIVES ===================== -->
+          <h2><span class="h-num">1</span>Derivatives: the slope at a single instant</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>A <strong>derivative</strong> measures how fast something is changing <em>right now</em>. If
+          a quantity <span style="white-space:nowrap">$y$</span> depends on an input
+          <span style="white-space:nowrap">$x$</span>, the derivative answers: “if I increase
+          <span style="white-space:nowrap">$x$</span> by a tiny amount, how much does
+          <span style="white-space:nowrap">$y$</span> move, and in which direction?” Geometrically it is
+          the <strong>slope</strong> of the curve at one point — how steeply it rises or falls at that exact
+          spot. A positive slope means “going up”; a negative slope means “going down”; a slope of zero
+          means “flat, for a moment.”</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Look at your car's <strong>speedometer</strong>. The odometer tells you total distance
+            travelled; the speedometer tells you how fast that distance is changing <em>at this instant</em>
+            — that is a derivative. Sixty km/h means “if this instant held, you'd cover 60 km in the next
+            hour.” You don't have to wait an hour to know your speed now; the derivative reads the rate of
+            change in the moment. Speed is the derivative of distance.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>Here is the honest problem. Slope is “rise over run” — change in output divided by change in
+          input — but at a <em>single point</em> there is no run to divide by. The clever fix: measure the
+          slope over a tiny step of width <span style="white-space:nowrap">$h$</span>, then shrink
+          <span style="white-space:nowrap">$h$</span> toward zero and see what number the slope settles on.
+          That settling-down process is a <dfn>limit</dfn> (the value an expression approaches as you push
+          a variable toward something). This gives the definition of the derivative:</p>
+          $$ f'(x) \;=\; \lim_{h \to 0} \frac{f(x+h) - f(x)}{h} $$
+          <p class="gloss"><b>In words:</b> take two points on the curve a tiny distance
+          <b>h</b> apart — one at <b>x</b>, one at <b>x + h</b>. The fraction is (change in output) ÷
+          (change in input): the slope of the little line joining them. As <b>h</b> shrinks to nothing
+          (<b>h → 0</b>), that little line hugs the curve tighter and tighter, until its slope becomes the
+          slope <em>at the single point</em> <b>x</b>. The result <b>f'(x)</b> (read “f-prime of x”) is the
+          derivative.</p>
+
+          <p>Let's actually compute one from scratch, so the limit stops being abstract. Take
+          <span style="white-space:nowrap">$f(x) = x^2$</span> and grind the definition:</p>
+          $$ \begin{aligned}
+            f'(x) &= \lim_{h \to 0} \frac{(x+h)^2 - x^2}{h} \\[4pt]
+                  &= \lim_{h \to 0} \frac{x^2 + 2xh + h^2 - x^2}{h} \\[4pt]
+                  &= \lim_{h \to 0} \frac{2xh + h^2}{h} \\[4pt]
+                  &= \lim_{h \to 0} \, (2x + h) \\[4pt]
+                  &= 2x
+          \end{aligned} $$
+          <p class="gloss"><b>In words:</b> we expanded <b>(x + h)²</b>, the two lone <b>x²</b> terms
+          cancelled, then we divided every surviving term by <b>h</b>. That left <b>2x + h</b>. Now let
+          <b>h</b> fall to zero and the leftover <b>h</b> simply vanishes, leaving <b>2x</b>. So the slope
+          of <b>x²</b> at any point is <b>2x</b>: at <b>x = 3</b> the curve rises with slope <b>6</b>; at
+          <b>x = 0</b> the slope is <b>0</b> (the bottom of the bowl, momentarily flat). We didn't guess —
+          we derived it.</p>
+
+          <div class="callout definition">
+            <div class="callout__label">Definition</div>
+            <p>The <dfn>derivative</dfn> of a function is another function that reports the original's slope
+            at every point. We write it <span style="white-space:nowrap">$f'(x)$</span> or
+            <span style="white-space:nowrap">$\frac{df}{dx}$</span> (read “dee-f dee-x”), which literally
+            means “a tiny change in <b>f</b> per tiny change in <b>x</b>.” Both notations mean the same
+            thing.</p>
+          </div>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <p>PyTorch never runs the limit by hand — it applies known rules like our
+          <span style="white-space:nowrap">$2x$</span> automatically. You mark an input as something to
+          track, compute an output, and call <code>.backward()</code> to get the derivative:</p>
+          <p class="codecap">the derivative of x² at x = 3</p>
+          <pre><code class="language-python">import torch
+
+x = torch.tensor(3.0, requires_grad=True)   # "watch this number"
+y = x ** 2                                   # f(x) = x^2
+
+y.backward()                                 # compute df/dx at x = 3
+print(x.grad)                                # tensor(6.)  -> 2*x = 2*3 = 6</code></pre>
+          <p class="gloss"><b>In words:</b> <code>requires_grad=True</code> tells PyTorch to remember how
+          <b>y</b> was built from <b>x</b>. <code>backward()</code> walks that record and fills
+          <code>x.grad</code> with the derivative — exactly the <b>2x = 6</b> we derived. You'll rarely
+          differentiate by hand again, but you must know what the machine is computing.</p>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">Using the limit definition, what is the derivative of the constant function <code>f(x) = 5</code>? What does the answer mean?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Plug in: <code>f(x + h) = 5</code> and <code>f(x) = 5</code>, so the top of the fraction
+                is <code>5 − 5 = 0</code>. That gives <code>0 / h = 0</code> for every non-zero
+                <code>h</code>, so the limit is <strong>0</strong>. Meaning: a flat, horizontal line has
+                slope zero everywhere — a constant never changes, so its rate of change is nothing. This is
+                why <em>bias</em> terms don't affect the slope with respect to an input, and why constants
+                drop out when you differentiate.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== PARTIAL DERIVATIVES ===================== -->
+          <h2><span class="h-num">2</span>Partial derivatives: change one input, freeze the rest</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>Real models don't depend on a single number — they depend on thousands. A function like
+          <span style="white-space:nowrap">$f(x, y)$</span> has two inputs, and “the slope” is ambiguous:
+          slope as we change <span style="white-space:nowrap">$x$</span>, or as we change
+          <span style="white-space:nowrap">$y$</span>? A <strong>partial derivative</strong> answers one at
+          a time. It measures how the output changes as you nudge <em>one single input</em>, while holding
+          all the others perfectly still. Nothing new to fear — it's the ordinary derivative from the start of this section,
+          just with everything except the chosen variable treated as a frozen constant.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Your shower has two taps: <strong>hot</strong> and <strong>cold</strong>. The water
+            temperature depends on both. To learn what the hot tap alone does, you leave the cold tap
+            exactly where it is and turn only the hot one, feeling how the temperature responds. That is a
+            partial derivative: the effect of one input while the other is held fixed. Turn only the cold
+            tap instead and you're measuring the other partial. Each tap has its own separate influence, and
+            you probe them one at a time.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>We swap the straight <span style="white-space:nowrap">$d$</span> for a curly
+          <span style="white-space:nowrap">$\partial$</span> (“partial”) to signal “there are other inputs,
+          but I'm holding them still.” To take
+          <span style="white-space:nowrap">$\frac{\partial f}{\partial x}$</span>, treat every other
+          variable as a plain number. Take
+          <span style="white-space:nowrap">$f(x, y) = x^2 y + 3y$</span>:</p>
+          $$ \frac{\partial f}{\partial x} = 2xy, \qquad \frac{\partial f}{\partial y} = x^2 + 3 $$
+          <p class="gloss"><b>In words:</b> for
+          <b>∂f/∂x</b> we treat <b>y</b> as a frozen constant. Then <b>x²y</b> differentiates like
+          <b>(constant)·x²</b>, giving <b>2xy</b>, and the <b>3y</b> term has no <b>x</b> in it at all, so
+          it's constant and drops to zero. For <b>∂f/∂y</b> we freeze <b>x</b> instead: <b>x²y</b> is
+          <b>(constant)·y</b>, whose slope in <b>y</b> is just that constant <b>x²</b>, and <b>3y</b>
+          contributes <b>3</b>. Same rules as before — only one variable moves at a time.</p>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">two partials at once</p>
+          <pre><code class="language-python">import torch
+
+x = torch.tensor(2.0, requires_grad=True)
+y = torch.tensor(5.0, requires_grad=True)
+
+f = x**2 * y + 3*y        # f(x, y) = x^2 * y + 3y
+f.backward()              # fills in BOTH partials
+
+print(x.grad)   # tensor(20.)  -> 2*x*y = 2*2*5 = 20
+print(y.grad)   # tensor(7.)   -> x^2 + 3 = 4 + 3 = 7</code></pre>
+          <p class="gloss"><b>In words:</b> one call to <code>backward()</code> computes the partial with
+          respect to every tracked input in a single sweep. That's the whole reason training is feasible:
+          the machine gets the influence of <em>all</em> the knobs together, not one slow experiment per
+          knob.</p>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">For <code>f(x, y) = 4x + y³</code>, what is <code>∂f/∂x</code>? Why does the <code>y³</code> term disappear?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p><code>∂f/∂x = 4</code>. When we differentiate with respect to <code>x</code>, we freeze
+                <code>y</code> — so <code>y³</code> is just some fixed constant number, and the derivative
+                of any constant is zero (we saw this at the start of this section). The <code>4x</code> term has slope
+                <code>4</code> in <code>x</code>. So <code>∂f/∂x = 4</code>. The <code>y³</code> term only
+                shows up if you ask for <code>∂f/∂y</code>, which would be <code>3y²</code>.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== GRADIENT ===================== -->
+          <h2><span class="h-num">3</span>The gradient: the direction of steepest climb</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>If a function has many inputs, collect <em>all</em> its partial derivatives into one vector.
+          That vector is the <strong>gradient</strong>, written
+          <span style="white-space:nowrap">$\nabla f$</span> (the symbol
+          <span style="white-space:nowrap">$\nabla$</span> is called “nabla” or just “del”). The gradient is
+          more than bookkeeping: it points in the direction where the function <strong>increases
+          fastest</strong>, and its length says how steep that increase is. Flip its sign and you get the
+          direction of steepest <em>decrease</em> — which, when the function is our error, is exactly the
+          way we want to move.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>You're on a mountainside in <strong>thick fog</strong>, trying to get down. You can't see the
+            valley, but you can feel the ground under your feet. You sense which way tilts most steeply
+            downward, take a step that way, then feel again and repeat. The steepest direction under your
+            feet is the (negative) gradient; the fog is your model's ignorance of the whole landscape. You
+            never see the map — you only ever feel the local slope, and that is enough to walk downhill.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>For a function of <span style="white-space:nowrap">$n$</span> inputs, the gradient is the
+          column of every partial derivative, one per input:</p>
+          $$ \nabla f = \begin{bmatrix} \dfrac{\partial f}{\partial x_1} \\[8pt] \dfrac{\partial f}{\partial x_2} \\[4pt] \vdots \\[4pt] \dfrac{\partial f}{\partial x_n} \end{bmatrix} $$
+          <p class="gloss"><b>In words:</b> slot <b>i</b> of the gradient is “how much the output changes
+          when I nudge input <b>i</b>.” Stacked together, these slots form an arrow in input-space. That
+          arrow aims at the fastest uphill direction — big values mean inputs that matter a lot right now,
+          near-zero values mean inputs that barely move the output at this point.</p>
+
+          <div class="callout definition">
+            <div class="callout__label">Definition</div>
+            <p><dfn>Gradient descent</dfn> is the recipe for minimizing a function: from wherever you stand,
+            compute the gradient, then take a small step in the <em>opposite</em> direction (downhill).
+            Repeat. Because the negative gradient is the steepest way down, each step lowers the value a
+            little, and enough steps carry you toward a minimum. In ML the function being minimized is the
+            <dfn>loss</dfn> (a number measuring how wrong the model is — smaller is better), so descending it
+            means the model gets better.</p>
+          </div>
+
+          <p>The step itself is one short update rule, applied again and again:</p>
+          $$ \theta \;\leftarrow\; \theta - \alpha\,\nabla L $$
+          <p class="gloss"><b>In words:</b> <b>θ</b> (“theta”) stands for the model's parameters — all the
+          numbers inside those weight matrices from Section 1. <b>∇L</b> is the gradient of the loss <b>L</b>
+          with respect to those parameters: the uphill-toward-more-error direction. We subtract it, so we
+          move toward <em>less</em> error. <b>α</b> (“alpha”) is the <dfn>learning rate</dfn>: a small
+          positive number setting how big each step is. The arrow <b>←</b> means “compute the right side,
+          then overwrite <b>θ</b> with it.” Do this thousands of times and the parameters drift to values
+          that make the loss small.</p>
+
+          <div class="callout pitfall">
+            <div class="callout__label"><span class="ic">▲</span> Watch out</div>
+            <p>The learning rate <span style="white-space:nowrap">$\alpha$</span> is the step size, and it
+            is delicate. Too <strong>small</strong> and training crawls — thousands of tiny steps to get
+            anywhere. Too <strong>large</strong> and you overshoot the valley on every step, bouncing from
+            wall to wall or flying off to infinity (the loss becomes <code>NaN</code> — “not a number”).
+            Picking <span style="white-space:nowrap">$\alpha$</span> is the first knob you'll tune on almost
+            every model.</p>
+          </div>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">gradient descent on f(x) = x², walking to the bottom</p>
+          <pre><code class="language-python">import torch
+
+x = torch.tensor(10.0, requires_grad=True)   # start far from the minimum
+lr = 0.1                                      # learning rate (alpha)
+
+for step in range(5):
+    loss = x ** 2                 # we want to minimize this
+    loss.backward()              # grad = df/dx = 2x
+    with torch.no_grad():        # don't track the update itself
+        x -= lr * x.grad         # theta <- theta - alpha * grad
+    x.grad.zero_()               # clear grad before the next step
+    print(f"x = {x.item():.4f}")
+
+# x marches 10 -> 8 -> 6.4 -> ... toward 0, the minimum of x^2</code></pre>
+          <p class="gloss"><b>In words:</b> each loop reads the slope at the current spot, steps against it
+          by <code>lr * grad</code>, and the value slides down the bowl toward zero. Clearing
+          <code>x.grad</code> matters because PyTorch <em>adds</em> new gradients onto old ones; forget it
+          and last step's slope contaminates this one.</p>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">You're minimizing a loss and the gradient with respect to a weight is <code>+4</code>. With learning rate <code>0.1</code>, does the weight go up or down, and by how much?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>The update is <code>θ ← θ − α·∇L = θ − 0.1·(+4) = θ − 0.4</code>. The weight goes
+                <strong>down by 0.4</strong>. A positive gradient means “increasing this weight increases
+                the loss,” so to reduce the loss we push the weight the other way — downward. The minus sign
+                in the update rule is precisely what turns “which way is uphill” into “step downhill.”</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== CHAIN RULE ===================== -->
+          <h2><span class="h-num">4</span>The chain rule: this is backpropagation</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>Neural networks are <strong>compositions</strong>: functions wrapped inside functions inside
+          functions. The input feeds layer 1, whose output feeds layer 2, whose output feeds layer 3, and
+          so on to the loss at the end. To train, we need the derivative of that final loss with respect to
+          a weight buried deep inside — many layers away from the output. The <strong>chain rule</strong> is
+          the tool that reaches back through the whole stack. Its idea is beautifully simple: the derivative
+          of a chain of functions is the <em>product</em> of the little derivatives along the chain. Each
+          link contributes its own local rate, and you multiply them together.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>You're changing money: <strong>US dollars → euros → pounds</strong>. Say 1 dollar buys 0.9
+            euros, and 1 euro buys 0.85 pounds. How many pounds does 1 extra dollar get you? You
+            <em>multiply</em> the rates: <code>0.9 × 0.85 = 0.765</code> pounds per dollar. Each conversion
+            is a link in a chain, and the overall rate is the product of the link rates. Gears mesh the same
+            way: if one gear turns twice as fast as the next, and that one twice as fast as the last, the
+            first spins four times the last — rates multiply along the chain. That multiplying-of-rates
+            <strong>is</strong> the chain rule.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>Suppose <span style="white-space:nowrap">$y$</span> depends on
+          <span style="white-space:nowrap">$u$</span>, and <span style="white-space:nowrap">$u$</span>
+          depends on <span style="white-space:nowrap">$x$</span> — a two-link chain
+          <span style="white-space:nowrap">$x \to u \to y$</span>. The chain rule says:</p>
+          $$ \frac{dy}{dx} = \frac{dy}{du}\cdot\frac{du}{dx} $$
+          <p class="gloss"><b>In words:</b> “how <b>y</b> changes as <b>x</b> moves” equals “how <b>y</b>
+          changes as <b>u</b> moves” times “how <b>u</b> changes as <b>x</b> moves.” The middle variable
+          <b>u</b> cancels visually, like a fraction — a handy way to remember it. Each factor is a
+          <em>local</em> derivative, easy on its own; the chain rule glues them by multiplication.</p>
+
+          <p>Let's work a full single-variable example. Take
+          <span style="white-space:nowrap">$y = (3x + 1)^2$</span>. We split it into the inner and outer
+          pieces:</p>
+          $$ u = 3x + 1, \qquad y = u^2 $$
+          <p>Now the two local derivatives, each trivial on its own:</p>
+          $$ \frac{dy}{du} = 2u, \qquad \frac{du}{dx} = 3 $$
+          <p>Multiply them, then substitute <span style="white-space:nowrap">$u = 3x+1$</span> back in:</p>
+          $$ \begin{aligned}
+            \frac{dy}{dx} &= \frac{dy}{du}\cdot\frac{du}{dx} \\[4pt]
+                          &= 2u \cdot 3 \\[4pt]
+                          &= 6u \\[4pt]
+                          &= 6(3x + 1) \\[4pt]
+                          &= 18x + 6
+          \end{aligned} $$
+          <p class="gloss"><b>In words:</b> we found the outer function's slope (<b>2u</b>, the derivative
+          of a square), the inner function's slope (<b>3</b>, the derivative of <b>3x + 1</b>), and
+          <em>multiplied</em> them. Then we put <b>u = 3x + 1</b> back so the answer is in terms of the
+          original <b>x</b>. We can check it: expanding <b>(3x + 1)² = 9x² + 6x + 1</b>, whose ordinary
+          derivative is <b>18x + 6</b> — a perfect match. The chain rule gave the same answer without ever
+          expanding the square.</p>
+
+          <h3>The multivariable chain rule: sum over every path</h3>
+          <p>In a network a variable usually influences the output through <em>several</em> routes at once.
+          When that happens, the chain rule gains one addition: differentiate along each path, then
+          <strong>add the paths up</strong>. If <span style="white-space:nowrap">$L$</span> depends on
+          <span style="white-space:nowrap">$a$</span> and <span style="white-space:nowrap">$b$</span>, and
+          both of those depend on <span style="white-space:nowrap">$x$</span>:</p>
+          $$ \frac{dL}{dx} = \frac{\partial L}{\partial a}\cdot\frac{da}{dx} \;+\; \frac{\partial L}{\partial b}\cdot\frac{db}{dx} $$
+          <p class="gloss"><b>In words:</b> <b>x</b> reaches <b>L</b> two ways — through <b>a</b> and
+          through <b>b</b>. Each route is a chain-rule product (multiply the rates along it), and because
+          both routes carry influence, we <em>sum</em> them. More paths, more terms in the sum. Every knob's
+          total effect is the sum of its effects along all routes to the output. That's the whole rule.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> Why this is the beating heart of ML</div>
+            <p><strong>Backpropagation is nothing but the chain rule applied to a neural network.</strong>
+            The network is a long composition of layers; the loss sits at the far end. To learn, we need the
+            gradient of the loss with respect to every weight, however deep. Backprop computes it by starting
+            at the loss and multiplying local derivatives layer by layer as it walks <em>backward</em> —
+            exactly <span style="white-space:nowrap">$\frac{dy}{dx} = \frac{dy}{du}\frac{du}{dx}$</span>,
+            chained across the whole network, summing wherever paths merge. When PyTorch's
+            <code>.backward()</code> ran in the code above, this is precisely what it did. We build it by
+            hand and see every multiplication in <a href="10-backprop.html">Section 10</a>.</p>
+          </div>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">the chain rule, computed for us</p>
+          <pre><code class="language-python">import torch
+
+x = torch.tensor(2.0, requires_grad=True)
+y = (3*x + 1) ** 2           # the composed function from above
+
+y.backward()                 # chain rule runs automatically
+print(x.grad)                # tensor(42.)  -> 18*x + 6 = 18*2 + 6 = 42</code></pre>
+          <p class="gloss"><b>In words:</b> PyTorch recorded that <b>y</b> was built as a square of
+          <b>(3x + 1)</b>. <code>backward()</code> walked that chain outer-to-inner, multiplying <b>2u</b>
+          by <b>3</b> just as we did by hand, and delivered <b>42</b> — matching our derived
+          <b>18x + 6</b> at <b>x = 2</b>. The rule you just learned is literally the engine under the hood.</p>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">Let <code>y = (x² + 1)³</code>. Using the chain rule with inner <code>u = x² + 1</code>, find <code>dy/dx</code>.</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Outer: <code>y = u³</code> gives <code>dy/du = 3u²</code>. Inner: <code>u = x² + 1</code>
+                gives <code>du/dx = 2x</code>. Multiply them:
+                <code>dy/dx = 3u² · 2x = 6x·u² = 6x(x² + 1)²</code>. Notice how the answer stays compact —
+                the chain rule spared us from expanding a cube. This is exactly why networks can be deep:
+                each layer just contributes one more local derivative to multiply into the chain.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== JACOBIAN ===================== -->
+          <h2><span class="h-num">5</span>The Jacobian: a gradient for every output at once</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>So far the output was a single number. But a layer usually maps a vector of inputs to a vector
+          of outputs, so there are many partial derivatives to track: each output slot has its own slope
+          against each input slot. Arrange all of them in a grid — one row per output, one column per input
+          — and you get the <strong>Jacobian</strong> matrix. It is simply the gradient idea scaled up: where
+          a single-output function has one gradient <em>vector</em>, a multi-output function has a whole
+          <em>matrix</em> of partials. The multivariable chain rule for vectors then becomes plain matrix
+          multiplication of Jacobians — which is why Section 1's shape rules and this section's chain rule
+          meet inside every real network, and why backprop is, at bottom, a sequence of matrix products.</p>
+
+          <hr />
+
+          <h2><span class="h-num">6</span>What to carry forward</h2>
+          <ul>
+            <li>A <strong>derivative</strong> is an instantaneous rate of change — the slope at a single point, defined by shrinking a step <span style="white-space:nowrap">$h$</span> to zero. The slope of <span style="white-space:nowrap">$x^2$</span> is <span style="white-space:nowrap">$2x$</span>.</li>
+            <li>A <strong>partial derivative</strong> is the ordinary derivative with respect to one input while all others are frozen — the hot tap while the cold stays put.</li>
+            <li>The <strong>gradient</strong> <span style="white-space:nowrap">$\nabla f$</span> stacks every partial into a vector that points uphill fastest. <strong>Gradient descent</strong> steps the other way to shrink a loss: <span style="white-space:nowrap">$\theta \leftarrow \theta - \alpha\nabla L$</span>, with <span style="white-space:nowrap">$\alpha$</span> the learning rate.</li>
+            <li>The <strong>chain rule</strong> multiplies local derivatives along a composition, and sums over paths when they merge. This <em>is</em> backpropagation — the exact mechanism we build in <a href="10-backprop.html">Section 10</a>.</li>
+            <li>The <strong>Jacobian</strong> generalizes the gradient to many outputs, turning the vector chain rule into matrix multiplication.</li>
+          </ul>
+          <p>You now hold the two halves of ML's foundation: linear algebra to move data, and calculus to
+          improve the model. Next we bring in the third — probability — so a model can express not just an
+          answer, but how sure it is.</p>
+
+          <div class="complete-bar" data-complete>
+            <span class="complete-bar__text">Finished this section? Mark it done to fill your progress bar.</span>
+            <button class="btn btn--primary">Mark section complete</button>
+          </div>
+
+          <nav class="pager" data-pager aria-label="Section navigation"></nav>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script defer src="../assets/vendor/katex/katex.min.js"></script>
+  <script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+  <script src="../assets/vendor/highlight/highlight.min.js"></script>
+  <script src="../assets/search-index.js"></script>
+  <script src="../assets/course.js"></script>
+</body>
+</html>

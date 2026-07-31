@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <script>try{var t=localStorage.getItem("z2h-ml-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Where to Go Next · ML Without the Magic</title>
+  <meta name="description" content="A curated reading list in order, project ideas by skill level, and how to stay current in ML research without drowning in hype — the closing section of the course." />
+  <link rel="stylesheet" href="../assets/vendor/fonts/fonts.css" />
+  <link rel="stylesheet" href="../assets/course.css" />
+  <link rel="stylesheet" href="../assets/vendor/katex/katex.min.css" />
+</head>
+<body data-slug="23-next-steps">
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="nav-scrim"></div>
+  <div class="layout">
+    <aside class="sidebar" aria-label="Course navigation">
+      <div class="brand">
+        <div class="brand__kicker">Machine Learning</div>
+        <h1 class="brand__title"><a href="../index.html">Without the Magic</a></h1>
+      </div>
+      <div class="progress">
+        <div class="progress__track"><div class="progress__fill" data-progress-fill></div></div>
+        <div class="progress__label" data-progress-label></div>
+      </div>
+      <nav class="nav" data-nav aria-label="Sections"></nav>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <button class="iconbtn menubtn" data-menu aria-label="Open navigation">☰</button>
+        <div class="topbar__spacer"></div>
+        <span class="topbar__meta">Part 6 · Capstone: Paper from Scratch</span>
+        <button class="iconbtn" data-theme-toggle aria-label="Toggle theme">☾</button>
+      </div>
+
+      <main id="main" class="reading">
+        <header class="lesson-head">
+          <p class="lesson-eyebrow">Part 6 · Capstone: Paper from Scratch <span class="dot"></span> Section 23</p>
+          <h1 class="lesson-title">Where to Go Next</h1>
+          <p class="lesson-standfirst">You've gone from a vector to a working Mixture of Experts — this last section hands you a map for everything after this course: what to read, what to build, and how to keep learning without drowning in hype.</p>
+          <div class="lesson-meta">
+            <span><b>18 min</b> read</span>
+            <span><b>You'll learn:</b> a reading list in order · project ideas by level · how to stay current without the hype</span>
+          </div>
+        </header>
+
+        <div class="prose">
+          <p class="lead">There is no final exam for machine learning. The field moves every week,
+          and nobody reads everything — not even the people whose names are on the papers. What you
+          need instead is a short list of the papers that actually changed how the field builds
+          things, a habit of building small projects that force real understanding, and a way to
+          filter the constant noise. This section gives you all three, and then says goodbye.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> The one idea to hold onto</div>
+            <p>You don't need to read everything — you need a <strong>path</strong> (papers that
+            build on each other, in order) and a <strong>habit</strong> (read a little, build a
+            little, on repeat). Both outlast any single paper you learn from them.</p>
+          </div>
+
+          <!-- ===================== READING LIST ===================== -->
+          <h2><span class="h-num">1</span>A reading list, in order</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>Below are the papers that actually matter, grouped by theme and ordered so each one
+          leans on the idea before it. Read them in this order once you finish the course — not
+          all at once, one every week or two is plenty. Use the three-pass method from
+          <a href="21-reading-papers.html">Section 21</a> on every one of them.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Nobody learns an instrument by opening a book of Chopin on day one. You learn scales,
+            then simple songs, then harder ones, then eventually you improvise. Reading order
+            matters as much as reading itself — the Transformer paper is your Chopin, and it will
+            make far more sense once you've done the scales below.</p>
+          </div>
+
+          <h3>Foundations</h3>
+          <ol>
+            <li>Rumelhart, Hinton &amp; Williams, 1986 — <em>"Learning representations by
+            back-propagating errors."</em> The paper that made training multi-layer networks
+            practical; you built this by hand in <a href="10-backprop.html">Section 10</a>.</li>
+            <li>Krizhevsky, Sutskever &amp; Hinton, 2012 — <em>"ImageNet Classification with Deep
+            Convolutional Neural Networks"</em> (AlexNet). Proved deep nets plus GPUs plus enough
+            data beats hand-engineered computer vision, almost overnight.</li>
+            <li>Kingma &amp; Ba, 2014 — <em>"Adam: A Method for Stochastic Optimization."</em> The
+            optimizer nearly every model since has defaulted to; you met it in
+            <a href="12-training-dynamics.html">Section 12</a>.</li>
+            <li>Ioffe &amp; Szegedy, 2015 — <em>"Batch Normalization: Accelerating Deep Network
+            Training by Reducing Internal Covariate Shift."</em> Why normalizing activations
+            between layers made much deeper networks trainable.</li>
+            <li>He, Zhang, Ren &amp; Sun, 2015 — <em>"Deep Residual Learning for Image
+            Recognition"</em> (ResNet). The skip connection: let a layer learn nothing and still
+            pass its input through untouched. This one idea is why networks hundreds of layers
+            deep can train at all.</li>
+          </ol>
+
+          <h3>Sequence → attention</h3>
+          <ol>
+            <li>Vaswani et al., 2017 — <em>"Attention Is All You Need."</em> Replaces recurrence
+            (Section 17) with attention alone; the architecture behind every modern language
+            model, covered in <a href="18-transformers.html">Section 18</a>.</li>
+          </ol>
+
+          <h3>Large language models</h3>
+          <ol>
+            <li>Ba, Kiros &amp; Hinton, 2016 — <em>"Layer Normalization."</em> The normalization
+            variant Transformers actually use, and a small prerequisite for reading GPT-2 closely.</li>
+            <li>Radford et al., 2019 — <em>"Language Models are Unsupervised Multitask Learners"</em>
+            (GPT-2). Shows a single next-token-prediction objective, scaled up, does far more than
+            predict text — the model you built the core of in
+            <a href="19-language-modeling.html">Section 19</a>.</li>
+            <li>Brown et al., 2020 — <em>"Language Models are Few-Shot Learners"</em> (GPT-3).
+            Scaling GPT-2's recipe by ~1000x parameters produces the ability to learn a new task
+            from a few examples in the prompt, with no weight updates at all.</li>
+            <li>Hoffmann et al., 2022 — <em>"Training Compute-Optimal Large Language Models"</em>
+            (Chinchilla). Shows most large models of that era were undertrained relative to their
+            size — for a fixed compute budget, a smaller model on more data beats a bigger model on
+            less. Read this right after GPT-3 to see the field correct itself in real time.</li>
+          </ol>
+
+          <h3>Efficiency &amp; Mixture of Experts</h3>
+          <ol>
+            <li>Shazeer et al., 2017 — <em>"Outrageously Large Neural Networks: The Sparsely-Gated
+            Mixture-of-Experts Layer."</em> The modern MoE layer, with top-2 routing.</li>
+            <li>Lepikhin et al., 2020 — <em>"GShard: Scaling Giant Models with Conditional
+            Computation and Automatic Sharding."</em> Scales MoE across thousands of accelerators.</li>
+            <li>Fedus, Zoph &amp; Shazeer, 2021 — <em>"Switch Transformers: Scaling to Trillion
+            Parameter Models with Simple and Efficient Sparsity."</em> Simplifies routing to top-1
+            and is exactly what you implemented in <a href="22-moe.html">Section 22</a>.</li>
+            <li>Jiang et al., 2024 — <em>"Mixtral of Experts."</em> A production-quality, openly
+            released MoE model — read this to see the Switch Transformer recipe applied at a scale
+            people actually run.</li>
+          </ol>
+
+          <h3>Fine-tuning &amp; alignment</h3>
+          <ol>
+            <li>Hu et al., 2021 — <em>"LoRA: Low-Rank Adaptation of Large Language Models."</em>
+            How to adapt a huge pretrained model to a new task by training a tiny number of extra
+            parameters instead of the whole network.</li>
+            <li>Ouyang et al., 2022 — <em>"Training language models to follow instructions with
+            human feedback"</em> (InstructGPT / RLHF). How a raw next-token predictor like GPT-3
+            becomes an assistant that follows instructions — the step between a language model and
+            a product.</li>
+          </ol>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">You want to understand why Mixtral only needs to run 2 of its 8 experts per token. Which two papers from the list above should you read first, and why in that order?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Read Shazeer et al. (2017) first — it's where the sparsely-gated MoE layer and
+                top-k routing are defined from scratch, so you'll understand the vocabulary
+                (router, gate, expert, top-k) before it's assumed. Then read Switch Transformer
+                (2021), which argues you can push <b>k</b> down to 1 without losing quality and
+                scales the idea into a full Transformer. Mixtral's "top-2 of 8" is a point on the
+                spectrum both papers already staked out — reading it cold, without either
+                predecessor, would leave "why 2 and not 1 or 4" completely unmotivated.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== PROJECTS ===================== -->
+          <h2><span class="h-num">2</span>Project ideas, by level</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>Reading tells you what's possible; building is what actually cements it. Pick one
+          project below that's slightly above your comfort level and finish it before starting the
+          next — half-finished projects teach far less than one completed one.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>You wouldn't hand a beginner cook a sourdough starter on day one, and you wouldn't
+            keep a chef making toast forever either. Match the project to where you actually are,
+            then move up a rung once it's done — not before.</p>
+          </div>
+
+          <div class="scroll-x">
+            <table>
+              <thead>
+                <tr><th>Level</th><th>Project</th><th>Builds on</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Beginner</td>
+                  <td>Reimplement <em>micrograd</em> — a tiny autograd engine, a few hundred lines,
+                  no dependencies.</td>
+                  <td><a href="10-backprop.html">Section 10</a> (backprop by hand)</td>
+                </tr>
+                <tr>
+                  <td>Beginner</td>
+                  <td>Train a character-level GPT on a small text file (a few hundred KB is
+                  plenty) and watch it go from random noise to almost-plausible words.</td>
+                  <td><a href="19-language-modeling.html">Section 19</a></td>
+                </tr>
+                <tr>
+                  <td>Intermediate</td>
+                  <td>Fine-tune a small open model on a narrow task using LoRA, and compare it
+                  against full fine-tuning on the same data and budget.</td>
+                  <td><a href="20-training-at-scale.html">Section 20</a></td>
+                </tr>
+                <tr>
+                  <td>Intermediate</td>
+                  <td>Implement an optimizer from scratch — plain SGD with momentum, then Adam —
+                  and verify it matches PyTorch's built-in version on a toy problem.</td>
+                  <td><a href="12-training-dynamics.html">Section 12</a></td>
+                </tr>
+                <tr>
+                  <td>Advanced</td>
+                  <td>Extend the Mixture-of-Experts model from this course: add top-2 routing, or
+                  swap the load-balancing loss for the "expert choice" routing variant, and measure
+                  what changes.</td>
+                  <td><a href="22-moe.html">Section 22</a></td>
+                </tr>
+                <tr>
+                  <td>Advanced</td>
+                  <td>Pick one paper from the reading list you haven't built anything from yet, and
+                  reproduce its smallest core result end to end — using the three-pass method to
+                  read it and the smallest-unit habit to implement it.</td>
+                  <td><a href="21-reading-papers.html">Section 21</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- ===================== STAYING CURRENT ===================== -->
+          <h2><span class="h-num">3</span>How to stay current without the hype</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>New papers appear faster than anyone can read them, and a good fraction of the loudest
+          announcements don't hold up under scrutiny. The goal isn't to read everything — it's to
+          have a short, reliable set of places to look, and a fast filter for separating a real
+          result from a demo video.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Learning an instrument never really ends — there's always a harder piece, a faster
+            tempo, a style you haven't tried. You don't panic about not having "finished" music;
+            you keep a practice habit and let curiosity pick the next piece. Machine learning is
+            the same: there's no finish line, only a better and better practice habit.</p>
+          </div>
+
+          <p>Where to actually look:</p>
+          <ul>
+            <li><strong>arXiv</strong> (the <code>cs.LG</code> and <code>cs.CL</code> categories) —
+            where almost everything is posted first, often months before formal publication.</li>
+            <li><strong>Top conferences</strong> — NeurIPS, ICML, and ICLR are where peer review
+            filters arXiv's firehose down to work that passed independent scrutiny.</li>
+            <li><strong>Papers With Code</strong> — pairs papers with their released code and
+            leaderboards, which is a fast way to check the next bullet point below.</li>
+            <li>A handful of consistently careful <strong>newsletters and blogs</strong> — the kind
+            that link the paper and the code, not just a demo clip — are worth more than a dozen
+            noisy ones. Curate a short list and prune it aggressively.</li>
+          </ul>
+
+          <p>How to evaluate a claim skeptically, in about two minutes:</p>
+          <ul>
+            <li>Is there an <strong>ablation table</strong>, or just one headline number?
+            (<a href="21-reading-papers.html">Section 21</a> covered why this matters.)</li>
+            <li>Is the <strong>baseline</strong> comparable — same data, same compute budget, same
+            amount of tuning — or is it a strawman?</li>
+            <li>Is there <strong>released code</strong>, and has anyone outside the original team
+            reproduced the result?</li>
+            <li>Is the claim's size proportional to the evidence — "improves accuracy by 2 points
+            on this benchmark" is a claim; "solves reasoning" is marketing.</li>
+          </ul>
+
+          <div class="callout pitfall">
+            <div class="callout__label"><span class="ic">▲</span> Watch out</div>
+            <p>The most common hype pattern is a striking demo with no baseline, no ablation, and
+            no released code — often timed around a funding announcement. It doesn't mean the work
+            is fake; it means you don't yet have enough to evaluate it, and treating it as settled
+            fact before that is exactly the trap. Wait for the paper, or move on.</p>
+          </div>
+
+          <hr />
+
+          <h2><span class="h-num">4</span>What to carry forward</h2>
+          <ul>
+            <li>Read the list above <strong>in order</strong> — foundations, then attention, then
+            LLMs, then efficiency and MoE, then fine-tuning — each leans on the one before it.</li>
+            <li>Pick projects <strong>one rung above</strong> where you are, and finish each one
+            before starting the next: micrograd and a char-level GPT, then LoRA fine-tuning and a
+            from-scratch optimizer, then extending the MoE or reproducing a paper cold.</li>
+            <li>Stay current with a short, reliable source list (arXiv, top conferences, Papers
+            With Code, a few careful newsletters) and a fast skepticism checklist: ablations,
+            fair baselines, released code, proportional claims.</li>
+            <li>There's no finish line — only a better practice habit, same as with any instrument
+            worth learning.</li>
+          </ul>
+
+          <p>You started this course looking at a vector — an arrow, a list of numbers — and you
+          end it having built, from scratch, a router deciding which of several expert networks
+          should handle a token inside a Transformer. Every step in between was earned, not
+          skipped: you derived backprop by hand, wrote an MLP in raw NumPy, debugged real shape
+          mismatches, and read a research paper the way an engineer does. That is the entire
+          distance from zero to hero. Go build something with it.</p>
+
+          <div class="complete-bar" data-complete>
+            <span class="complete-bar__text">Finished this section? Mark it done to fill your progress bar.</span>
+            <button class="btn btn--primary">Mark section complete</button>
+          </div>
+
+          <nav class="pager" data-pager aria-label="Section navigation"></nav>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script defer src="../assets/vendor/katex/katex.min.js"></script>
+  <script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+  <script src="../assets/vendor/highlight/highlight.min.js"></script>
+  <script src="../assets/search-index.js"></script>
+  <script src="../assets/course.js"></script>
+</body>
+</html>

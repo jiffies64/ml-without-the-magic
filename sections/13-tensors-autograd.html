@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <script>try{var t=localStorage.getItem("z2h-ml-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tensors &amp; Autograd · ML Without the Magic</title>
+  <meta name="description" content="What a tensor actually is, how broadcasting stretches shapes to fit, and how PyTorch's autograd builds and runs the same backward pass you did by hand in Section 10." />
+  <link rel="stylesheet" href="../assets/vendor/fonts/fonts.css" />
+  <link rel="stylesheet" href="../assets/course.css" />
+  <link rel="stylesheet" href="../assets/vendor/katex/katex.min.css" />
+</head>
+<body data-slug="13-tensors-autograd">
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="nav-scrim"></div>
+  <div class="layout">
+    <aside class="sidebar" aria-label="Course navigation">
+      <div class="brand">
+        <div class="brand__kicker">Machine Learning</div>
+        <h1 class="brand__title"><a href="../index.html">Without the Magic</a></h1>
+      </div>
+      <div class="progress">
+        <div class="progress__track"><div class="progress__fill" data-progress-fill></div></div>
+        <div class="progress__label" data-progress-label></div>
+      </div>
+      <nav class="nav" data-nav aria-label="Sections"></nav>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <button class="iconbtn menubtn" data-menu aria-label="Open navigation">☰</button>
+        <div class="topbar__spacer"></div>
+        <span class="topbar__meta">Part 4 · PyTorch</span>
+        <button class="iconbtn" data-theme-toggle aria-label="Toggle theme">☾</button>
+      </div>
+
+      <main id="main" class="reading">
+        <header class="lesson-head">
+          <p class="lesson-eyebrow">Part 4 · PyTorch <span class="dot"></span> Section 13</p>
+          <h1 class="lesson-title">Tensors &amp; Autograd</h1>
+          <p class="lesson-standfirst">Everything you hand-derived in Section 10 — the graph, the chain rule, the backward pass — is about to be built and run for you automatically. You'll re-derive a small graph by hand, then watch autograd reproduce your gradients to the decimal.</p>
+          <div class="lesson-meta">
+            <span><b>26 min</b> read</span>
+            <span><b>You'll learn:</b> tensors · broadcasting · autograd · the computation graph</span>
+          </div>
+        </header>
+
+        <div class="prose">
+          <p class="lead">A <strong>tensor</strong> is PyTorch's one and only data structure — every
+          input, weight, and output you will ever touch is one. Underneath it's refreshingly boring:
+          a grid of numbers with a shape. What makes it interesting is that PyTorch can quietly track
+          every operation you do to a tensor and, on request, hand you back the exact gradient — the
+          thing you spent Section 10 computing by hand.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> The one idea to hold onto</div>
+            <p>A tensor is just an n-dimensional array. <strong>Autograd</strong> is the part of PyTorch
+            that, as you do arithmetic on tensors, silently builds the same kind of computation graph you drew
+            by hand in <a href="10-backprop.html">Section 10</a> — then runs the same backward pass to
+            fill in every gradient, automatically.</p>
+          </div>
+
+          <!-- ===================== TENSORS ===================== -->
+          <h2><span class="h-num">1</span>Tensors: arrays that can grow another dimension</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>A <strong>tensor</strong> is a number, or a list of numbers, or a grid of numbers, or a
+          stack of grids of numbers — the same idea, just allowed to keep growing dimensions. A single
+          number is a <em>scalar</em> (rank 0). A list is a <em>vector</em> (rank 1, one you already know
+          from <a href="01-linear-algebra.html">Section 1</a>). A grid is a <em>matrix</em> (rank 2). A
+          stack of matrices is a rank-3 tensor, and so on — PyTorch doesn't care where you stop.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Think of a spreadsheet. One cell is a scalar. One row is a vector. The whole sheet is a
+            matrix. Now imagine a <em>workbook</em> — several sheets stacked behind each other, all the
+            same shape. That stack is a cube, a rank-3 tensor. Nothing new happened, you just kept
+            stacking the same kind of thing one level deeper. That's all a tensor ever is.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>Every tensor carries three pieces of information you should check whenever something breaks:</p>
+          <ul>
+            <li><strong>shape</strong> — how many entries along each dimension, e.g. <code>(64, 3, 28, 28)</code> for 64 color images of 28×28 pixels.</li>
+            <li><strong>dtype</strong> — what kind of number is stored (<code>float32</code>, <code>int64</code>, ...). Mixing dtypes in one operation is a common source of errors.</li>
+            <li><strong>device</strong> — where the numbers physically live: the CPU's memory, or a GPU's memory. We'll come back to this at the end.</li>
+          </ul>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">making tensors and reading their shape</p>
+          <pre><code class="language-python">import torch
+
+scalar = torch.tensor(3.0)                     # rank 0
+vector = torch.tensor([1.0, 2.0, 3.0])          # rank 1, shape (3,)
+matrix = torch.tensor([[1.0, 2.0],
+                       [3.0, 4.0]])             # rank 2, shape (2, 2)
+cube   = torch.zeros(2, 3, 4)                   # rank 3, shape (2, 3, 4)
+
+print(vector.shape, vector.dtype, vector.device)
+# torch.Size([3]) torch.float32 cpu</code></pre>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">A batch of 32 grayscale images, each 28×28 pixels. What rank is the tensor, and what's a reasonable shape?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Rank 3, shape <code>(32, 28, 28)</code> — one dimension for "which image in the batch"
+                (32), and two for the pixel grid (28, 28). If the images were color you'd add a channel
+                dimension, giving rank 4: <code>(32, 3, 28, 28)</code>.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== BROADCASTING ===================== -->
+          <h2><span class="h-num">2</span>Broadcasting: stretching a small tensor to fit a big one</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p><strong>Broadcasting</strong> is the rule PyTorch uses to let you combine tensors of
+          different shapes without writing a loop. If one tensor is smaller along some dimension,
+          PyTorch mentally "repeats" it along that dimension until the shapes match, then does the
+          operation. No memory is actually copied — it just behaves as if it were.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>A spreadsheet of sale amounts, one row per transaction, and you want to apply a single
+            8% tax rate to every row. You don't write the rate 10,000 times — you write it once and the
+            spreadsheet applies it to every row for you. Broadcasting is exactly that: one small tensor
+            (the tax rate) automatically applied across every row of a bigger one (the transactions).</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>PyTorch compares two shapes from the <em>right-hand side</em>, dimension by dimension.
+          Two dimensions are compatible if they are equal, or if one of them is 1 (a size-1 dimension
+          gets stretched to match). If every pair is compatible, the shapes broadcast together:</p>
+          $$ (4, 3) \quad \text{and} \quad (3,) \;\longrightarrow\; \text{compatible: } (3,) \text{ acts like } (4, 3) $$
+          <p class="gloss"><b>In words:</b> a matrix with 4 rows and 3 columns, combined with a plain
+          vector of length 3, works because the vector's single dimension (3) matches the matrix's last
+          dimension (3). PyTorch treats the vector as if it were copied into all 4 rows.</p>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">applying one row to every row — the tax-rate example</p>
+          <pre><code class="language-python">import torch
+
+sales = torch.tensor([[100.0, 200.0, 300.0],   # 4 transactions,
+                      [ 50.0,  75.0,  10.0],   # 3 line items each
+                      [400.0, 100.0,  20.0],
+                      [ 10.0,  10.0,  10.0]])  # shape (4, 3)
+
+tax_rate = torch.tensor([0.08, 0.08, 0.08])    # shape (3,) — or just 0.08, a scalar
+
+print(sales * tax_rate)   # shape (4, 3): the rate applied to every row, no loop</code></pre>
+
+          <div class="callout pitfall">
+            <div class="callout__label"><span class="ic">▲</span> The bug you will hit first</div>
+            <p><code>RuntimeError: The size of tensor a (3) must match the size of tensor b (4) at
+            non-singleton dimension 1</code>. Broadcasting only stretches dimensions that are exactly
+            size 1 — it will never silently guess how to match a 3 against a 4. Print both
+            <code>.shape</code>s and check which dimension refuses to line up.</p>
+          </div>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">You have <code>x</code> of shape <code>(64, 10)</code> (a batch of 64 rows of 10 scores) and <code>b</code> of shape <code>(10,)</code> (a bias per column). Does <code>x + b</code> broadcast, and if so, to what shape?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Yes. Comparing from the right: 10 vs 10 match, and the leftover dimension on
+                <code>x</code> (64) simply stays. The result has shape <code>(64, 10)</code> — the same
+                bias vector added to every one of the 64 rows. This is exactly how a linear layer's bias
+                term <span style="white-space:nowrap">$\mathbf{Wx}+\mathbf{b}$</span> gets applied to a
+                whole batch at once.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== AUTOGRAD ===================== -->
+          <h2><span class="h-num">3</span>Autograd: the payoff of Section 10</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>In <a href="10-backprop.html">Section 10</a> you built a computation graph by hand — nodes
+          for each operation, arrows for how values flow forward, then walked the arrows backward
+          applying the chain rule to get every gradient. <strong>Autograd</strong> is PyTorch doing
+          exactly that same bookkeeping for you. Every time you do arithmetic on a tensor that has
+          <code>requires_grad=True</code>, PyTorch records the operation as a node in a graph. Call
+          <code>.backward()</code> and it walks that graph backward, the same direction you walked by
+          hand, filling in <code>.grad</code> on every leaf.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Doing your own taxes by hand once teaches you exactly how each deduction moves the final
+            number. Tax software then does the identical arithmetic for you every year after — same
+            rules, same order of operations, just automated. Section 10 was doing your taxes by hand.
+            Autograd is the software. It isn't a different, cleverer method — it's the same method, run
+            for you.</p>
+          </div>
+
+          <div class="callout definition">
+            <div class="callout__label">Definition</div>
+            <p>A tensor with <code>requires_grad=True</code> tells PyTorch "track every operation done to
+            me, because I'll want a gradient with respect to this value later." Calling
+            <code>.backward()</code> on a final scalar output triggers the backward pass; the result for
+            each tracked tensor lands in its <code>.grad</code> attribute.</p>
+          </div>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">the minimum working example</p>
+          <pre><code class="language-python">import torch
+
+x = torch.tensor(3.0, requires_grad=True)
+y = x ** 2 + 2 * x            # y = x^2 + 2x
+
+y.backward()                  # walk the graph backward from y
+print(x.grad)                 # tensor(8.)  because dy/dx = 2x + 2 = 2(3)+2 = 8</code></pre>
+
+          <h3>Worked connection: a tiny graph by hand and by autograd — the same chain-rule walk as Section 10</h3>
+          <p>Take a small expression in the same spirit as <a href="10-backprop.html">Section 10</a>'s
+          network — multiply two values, add a third, then multiply the result by a fourth. Different
+          numbers from Section 10's sigmoid neuron, but the exact same backward procedure.</p>
+          $$ e = a \cdot b, \qquad d = e + c, \qquad L = d \cdot f $$
+          <p class="gloss"><b>In words:</b> three operations chained together, ending in a single
+          number <b>L</b>. This is a tiny neural network in disguise: a multiply (like a weight times
+          an input), an add (like a bias), then another multiply (like a second layer).</p>
+
+          <p>With <code>a = 2, b = -3, c = 10, f = -2</code>, the forward pass gives
+          <code>e = -6</code>, <code>d = 4</code>, <code>L = -8</code>. Now apply the chain rule
+          backward from <b>L</b>, exactly as in Section 10:</p>
+          $$
+          \begin{aligned}
+          \frac{\partial L}{\partial d} &= f = -2, &\qquad \frac{\partial L}{\partial f} &= d = 4 \\[4pt]
+          \frac{\partial L}{\partial e} &= \frac{\partial L}{\partial d}\cdot\frac{\partial d}{\partial e} = -2 \cdot 1 = -2, &\qquad \frac{\partial L}{\partial c} &= \frac{\partial L}{\partial d}\cdot\frac{\partial d}{\partial c} = -2 \cdot 1 = -2 \\[4pt]
+          \frac{\partial L}{\partial a} &= \frac{\partial L}{\partial e}\cdot\frac{\partial e}{\partial a} = -2 \cdot b = -2\cdot(-3) = 6, &\qquad \frac{\partial L}{\partial b} &= \frac{\partial L}{\partial e}\cdot\frac{\partial e}{\partial b} = -2 \cdot a = -2\cdot 2 = -4
+          \end{aligned}
+          $$
+          <p class="gloss"><b>In words:</b> start at the output and multiply local derivatives backward
+          along the graph, exactly the chain-rule walk from Section 10. Each variable's gradient is "how
+          much did the final number move, per unit change in me" — <b>a</b>'s gradient of 6 means
+          nudging <b>a</b> up by a tiny amount would push <b>L</b> up by about 6 times that amount.</p>
+
+          <p>Now build the identical graph in PyTorch and let autograd do the same walk:</p>
+          <pre><code class="language-python">import torch
+
+a = torch.tensor(2.0,  requires_grad=True)
+b = torch.tensor(-3.0, requires_grad=True)
+c = torch.tensor(10.0, requires_grad=True)
+f = torch.tensor(-2.0, requires_grad=True)
+
+e = a * b
+d = e + c
+L = d * f
+
+L.backward()
+
+print(a.grad, b.grad, c.grad, f.grad)
+# tensor(6.) tensor(-4.) tensor(-2.) tensor(4.)  <-- identical to the hand derivation above</code></pre>
+          <p>Same numbers, to the decimal. That's the whole trick of autograd: it is not a different or
+          approximate technique, it is the literal chain-rule walk from Section 10, executed by a
+          machine that never drops a term.</p>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">In the worked example, why is <code>c.grad</code> exactly equal to <code>e</code>'s upstream gradient, both −2?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Because <code>d = e + c</code>, and the local derivative of a sum with respect to
+                either input is always 1 (<code>∂d/∂e = 1</code>, <code>∂d/∂c = 1</code>). The chain rule
+                multiplies the upstream gradient by that local derivative, so both <code>e</code> and
+                <code>c</code> simply inherit <code>d</code>'s gradient unchanged. Addition never
+                rescales a gradient — it only ever copies it to both of its inputs.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== GRAPH MECHANICS ===================== -->
+          <h2><span class="h-num">4</span>Graph mechanics: leaves, detaching, and not tracking at all</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>A few practical rules keep autograd from doing more (or less) work than you want. Knowing
+          them is the difference between code that trains correctly and code that silently accumulates
+          garbage or crashes with a confusing error.</p>
+
+          <div class="callout definition">
+            <div class="callout__label">Definition</div>
+            <p>A <dfn>leaf tensor</dfn> is one you created directly (like <code>a</code> and <code>b</code>
+            above) rather than one produced by an operation on other tracked tensors (like <code>e</code>
+            or <code>d</code>). Only leaf tensors accumulate a <code>.grad</code> by default — the model's
+            actual parameters (weights, biases) are always leaves, which is exactly what you want, since
+            those are the numbers you'll update.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>Two ways to stop autograd from tracking, for different reasons:</p>
+          <ul>
+            <li><code>.detach()</code> — returns the same numbers as a new tensor that is no longer
+            connected to the graph. Use it when you want a value (say, to log or plot) without dragging
+            the whole history of how it was computed along with it.</li>
+            <li><code>torch.no_grad()</code> — a context manager that turns off graph-building entirely
+            for everything inside it. Use it for <em>inference</em> (making predictions, not training):
+            there's no backward pass coming, so building the graph would only waste memory and time.</li>
+          </ul>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <pre><code class="language-python">import torch
+
+w = torch.tensor(1.5, requires_grad=True)
+x = torch.tensor(2.0)
+
+y = w * x
+print(y.requires_grad)        # True  -- built from a tracked tensor
+
+with torch.no_grad():
+    y_infer = w * x           # no graph built at all -- for prediction, not training
+    print(y_infer.requires_grad)  # False
+
+y_detached = y.detach()       # same value as y, graph history dropped
+print(y_detached.requires_grad)   # False</code></pre>
+
+          <div class="callout pitfall">
+            <div class="callout__label"><span class="ic">▲</span> Gradients accumulate — zero them</div>
+            <p>Calling <code>.backward()</code> does not <em>overwrite</em> <code>.grad</code>, it
+            <strong>adds</strong> to whatever was already there. Run the backward pass twice in a row
+            without resetting, and you'll silently add two steps' worth of gradient together — a subtle
+            bug that trains, just wrong. This is why every training loop calls something like
+            <code>optimizer.zero_grad()</code> before each backward pass; we'll wire that into a full
+            loop in <a href="14-nn-module.html">Section 14</a>.</p>
+          </div>
+
+          <pre><code class="language-python">x = torch.tensor(2.0, requires_grad=True)
+
+y = x ** 2
+y.backward()
+print(x.grad)     # tensor(4.)   dy/dx = 2x = 4
+
+y = x ** 2
+y.backward()
+print(x.grad)     # tensor(8.)   NOT 4 again -- it accumulated: 4 + 4
+
+x.grad.zero_()     # reset before the next backward pass
+y = x ** 2
+y.backward()
+print(x.grad)      # tensor(4.)  correct, now that we cleared it first</code></pre>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">You call <code>loss.backward()</code> three times in a row on the same weights, forgetting to zero the gradient between calls, where each call would individually produce a gradient of 0.5. What ends up in <code>.grad</code>?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p><code>1.5</code> — gradients accumulate by addition, so three backward passes of 0.5
+                each sum to <code>0.5 + 0.5 + 0.5 = 1.5</code>. If your training loss is doing something
+                inexplicable, "forgot to call <code>zero_grad()</code>" is one of the first things to
+                check.</p>
+              </div>
+            </details>
+          </div>
+
+          <hr />
+
+          <h2><span class="h-num">5</span>What to carry forward</h2>
+          <ul>
+            <li>A <strong>tensor</strong> is an n-dimensional array with a <code>shape</code>, <code>dtype</code>, and <code>device</code> — scalar, vector, matrix, or higher, all the same idea.</li>
+            <li><strong>Broadcasting</strong> stretches a smaller tensor across a bigger one when their shapes are compatible from the right, no loop required.</li>
+            <li><strong>Autograd</strong> builds the same kind of computation graph you built by hand in Section 10, and <code>.backward()</code> runs the exact same chain-rule walk — autograd matched the by-hand gradients above to the decimal.</li>
+            <li>Only <strong>leaf tensors</strong> (like model parameters) accumulate <code>.grad</code>; use <code>.detach()</code> to drop history and <code>torch.no_grad()</code> for inference.</li>
+            <li><strong>Gradients accumulate</strong> across calls to <code>.backward()</code> — always zero them before the next backward pass.</li>
+          </ul>
+          <p>Next we'll stop wiring graphs by hand entirely and let <code>nn.Module</code> organize the
+          layers, the parameters, and the training loop itself.</p>
+
+          <div class="complete-bar" data-complete>
+            <span class="complete-bar__text">Finished this section? Mark it done to fill your progress bar.</span>
+            <button class="btn btn--primary">Mark section complete</button>
+          </div>
+
+          <nav class="pager" data-pager aria-label="Section navigation"></nav>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script defer src="../assets/vendor/katex/katex.min.js"></script>
+  <script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+  <script src="../assets/vendor/highlight/highlight.min.js"></script>
+  <script src="../assets/search-index.js"></script>
+  <script src="../assets/course.js"></script>
+</body>
+</html>

@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <script>try{var t=localStorage.getItem("z2h-ml-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Debugging & Good Habits · ML Without the Magic</title>
+  <meta name="description" content="A practical, checklist-driven guide to finding bugs in a training run: shape discipline, gradient checking, the overfit-a-single-batch test, reading loss curves, and checkpointing." />
+  <link rel="stylesheet" href="../assets/vendor/fonts/fonts.css" />
+  <link rel="stylesheet" href="../assets/course.css" />
+  <link rel="stylesheet" href="../assets/vendor/katex/katex.min.css" />
+</head>
+<body data-slug="15-debugging">
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="nav-scrim"></div>
+  <div class="layout">
+    <aside class="sidebar" aria-label="Course navigation">
+      <div class="brand">
+        <div class="brand__kicker">Machine Learning</div>
+        <h1 class="brand__title"><a href="../index.html">Without the Magic</a></h1>
+      </div>
+      <div class="progress">
+        <div class="progress__track"><div class="progress__fill" data-progress-fill></div></div>
+        <div class="progress__label" data-progress-label></div>
+      </div>
+      <nav class="nav" data-nav aria-label="Sections"></nav>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <button class="iconbtn menubtn" data-menu aria-label="Open navigation">☰</button>
+        <div class="topbar__spacer"></div>
+        <span class="topbar__meta">Part 4 · PyTorch</span>
+        <button class="iconbtn" data-theme-toggle aria-label="Toggle theme">☾</button>
+      </div>
+
+      <main id="main" class="reading">
+        <header class="lesson-head">
+          <p class="lesson-eyebrow">Part 4 · PyTorch <span class="dot"></span> Section 15</p>
+          <h1 class="lesson-title">Debugging & Good Habits</h1>
+          <p class="lesson-standfirst">Almost every training bug announces itself the same handful of ways — learn to recognize them and a broken run stops being a mystery and becomes a five-minute fix.</p>
+          <div class="lesson-meta">
+            <span><b>22 min</b> read</span>
+            <span><b>You'll learn:</b> shape discipline · gradient checking · overfit-a-single-batch · logging &amp; checkpointing</span>
+          </div>
+        </header>
+
+        <div class="prose">
+          <p class="lead">Training a neural network fails silently far more often than it fails loudly. The
+          loss doesn't always crash with a red error — sometimes it just quietly refuses to go down, and
+          nothing in the code looks wrong. This section is not theory. It's the exact sequence of checks a
+          working engineer runs, in order, whenever a model isn't learning.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> The one idea to hold onto</div>
+            <p>Debugging a model is not different from debugging any other program — it's just that the
+            failures are quieter. Make them loud on purpose: print shapes, check gradients by hand, and
+            prove the model <em>can</em> learn something trivial before trusting it on something hard.</p>
+          </div>
+
+          <!-- ===================== SHAPES ===================== -->
+          <h2><span class="h-num">1</span>Shape discipline: print them everywhere</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>The single most common bug in any deep learning codebase is a <strong>shape
+          mismatch</strong> — a tensor coming out of one layer doesn't have the shape the next layer
+          expects. We already met the rule that governs this in <a href="01-linear-algebra.html">Section 1</a>:
+          to multiply an <em>(m × n)</em> matrix by an <em>(n × p)</em> matrix, the inner numbers must
+          match. Every time you write a new layer, model, or loss function, you are betting that this rule
+          holds all the way through. Bet wrong, and PyTorch will tell you — but only if you read the error
+          carefully.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>It's like plumbing pipes of different diameters. If pipe A ends in a 2-inch opening and pipe
+            B starts with a 3-inch fitting, water doesn't flow — no matter how good either pipe is on its
+            own. A shape mismatch is exactly that: two perfectly correct layers that simply don't connect,
+            because one hands over a different-sized "pipe" than the next one expects.</p>
+          </div>
+
+          <p class="beat beat--code">Reading a real shape error</p>
+          <p>Say you build a tiny two-layer network, but mistype the input size of the second layer:</p>
+          <pre><code class="language-python">import torch.nn as nn
+
+layer1 = nn.Linear(784, 128)   # 784 pixels in, 128 features out
+layer2 = nn.Linear(64, 10)     # BUG: should be nn.Linear(128, 10)
+
+x = torch.randn(32, 784)       # a batch of 32 images
+h = layer1(x)                  # h has shape (32, 128) -- correct so far
+out = layer2(h)                # crashes</code></pre>
+          <p class="codecap">what PyTorch actually prints</p>
+          <pre><code>RuntimeError: mat1 and mat2 shapes cannot be multiplied (32x128 and 64x10)</code></pre>
+          <p>Read it left to right: <code>mat1</code> is your data, shape (32, 128) — that's <code>h</code>,
+          exactly as expected. <code>mat2</code> is the weight matrix inside <code>layer2</code>, and its
+          first number, 64, is wrong: it should have matched <code>h</code>'s last dimension, 128. The error
+          message is telling you exactly which two tensors collided and what their shapes were at that
+          moment — it is not a generic complaint, it's a diagnosis, if you read both numbers on each side.</p>
+
+          <div class="callout pitfall">
+            <div class="callout__label"><span class="ic">▲</span> Watch out</div>
+            <p>Don't guess at a fix by trial and error. Instead, add <code>print(x.shape)</code> after every
+            line that changes a tensor's shape while you're debugging, then delete the prints once the model
+            runs. Five seconds of printing beats twenty minutes of guessing.</p>
+          </div>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">Using the buggy code above, what one-word change to <code>layer2</code> fixes it, and why does 128 (not 64 or 10) belong there?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Change <code>nn.Linear(64, 10)</code> to <code>nn.Linear(128, 10)</code>. A
+                <code>nn.Linear(in_features, out_features)</code> layer's <strong>first</strong> number must
+                match the last dimension of whatever tensor flows into it — here, <code>h</code> has shape
+                (32, 128), so the incoming feature dimension is 128, regardless of what the previous layer's
+                <em>output count</em> happened to be conceptually. The 10 stays as-is; it's the number of
+                classes you want out, unrelated to the mismatch.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== GRADIENT CHECKING ===================== -->
+          <h2><span class="h-num">2</span>Gradient checking: does the math match reality</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>Backpropagation (covered in <a href="10-backprop.html">Section 10</a>) computes gradients
+          <em>analytically</em> — by applying calculus rules symbolically. That's fast, but if you've
+          written a custom loss or layer, it's easy to get one sign or one factor wrong. <strong>Gradient
+          checking</strong> catches this by computing the same gradient a second, much slower way — by
+          literally nudging one number and watching how much the output moves — and comparing the two
+          answers.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>You calculate a tip in your head (analytic: apply the 15% rule). Then, to double check, you
+            actually add one dollar to the bill and see the total change by roughly the right amount (numeric: nudge
+            and observe). If your mental math and the nudge-and-observe check disagree, trust the nudge —
+            your mental shortcut has a bug in it.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>The definition of a derivative already tells us how to check it: nudge the input by a tiny
+          amount <code>ε</code> in both directions and see how the loss <code>L</code> moves.</p>
+          $$ \frac{\partial L}{\partial w} \approx \frac{L(w+\epsilon) - L(w-\epsilon)}{2\epsilon} $$
+          <p class="gloss"><b>In words:</b> nudge the weight <b>w</b> up by a tiny amount <b>ε</b> (epsilon)
+          and evaluate the loss; nudge it down by the same tiny amount and evaluate again; the difference,
+          divided by twice the nudge, is an estimate of the slope at that point — the numeric gradient. This
+          uses <em>both</em> sides (a "centered" difference) because it cancels out more error than only
+          nudging one way.</p>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <pre><code class="language-python">import torch
+
+def loss_fn(w):
+    return (w ** 2).sum()   # a toy loss; true gradient is 2*w
+
+w = torch.tensor([1.0, 2.0, 3.0], requires_grad=True)
+
+# 1) the analytic gradient, from autograd
+loss = loss_fn(w)
+loss.backward()
+analytic = w.grad.clone()
+
+# 2) the numeric gradient, one entry at a time
+eps = 1e-4
+numeric = torch.zeros_like(w)
+for i in range(len(w)):
+    w_plus = w.detach().clone();  w_plus[i]  += eps
+    w_minus = w.detach().clone(); w_minus[i] -= eps
+    numeric[i] = (loss_fn(w_plus) - loss_fn(w_minus)) / (2 * eps)
+
+print(analytic)   # tensor([2., 4., 6.])
+print(numeric)    # tensor([2.0000, 4.0000, 6.0000])  -- matches, within ~eps^2</code></pre>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">You run this check and the analytic gradient is consistently exactly 1000 times larger than the numeric one, across every entry. What kind of bug does that pattern suggest?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>A random, scattered mistake wouldn't produce a clean, uniform ratio like 1000x on every
+                entry. A constant multiplicative gap points to a <strong>scale</strong> bug in the analytic
+                path — e.g. the loss is being summed over a batch of 1000 elsewhere without ever averaging,
+                or a manually derived gradient is missing (or double-applying) a constant factor from the
+                chain rule. Look for a stray <code>.sum()</code> that should be <code>.mean()</code>, or a
+                dropped/extra constant in a hand-written derivative.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== OVERFIT ONE BATCH ===================== -->
+          <h2><span class="h-num">3</span>The single best debugging test: overfit one batch</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>Before you trust a model on your real dataset, ask it to do something much easier: memorize
+          <strong>one small batch</strong> — say, 8 or 16 examples — with nothing held back. Train on that
+          exact same batch for a few hundred steps. A working model and training loop should drive the loss
+          down to nearly zero (or accuracy to 100%) on that tiny batch, because there is nothing to
+          generalize; it just has to remember 16 answers.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>You don't test a new oven by baking 200 cookies at once. You bake <em>one</em> cookie first.
+            If that one cookie comes out burnt or raw, you don't have a "cookie problem," you have an
+            <strong>oven problem</strong> — and you'd rather find that out with one cookie than with 200.
+            Overfitting a single batch is baking the one test cookie before you commit the whole tray.</p>
+          </div>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> Why this test is so powerful</div>
+            <p>If the model <strong>cannot</strong> drive the loss near zero on one tiny, memorizable batch,
+            the bug is almost never about the model being "not powerful enough" or "needing more data." It's
+            a real bug: a wrong loss function, a detached computation graph (gradients silently not
+            flowing), mismatched or shuffled labels, or a learning rate that's absurdly wrong. Find it here,
+            on one batch, in seconds — not three hours into a real training run.</p>
+          </div>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <pre><code class="language-python">model = MyModel()
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+criterion = torch.nn.CrossEntropyLoss()
+
+xb, yb = next(iter(train_loader))   # grab ONE batch and reuse it every step
+
+for step in range(300):
+    optimizer.zero_grad()
+    out = model(xb)
+    loss = criterion(out, yb)
+    loss.backward()
+    optimizer.step()
+    if step % 50 == 0:
+        print(step, loss.item())
+
+# healthy run: loss falls toward ~0 well before step 300
+# broken run: loss plateaus at a stubbornly high value -- go find the bug</code></pre>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">You run the overfit-one-batch test and the loss drops for a bit, then plateaus at a high value and never gets close to zero, even after 500 steps. Name three concrete things to check.</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>(1) Are the labels actually aligned with the inputs — did shuffling or a data pipeline bug
+                scramble <code>xb</code> and <code>yb</code> relative to each other? (2) Is the loss function
+                right for the task (e.g. not using mean-squared-error on raw classification logits, or using
+                the wrong reduction) and is gradient actually flowing — no accidental
+                <code>.detach()</code> or a stray <code>.item()</code>/<code>.data</code> access that cuts the
+                graph? (3) Is the learning rate reasonable — plateauing rather than diverging can mean the
+                learning rate is too <em>small</em> to make progress in the number of steps you gave it.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== LOSS CURVES ===================== -->
+          <h2><span class="h-num">4</span>Logging and reading loss curves</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>Once the single-batch test passes, log the loss (and any accuracy metric) every epoch, for
+          both the training set and a held-out validation set, and plot them. The shape of that curve is a
+          diagnosis, not just a number.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>A doctor doesn't just look at your temperature once — they look at the <em>trend</em> across
+            the day. A fever that's climbing, one that's flat and high, and one that's falling all mean
+            different things and call for different responses. A loss curve is a vital-signs chart for your
+            training run.</p>
+          </div>
+
+          <table>
+            <thead><tr><th>What you see</th><th>What it usually means</th></tr></thead>
+            <tbody>
+              <tr><td>Loss stays high, barely moves</td><td>Something is fundamentally broken — re-run the
+              overfit-one-batch test if you haven't; also suspect a learning rate that's far too small.</td></tr>
+              <tr><td>Loss goes up, or to <code>NaN</code></td><td>Diverging. Almost always the learning rate
+              is too high, or an unstable operation (e.g. <code>log(0)</code>, exploding gradients) is
+              involved. Try lowering the learning rate or adding gradient clipping.</td></tr>
+              <tr><td>Training loss keeps falling, validation loss flattens or rises</td><td>A growing
+              <strong>gap</strong> between train and validation performance — this is overfitting: the model
+              is memorizing the training set instead of learning general patterns.</td></tr>
+              <tr><td>Both curves fall together and flatten near the same value</td><td>Healthy. This is what
+              a well-behaved training run looks like.</td></tr>
+            </tbody>
+          </table>
+
+          <p class="codecap">minimal logging loop</p>
+          <pre><code class="language-python">history = {"train_loss": [], "val_loss": []}
+
+for epoch in range(num_epochs):
+    model.train()
+    train_loss = run_one_epoch(model, train_loader, optimizer)  # your training step
+
+    model.eval()
+    with torch.no_grad():
+        val_loss = run_one_epoch(model, val_loader, optimizer=None)  # no update, just measure
+
+    history["train_loss"].append(train_loss)
+    history["val_loss"].append(val_loss)
+    print(f"epoch {epoch}: train={train_loss:.4f}  val={val_loss:.4f}")</code></pre>
+
+          <!-- ===================== CHECKPOINTING ===================== -->
+          <h2><span class="h-num">5</span>Checkpointing, and train() vs eval()</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>A <strong>checkpoint</strong> is a saved snapshot of your model's learned numbers, so a crashed
+          run — or a finished one — doesn't cost you the training you already did. Saving is only half the
+          story, though: when you load a model back for evaluation, you must also tell it to
+          <em>behave differently</em> than it did during training, using <code>model.eval()</code>.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Think of a restaurant kitchen during a chaotic dinner rush versus a calm plating for a food
+            photographer. During the rush (training), the kitchen improvises, substitutes ingredients, and
+            varies technique run to run. For the photo (evaluation), everyone follows the exact same,
+            fixed, repeatable steps every time. Same kitchen, same recipe — deliberately different mode.</p>
+          </div>
+
+          <p class="beat beat--code">Saving and loading</p>
+          <pre><code class="language-python">torch.save(model.state_dict(), "checkpoint.pt")
+
+model = MyModel()
+model.load_state_dict(torch.load("checkpoint.pt"))</code></pre>
+
+          <p>Some layers — dropout and batch normalization, covered in
+          <a href="20-training-at-scale.html">Section 20</a> — behave differently while training than while
+          evaluating. Dropout randomly zeroes units only during training; batch norm uses statistics from
+          the current batch while training, but a running average while evaluating. <code>model.train()</code>
+          and <code>model.eval()</code> are how you tell PyTorch which mode those layers should use — they
+          do not touch the weights, only the <em>behavior</em> of a few specific layer types.</p>
+
+          <pre><code class="language-python">model.train()                 # dropout active; batchnorm uses batch stats
+for xb, yb in train_loader:
+    ...                        # normal training step
+
+model.eval()                  # dropout off; batchnorm uses running stats
+with torch.no_grad():         # also skip building the graph -- we won't call backward()
+    preds = model(x_val)</code></pre>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">You load a checkpoint and run inference, but predictions are noticeably worse and slightly different every time you re-run the exact same input. What did you most likely forget?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p><code>model.eval()</code>. Without it, the model is still in training mode: dropout is
+                randomly zeroing a fraction of units on every call (which explains why the same input gives
+                slightly different outputs each time), and batch normalization is using statistics from
+                whatever small batch you happened to pass in, rather than the stable running averages
+                collected during training. Both effects degrade and randomize predictions in exactly this way.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== COMMON BUGS ===================== -->
+          <h2><span class="h-num">6</span>The usual suspects: a checklist</h2>
+          <p>When a model won't train, walk this list before anything more exotic:</p>
+          <ul>
+            <li><strong>Forgot <code>optimizer.zero_grad()</code>.</strong> Gradients accumulate
+            (add up) across calls to <code>backward()</code> by default. Skip the reset and each step's
+            gradient is contaminated by every previous step's.</li>
+            <li><strong>Forgot <code>model.eval()</code> at evaluation time.</strong> Dropout and batch norm
+            keep training-time behavior, quietly corrupting validation/test numbers.</li>
+            <li><strong>Learning rate too high.</strong> Shows up as a diverging or <code>NaN</code> loss;
+            the fix is almost always to lower it (or warm it up gradually).</li>
+            <li><strong>Wrong loss reduction.</strong> Mixing up <code>sum</code> and <code>mean</code>
+            reduction silently rescales your effective learning rate by the batch size.</li>
+            <li><strong>Data on the wrong device.</strong> Mixing a CPU tensor with a GPU model (or vice
+            versa) raises a clear error, but forgetting to move a <em>new</em> tensor you created mid-forward
+            pass is an easy miss — watch for <code>RuntimeError: Expected all tensors to be on the same
+            device</code>.</li>
+          </ul>
+
+          <hr />
+
+          <h2><span class="h-num">7</span>What to carry forward</h2>
+          <ul>
+            <li>Print shapes constantly. Most bugs are a shape mismatch, and PyTorch's error message tells
+            you exactly which two tensors collided if you read both sides.</li>
+            <li><strong>Gradient checking</strong> compares the analytic gradient (from <code>backward()</code>)
+            against a numeric one from nudging weights by <code>ε</code> — use it whenever you write a
+            custom loss or layer.</li>
+            <li><strong>Overfit one small batch first.</strong> If the loss won't go near zero on a batch
+            of 16, the bug is in your code, not your data or your model's capacity.</li>
+            <li>Log train and validation curves every epoch; a growing gap between them means overfitting,
+            a flat high loss means something is broken, a rising loss means the learning rate is too high.</li>
+            <li>Checkpoint with <code>state_dict()</code>, and always pair loading a model with the right
+            <code>model.train()</code> / <code>model.eval()</code> call.</li>
+          </ul>
+
+          <p>Next we put these habits to work on real architectures, starting with convolutional networks
+          for images in <a href="16-cnns.html">Section 16</a>.</p>
+
+          <div class="complete-bar" data-complete>
+            <span class="complete-bar__text">Finished this section? Mark it done to fill your progress bar.</span>
+            <button class="btn btn--primary">Mark section complete</button>
+          </div>
+
+          <nav class="pager" data-pager aria-label="Section navigation"></nav>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script defer src="../assets/vendor/katex/katex.min.js"></script>
+  <script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+  <script src="../assets/vendor/highlight/highlight.min.js"></script>
+  <script src="../assets/search-index.js"></script>
+  <script src="../assets/course.js"></script>
+</body>
+</html>

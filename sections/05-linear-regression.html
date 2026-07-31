@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <script>try{var t=localStorage.getItem("z2h-ml-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>What Learning Means · ML Without the Magic</title>
+  <meta name="description" content="The learning triad — hypothesis, loss, and optimization — worked out in full through linear regression, solved both by the normal equation and by gradient descent." />
+  <link rel="stylesheet" href="../assets/vendor/fonts/fonts.css" />
+  <link rel="stylesheet" href="../assets/course.css" />
+  <link rel="stylesheet" href="../assets/vendor/katex/katex.min.css" />
+</head>
+<body data-slug="05-linear-regression">
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="nav-scrim"></div>
+  <div class="layout">
+    <aside class="sidebar" aria-label="Course navigation">
+      <div class="brand">
+        <div class="brand__kicker">Machine Learning</div>
+        <h1 class="brand__title"><a href="../index.html">Without the Magic</a></h1>
+      </div>
+      <div class="progress">
+        <div class="progress__track"><div class="progress__fill" data-progress-fill></div></div>
+        <div class="progress__label" data-progress-label></div>
+      </div>
+      <nav class="nav" data-nav aria-label="Sections"></nav>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <button class="iconbtn menubtn" data-menu aria-label="Open navigation">☰</button>
+        <div class="topbar__spacer"></div>
+        <span class="topbar__meta">Part 2 · Classical ML</span>
+        <button class="iconbtn" data-theme-toggle aria-label="Toggle theme">☾</button>
+      </div>
+
+      <main id="main" class="reading">
+        <header class="lesson-head">
+          <p class="lesson-eyebrow">Part 2 · Classical ML <span class="dot"></span> Section 5</p>
+          <h1 class="lesson-title">What Learning Means</h1>
+          <p class="lesson-standfirst">Every model you will ever train is secretly just three ingredients — a hypothesis, a loss, and an optimizer — and linear regression is the cleanest place to watch all three get solved by hand.</p>
+          <div class="lesson-meta">
+            <span><b>30 min</b> read</span>
+            <span><b>You'll learn:</b> hypothesis classes · loss functions · optimization · linear regression (closed form &amp; gradient descent)</span>
+          </div>
+        </header>
+
+        <div class="prose">
+          <p class="lead">"Training a model" sounds mysterious until you break it into three
+          questions, none of which is mysterious at all: what kinds of guesses are we willing to
+          make, how do we score a guess as good or bad, and how do we search for the best one? Get
+          comfortable with those three questions and you can read the training loop of almost any
+          model in this course — including the giant ones later on.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> The one idea to hold onto</div>
+            <p>Learning is <strong>search</strong>. You fix a family of candidate functions, you fix a
+            number that measures how wrong each candidate is, and then you search that family for the
+            candidate with the lowest wrongness. Every algorithm in this course is a different way of
+            doing that search.</p>
+          </div>
+
+          <!-- ===================== THE TRIAD ===================== -->
+          <h2><span class="h-num">1</span>The learning triad: hypothesis, loss, optimization</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>Three separate ingredients make up every learning algorithm you'll meet. First, a
+          <strong>hypothesis class</strong>: the family of functions you're willing to consider as
+          "the answer" — maybe only straight lines, maybe anything a neural network can express.
+          Second, a <strong>loss</strong>: a single number that says how wrong one particular
+          function's guesses are, computed by comparing its predictions to the real answers. Third,
+          <strong>optimization</strong>: the search procedure that tries different functions from the
+          hypothesis class and steers toward the one with the lowest loss. Learning, end to end, is
+          just those three things wired together.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>You're tuning a recipe for tomato soup. The <strong>hypothesis class</strong> is every
+            recipe you'd consider making — maybe you've decided it must be tomato, garlic, and cream
+            in some proportions, so "recipe" really means "the three numbers: how much tomato, how
+            much garlic, how much cream." The <strong>loss</strong> is a taste test: how far this
+            batch is from the flavor you're aiming for (too salty, not creamy enough — turned into one
+            "distance from perfect" score). <strong>Optimization</strong> is what you do next: taste,
+            adjust the ratios a little in the direction that helped last time, taste again. You never
+            see "the answer" printed anywhere — you find it by repeatedly tasting and nudging.</p>
+          </div>
+
+          <div class="callout definition">
+            <div class="callout__label">Definition</div>
+            <p>A <dfn>hypothesis class</dfn> is the set of candidate functions a model is allowed to
+            choose from. Restricting it is a choice you make before training even starts — e.g.
+            "only straight lines" is a much smaller, simpler hypothesis class than "any curve a deep
+            network can draw."</p>
+          </div>
+
+          <div class="callout definition">
+            <div class="callout__label">Definition</div>
+            <p>A <dfn>loss function</dfn> takes one hypothesis's predictions and the true answers and
+            returns a single non-negative number: 0 means "perfect," and bigger means "worse." Every
+            training run is, underneath, minimizing some loss function.</p>
+          </div>
+
+          <div class="callout definition">
+            <div class="callout__label">Definition</div>
+            <p>An <dfn>optimization</dfn> procedure is the algorithm that searches the hypothesis
+            class for the member with the lowest loss. It never magically knows the answer; it only
+            knows how to take the current guess and produce a slightly better one.</p>
+          </div>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">In the soup analogy, what plays the role of the loss function — and would "zero loss" ever really happen?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>The taste test's "distance from the target flavor" score is the loss. In practice you
+                almost never hit exactly zero — there's always some noise (today's tomatoes are
+                slightly different from yesterday's), so the goal is realistically "as low as we can
+                get," not a mathematically perfect zero. The same is true of nearly every model you'll
+                train on real data.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== HYPOTHESIS CLASS ===================== -->
+          <h2><span class="h-num">2</span>The hypothesis class: linear regression</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>The simplest useful hypothesis class is: predictions are a <strong>straight-line
+          function</strong> of the input. Linear regression restricts itself to exactly that family
+          and nothing fancier — no curves, no bends.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Predicting a house's price from its size. Bigger houses tend to cost more, roughly in
+            proportion — add a square foot, add a roughly fixed number of dollars. That's exactly the
+            shape of a straight line: a starting price plus a rate per square foot.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>With a single input <b>x</b> (say, size in square feet), the hypothesis is:</p>
+          $$ \hat{y} = wx + b $$
+          <p class="gloss"><b>In words:</b> <b>ŷ</b> ("y-hat") is the model's predicted price. <b>x</b>
+          is the house's size. <b>w</b> (the <em>weight</em>) is dollars added per extra square foot —
+          the slope. <b>b</b> (the <em>bias</em>) is the baseline price when size is zero — the
+          intercept. Learning this hypothesis means finding good numbers for <b>w</b> and <b>b</b>.</p>
+
+          <p>Real houses have more than one useful feature — size, number of bedrooms, age, distance to
+          downtown. Stack those numbers into a vector <b>x</b> and give each one its own weight in a
+          vector <b>w</b>; the model is the same idea generalized:</p>
+          $$ \hat{y} = \mathbf{w}^\top\mathbf{x} + b = w_1x_1 + w_2x_2 + \dots + w_dx_d + b $$
+          <p class="gloss"><b>In words:</b> <b>wᵀx</b> is a dot product (Section 1) — multiply each
+          feature by its own weight and add up the results — then shift by the single bias number
+          <b>b</b>. One weight per feature, one shared bias for the whole prediction.</p>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <pre><code class="language-python">import torch
+
+w = torch.tensor([120.0])      # $ per extra sqft
+b = torch.tensor([10000.0])    # baseline price
+x = torch.tensor([1800.0])     # house size, sqft
+
+y_hat = x * w + b
+print(y_hat)                   # tensor([226000.])</code></pre>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">With ŷ = 120x + 10000, what price does the model predict for a 1,800 sqft house, and what do w and b represent in plain words?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>ŷ = 120 × 1800 + 10000 = <strong>226,000</strong>. Here <b>w = 120</b> means "each
+                extra square foot adds 120 dollars to the predicted price," and <b>b = 10000</b> means "a
+                hypothetical zero-square-foot house would be priced at 10,000 dollars" — a baseline that
+                mostly exists to shift the line up or down, not a literal claim about tiny houses.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== LOSS ===================== -->
+          <h2><span class="h-num">3</span>The loss: Mean Squared Error</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>We need one number that says "across every house in our data, how wrong were this line's
+          guesses?" <strong>Mean Squared Error</strong> (MSE) does this: for each house, subtract the
+          true price from the predicted price, square that difference, and average the squares over
+          all houses.</p>
+
+          <p class="beat beat--math">Now the math</p>
+          $$ L(w,b) = \frac{1}{n}\sum_{i=1}^{n}\left(\hat{y}_i - y_i\right)^2, \qquad \hat{y}_i = wx_i+b $$
+          <p class="gloss"><b>In words:</b> for each of the <b>n</b> houses, take (predicted price −
+          true price), square it, then average all <b>n</b> squared errors into one number. Squaring
+          does two jobs at once: it makes every error positive (so a 10-dollar over-guess and a 10-dollar
+          under-guess don't cancel out when summed), and it punishes large mistakes far more than
+          small ones.</p>
+
+          <div class="callout definition">
+            <div class="callout__label">Why square, and not absolute value?</div>
+            <p>Absolute value |ŷ−y| would also make errors positive, but it isn't smooth: at exactly
+            zero its slope jumps abruptly, which is awkward for gradient-based optimization (Section
+            2). Squaring is smooth everywhere and — as the next box shows — falls directly out of a
+            simple assumption about noisy data, rather than being picked arbitrarily.</p>
+          </div>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> Where MSE actually comes from</div>
+            <p>Suppose the true price is a straight line plus random noise:
+            $y_i = wx_i + b + \varepsilon_i$, where each $\varepsilon_i$ is drawn from a Gaussian
+            (bell-curve) distribution with mean 0 (see <a href="03-probability.html">Section 3</a>).
+            Then the probability of seeing price $y_i$ given $x_i$ is the Gaussian density
+            centered at $\hat y_i = wx_i+b$:</p>
+            $$ p(y_i\mid x_i;w,b) = \frac{1}{\sqrt{2\pi\sigma^2}}\exp\!\left(-\frac{(y_i-\hat y_i)^2}{2\sigma^2}\right) $$
+            <p>Assuming the houses are independent, the likelihood of the <em>whole</em> dataset is the
+            product of these densities. Taking the log turns the product into a sum (logs turn
+            multiplication into addition) and the exponential into a plain term:</p>
+            $$ \log \mathcal{L}(w,b) = \sum_{i=1}^n \left[-\log\sqrt{2\pi\sigma^2} - \frac{(y_i-\hat y_i)^2}{2\sigma^2}\right]
+               = -n\log\sqrt{2\pi\sigma^2} - \frac{1}{2\sigma^2}\sum_{i=1}^n (y_i-\hat y_i)^2 $$
+            <p class="gloss"><b>In words:</b> the first term doesn't involve <b>w</b> or <b>b</b> at all,
+            and $\tfrac{1}{2\sigma^2}$ is just a positive constant. So <em>maximizing</em> this
+            log-likelihood over <b>w,b</b> is exactly the same job as <em>minimizing</em>
+            $\sum_i(y_i-\hat y_i)^2$ — which is Mean Squared Error, up to the constant $1/n$. Squared
+            error isn't an arbitrary convention; it's what falls out the moment you assume Gaussian
+            noise.</p>
+          </div>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">Why does minimizing sum-of-squared-errors correspond to maximizing likelihood under Gaussian noise, rather than, say, minimizing it?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>The log-likelihood is <code>−n·log(√2πσ²) − (1/2σ²)·Σ(y−ŷ)²</code>. The second term
+                is subtracted, and its size grows with the squared errors. So making the squared errors
+                <em>bigger</em> makes the log-likelihood <em>smaller</em>, and making them
+                <em>smaller</em> makes the log-likelihood <em>larger</em>. To maximize likelihood you
+                therefore have to minimize the sum of squared errors — the minus sign is what flips
+                "minimize error" into "maximize likelihood."</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== CLOSED FORM ===================== -->
+          <h2><span class="h-num">4</span>Optimization, take one: solving directly</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>Because the MSE loss for a straight line is a smooth bowl shape (one single lowest point,
+          no bumps), we don't have to search for the bottom by trial and error — we can use calculus to
+          jump straight to it, the same way you'd find the minimum of a simple parabola by setting its
+          slope to zero and solving.</p>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>First, a trick to handle the bias <b>b</b> without carrying it separately: glue a column of
+          1s onto the front of the data matrix, and glue <b>b</b> onto the front of the weight vector.
+          Call the augmented versions $\tilde{\mathbf{X}}$ (shape $n\times(d+1)$) and
+          $\tilde{\mathbf{w}}$ (length $d+1$, with $\tilde w_0=b$). Now $\tilde{\mathbf{X}}\tilde{\mathbf{w}}$
+          produces every prediction $\hat y_i = wx_i+b$ at once, and the loss is:</p>
+          $$ L(\tilde{\mathbf{w}}) = \frac{1}{n}\sum_{i=1}^n \left(\tilde{\mathbf{x}}_i\cdot\tilde{\mathbf{w}} - y_i\right)^2 $$
+          <p class="gloss"><b>In words:</b> $\tilde{\mathbf{x}}_i$ is row $i$ of $\tilde{\mathbf{X}}$ —
+          one house's (augmented) features. This is exactly the same MSE as before, just written with
+          the bias folded in.</p>
+
+          <p>Differentiate with respect to one weight $\tilde w_k$ using the chain rule (derivative of a
+          square, times derivative of the inside):</p>
+          $$ \frac{\partial L}{\partial \tilde w_k} = \frac{1}{n}\sum_{i=1}^n 2\left(\tilde{\mathbf{x}}_i\cdot\tilde{\mathbf{w}} - y_i\right)\tilde x_{i,k} $$
+          <p class="gloss"><b>In words:</b> for every house, take its residual (predicted − actual) and
+          multiply by that house's <b>k</b>-th feature value, then average and double. Stacking this
+          expression over every <b>k</b> reassembles a vector, giving the full gradient in matrix
+          form:</p>
+          $$ \nabla_{\tilde{\mathbf{w}}} L = \frac{2}{n}\,\tilde{\mathbf{X}}^\top\!\left(\tilde{\mathbf{X}}\tilde{\mathbf{w}} - \mathbf{y}\right) $$
+          <p class="gloss"><b>In words:</b> compute every residual at once ($\tilde{\mathbf{X}}\tilde{\mathbf{w}}-\mathbf{y}$,
+          a length-<b>n</b> vector), then multiply by $\tilde{\mathbf{X}}^\top$, which — being a matrix —
+          does exactly the "multiply by each feature column and sum over houses" step from the line
+          above, for every weight simultaneously.</p>
+
+          <p>Now solve for the minimum by setting the gradient to the zero vector:</p>
+          $$
+          \begin{aligned}
+          \frac{2}{n}\,\tilde{\mathbf{X}}^\top\!\left(\tilde{\mathbf{X}}\tilde{\mathbf{w}} - \mathbf{y}\right) &= \mathbf{0} \\
+          \tilde{\mathbf{X}}^\top\tilde{\mathbf{X}}\tilde{\mathbf{w}} - \tilde{\mathbf{X}}^\top\mathbf{y} &= \mathbf{0} \\
+          \tilde{\mathbf{X}}^\top\tilde{\mathbf{X}}\tilde{\mathbf{w}} &= \tilde{\mathbf{X}}^\top\mathbf{y} \\
+          \tilde{\mathbf{w}} &= \left(\tilde{\mathbf{X}}^\top\tilde{\mathbf{X}}\right)^{-1}\tilde{\mathbf{X}}^\top\mathbf{y}
+          \end{aligned}
+          $$
+          <p class="gloss"><b>In words:</b> multiply both sides by $n/2$ (drops out), move the constant
+          term to the other side, then multiply both sides by the inverse of
+          $\tilde{\mathbf{X}}^\top\tilde{\mathbf{X}}$ to isolate $\tilde{\mathbf{w}}$. This is the
+          <strong>normal equation</strong>: one formula that hands you the exact best-fit weights, no
+          searching required.</p>
+
+          <div class="callout pitfall">
+            <div class="callout__label"><span class="ic">▲</span> Watch out</div>
+            <p>The inverse $(\tilde{\mathbf{X}}^\top\tilde{\mathbf{X}})^{-1}$ only exists when
+            $\tilde{\mathbf{X}}^\top\tilde{\mathbf{X}}$ is non-singular — roughly, when no feature is an
+            exact linear combination of the others (e.g. one column being exactly twice another). In
+            practice, real code never calls an explicit matrix-inverse function; it calls a linear-solve
+            routine instead, which is faster and numerically safer for the same answer.</p>
+          </div>
+
+          <p class="beat beat--code">The same thing in NumPy</p>
+          <pre><code class="language-python">import numpy as np
+
+def fit_normal_equation(X, y):
+    n = X.shape[0]
+    X_aug = np.hstack([np.ones((n, 1)), X])       # bias trick: prepend a column of 1s
+    w_aug = np.linalg.solve(X_aug.T @ X_aug, X_aug.T @ y)   # solve, don't explicitly invert
+    b, w = w_aug[0], w_aug[1:]
+    return w, b
+
+X = np.array([[650.0], [800.0], [1200.0], [1500.0]])   # house size, sqft
+y = np.array([150_000.0, 180_000.0, 240_000.0, 300_000.0])
+
+w, b = fit_normal_equation(X, y)
+print(w, b)   # array([176.6...]), 22...   -- exact best-fit line, in one call</code></pre>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">Suppose two of your features are "size in sqft" and "size in square meters" — one is just the other times a constant. What breaks in the normal equation, and why?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>$\tilde{\mathbf{X}}^\top\tilde{\mathbf{X}}$ becomes singular (non-invertible), because
+                the two columns carry identical information — infinitely many combinations of their two
+                weights produce the exact same predictions, so there's no single "best" solution to land
+                on. Geometrically, the two features point in the same direction, so the loss bowl isn't a
+                bowl anymore along that direction — it's flat, like a valley floor rather than a single
+                pit. The usual fix, <em>ridge regularization</em>, adds a small penalty that makes the
+                matrix invertible again (a technique from <a href="07-overfitting.html">Section 7</a>).</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== GRADIENT DESCENT ===================== -->
+          <h2><span class="h-num">5</span>Optimization, take two: gradient descent</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>The normal equation is exact, but it needs to invert a $(d+1)\times(d+1)$ matrix, which
+          gets expensive — and sometimes impossible — as the number of features $d$ grows huge.
+          <strong>Gradient descent</strong> instead starts from any guess and repeatedly takes a small
+          step downhill on the loss surface, using the gradient (Section 2 of
+          <a href="02-calculus.html">this course</a>) as a compass that always points toward steepest
+          increase — so we step in the opposite direction.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>You're hiking down a mountain in thick fog. You can't see the valley floor, but you can
+            feel which way the ground slopes under your feet right now. So you take a step in the
+            steepest downhill direction, feel the new slope, take another step, and repeat. You never
+            need a map of the whole mountain — just the local slope, over and over. It's the same foggy
+            hillside from <a href="02-calculus.html">Section 2</a>; here we finally walk all the way down it.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>We already derived the gradient above:
+          $\nabla_{\tilde{\mathbf{w}}} L = \tfrac{2}{n}\tilde{\mathbf{X}}^\top(\tilde{\mathbf{X}}\tilde{\mathbf{w}}-\mathbf{y})$.
+          Gradient descent uses it not to solve for zero directly, but to take a small step against
+          it:</p>
+          $$ \tilde{\mathbf{w}} \leftarrow \tilde{\mathbf{w}} - \alpha\,\nabla_{\tilde{\mathbf{w}}} L $$
+          <p class="gloss"><b>In words:</b> the arrow means "replace the old value with this new one."
+          $\alpha$ (alpha) is the <dfn>learning rate</dfn>, a small positive number controlling step
+          size. We move a little bit in the direction <em>opposite</em> the gradient, because the
+          gradient points toward increasing loss and we want to decrease it. Repeat this update many
+          times and $\tilde{\mathbf{w}}$ slides down the loss bowl toward its bottom.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> When gradient descent beats the closed form</div>
+            <p>The normal equation costs roughly $O(d^3)$ to invert a $d\times d$ matrix — for
+            a dataset with a million features (e.g. a bag-of-words text representation), that's
+            completely infeasible, and such matrices are often sparse in a way that inversion destroys.
+            Gradient descent instead only needs cheap matrix–vector products at each step, can process
+            data in small batches instead of loading everything into memory at once, and works even when
+            $\tilde{\mathbf{X}}^\top\tilde{\mathbf{X}}$ isn't invertible at all. The trade: it gives an
+            approximate answer that improves gradually, instead of the closed form's exact answer in one
+            shot.</p>
+          </div>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <pre><code class="language-python">import torch
+
+X = torch.tensor([[650.], [800.], [1200.], [1500.]])
+y = torch.tensor([150_000., 180_000., 240_000., 300_000.])
+
+# gradient descent is sensitive to feature scale -- normalize first
+X_mean, X_std = X.mean(), X.std()
+Xn = (X - X_mean) / X_std
+
+w = torch.zeros(1, requires_grad=True)
+b = torch.zeros(1, requires_grad=True)
+lr = 0.1
+
+for step in range(500):
+    y_hat = Xn.squeeze() * w + b        # forward pass (the hypothesis)
+    loss = ((y_hat - y) ** 2).mean()    # MSE
+
+    loss.backward()                     # autograd fills w.grad, b.grad
+
+    with torch.no_grad():               # the update step itself isn't part of the graph
+        w -= lr * w.grad
+        b -= lr * b.grad
+        w.grad.zero_()
+        b.grad.zero_()
+
+print(w.item(), b.item(), loss.item())</code></pre>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">You're training on a bag-of-words dataset with 1,000,000 features. Why is gradient descent the practical choice over the normal equation here?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>The normal equation needs $(\tilde{\mathbf{X}}^\top\tilde{\mathbf{X}})^{-1}$, a
+                1,000,000 × 1,000,000 matrix inverse — roughly $10^{18}$ operations and enormous memory,
+                completely impractical. Gradient descent instead touches the data only through
+                matrix–vector products, which stay cheap and can even exploit the sparsity that
+                bag-of-words features usually have (most entries are zero). It trades an exact one-shot
+                answer for a sequence of cheap, scalable steps.</p>
+              </div>
+            </details>
+          </div>
+
+          <hr />
+
+          <h2><span class="h-num">6</span>What to carry forward</h2>
+          <ul>
+            <li>Learning = <strong>hypothesis class</strong> (what functions we allow) +
+            <strong>loss</strong> (how we score wrongness) + <strong>optimization</strong> (how we
+            search) — every algorithm in this course is this triad in a different costume.</li>
+            <li>Linear regression's hypothesis is $\hat y = \mathbf{w}^\top\mathbf{x}+b$, a straight
+            line (or plane, or hyperplane) fit to the data.</li>
+            <li><strong>MSE</strong> squares and averages the errors — and isn't an arbitrary choice:
+            it's the maximum-likelihood loss when noise is Gaussian.</li>
+            <li>The <strong>normal equation</strong> $\tilde{\mathbf{w}} = (\tilde{\mathbf{X}}^\top\tilde{\mathbf{X}})^{-1}\tilde{\mathbf{X}}^\top\mathbf{y}$
+            solves for the exact minimum directly, by setting the gradient to zero.</li>
+            <li><strong>Gradient descent</strong> instead walks downhill step by step —
+            slower per problem, but the only option once the data is too large or too sparse to invert.</li>
+          </ul>
+          <p>Next we'll keep the same triad but swap the hypothesis and the loss: predicting a
+          category instead of a number, in <a href="06-logistic-regression.html">Logistic
+          Regression</a>.</p>
+
+          <div class="complete-bar" data-complete>
+            <span class="complete-bar__text">Finished this section? Mark it done to fill your progress bar.</span>
+            <button class="btn btn--primary">Mark section complete</button>
+          </div>
+
+          <nav class="pager" data-pager aria-label="Section navigation"></nav>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script defer src="../assets/vendor/katex/katex.min.js"></script>
+  <script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+  <script src="../assets/vendor/highlight/highlight.min.js"></script>
+  <script src="../assets/search-index.js"></script>
+  <script src="../assets/course.js"></script>
+</body>
+</html>

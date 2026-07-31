@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <script>try{var t=localStorage.getItem("z2h-ml-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sequence Models: RNNs &amp; LSTMs · ML Without the Magic</title>
+  <meta name="description" content="Why order matters and how a hidden state carries memory forward, how repeated multiplication makes gradients vanish or explode over long sequences, and why LSTMs and attention came next." />
+  <link rel="stylesheet" href="../assets/vendor/fonts/fonts.css" />
+  <link rel="stylesheet" href="../assets/course.css" />
+  <link rel="stylesheet" href="../assets/vendor/katex/katex.min.css" />
+</head>
+<body data-slug="17-sequence-models">
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="nav-scrim"></div>
+  <div class="layout">
+    <aside class="sidebar" aria-label="Course navigation">
+      <div class="brand">
+        <div class="brand__kicker">Machine Learning</div>
+        <h1 class="brand__title"><a href="../index.html">Without the Magic</a></h1>
+      </div>
+      <div class="progress">
+        <div class="progress__track"><div class="progress__fill" data-progress-fill></div></div>
+        <div class="progress__label" data-progress-label></div>
+      </div>
+      <nav class="nav" data-nav aria-label="Sections"></nav>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <button class="iconbtn menubtn" data-menu aria-label="Open navigation">☰</button>
+        <div class="topbar__spacer"></div>
+        <span class="topbar__meta">Part 5 · Deep Learning Architectures</span>
+        <button class="iconbtn" data-theme-toggle aria-label="Toggle theme">☾</button>
+      </div>
+
+      <main id="main" class="reading">
+        <header class="lesson-head">
+          <p class="lesson-eyebrow">Part 5 · Deep Learning Architectures <span class="dot"></span> Section 17</p>
+          <h1 class="lesson-title">Sequence Models: RNNs &amp; LSTMs</h1>
+          <p class="lesson-standfirst">A recurrent network reads one step at a time and carries a memory forward — and the very thing that makes that possible is also what makes it so hard to train over long stretches.</p>
+          <div class="lesson-meta">
+            <span><b>24 min</b> read</span>
+            <span><b>You'll learn:</b> RNNs &amp; hidden state · unrolling · vanishing/exploding gradients · LSTMs · why we moved on</span>
+          </div>
+        </header>
+
+        <div class="prose">
+          <p class="lead">Convolutional networks in <a href="16-cnns.html">Section 16</a> assume their
+          input is a grid where nearby pixels matter, but position order isn't inherently meaningful in
+          any particular direction. Text, audio, and time series are different: they're
+          <strong>sequences</strong>, where <em>order</em> carries the meaning. “Dog bites man” and “man
+          bites dog” use the same words in a different order to say something completely different.
+          Recurrent networks are the first architecture built specifically to respect that.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> The one idea to hold onto</div>
+            <p>A recurrent network reads a sequence one element at a time and keeps a running
+            <strong>hidden state</strong> — a summary of everything seen so far — updating it at every
+            step. That single reused update rule, applied over and over, is both the source of its power
+            and, as you'll see, the source of its biggest weakness.</p>
+          </div>
+
+          <!-- ===================== RNN & HIDDEN STATE ===================== -->
+          <h2><span class="h-num">1</span>RNNs: a hidden state that carries memory forward</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>A <strong>recurrent neural network</strong> (RNN) processes a sequence step by step — one
+          word, one audio sample, one time-tick at a time. At each step it looks at the current input
+          <em>and</em> a running summary of everything it has seen before (the <strong>hidden
+          state</strong>), and produces an updated summary to carry into the next step.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Think of reading a sentence word by word, out loud, to someone who can't see the page.
+            By the time you reach the word “bank” in “I walked along the river bank,” you already have a
+            running sense of the sentence's meaning from the words before it — that running sense is
+            what lets you interpret “bank” as a riverbank, not a place to deposit money. You don't
+            re-read the whole sentence from scratch at every word; you carry a summary forward and update
+            it. That carried summary is the hidden state.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>At each time step <b>t</b>, the network takes the current input <b>x_t</b> and the previous
+          hidden state <b>h_{t-1}</b>, and produces the new hidden state <b>h_t</b>:</p>
+          $$ \mathbf{h}_t = \tanh\!\left( \mathbf{W} \mathbf{x}_t + \mathbf{U} \mathbf{h}_{t-1} + \mathbf{b} \right) $$
+          <p class="gloss"><b>In words:</b> <b>W</b> is a matrix that transforms the current input
+          (exactly the <span style="white-space:nowrap">$\mathbf{Wx}$</span> from
+          <a href="01-linear-algebra.html">Section 1</a>); <b>U</b> is a matrix that transforms the
+          previous hidden state, folding in what's been remembered so far; <b>b</b> is a bias vector; and
+          <b>tanh</b> squashes the result into a bounded range so the hidden state can't grow without
+          limit. Crucially, the <em>same</em> <b>W</b>, <b>U</b>, and <b>b</b> are reused at every single
+          time step — one small set of weights processes a sequence of any length, just like one
+          convolution kernel is reused at every position in <a href="16-cnns.html">Section 16</a>.</p>
+
+          <h3>Unrolling and backprop-through-time</h3>
+          <p>To picture what's happening — and to train the network — it helps to draw the RNN
+          “unrolled”: one copy of the same update rule per time step, laid out left to right, each
+          feeding its hidden state into the next.</p>
+          $$ x_1 \to h_1 \to h_2 \to h_3 \to \dots \to h_T $$
+          <p class="gloss"><b>In words:</b> it looks like a very deep feedforward network — except every
+          copy shares the exact same weights <b>W</b> and <b>U</b>. Training uses ordinary backpropagation
+          (see <a href="12-training-dynamics.html">Section 12</a>) applied to this unrolled picture, which
+          is why it's called <strong>backpropagation through time</strong>: the error at the last step has
+          to flow backward through every earlier time step, through the same weight matrix, again and
+          again, to reach the beginning of the sequence.</p>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <pre><code class="language-python">import torch
+import torch.nn as nn
+
+rnn = nn.RNN(input_size=8, hidden_size=16, batch_first=True)
+
+x = torch.randn(4, 10, 8)          # (batch=4, sequence length=10, features=8)
+h0 = torch.zeros(1, 4, 16)         # initial hidden state, all zeros
+
+outputs, h_last = rnn(x, h0)
+print(outputs.shape)   # torch.Size([4, 10, 16]) -> hidden state at every one of the 10 steps
+print(h_last.shape)    # torch.Size([1, 4, 16])  -> just the final hidden state</code></pre>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">Why can the same RNN, with a fixed number of parameters, process both a 5-word sentence and a 500-word sentence?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Because the parameters (<code>W</code>, <code>U</code>, <code>b</code>) don't
+                describe the whole sequence — they describe a single <em>update step</em>, applied
+                once per token regardless of how many tokens there are. A 500-word sentence just runs
+                that same small update 500 times instead of 5, reusing identical weights each time. This
+                is the sequence analogue of a convolution kernel being reused at every pixel position
+                rather than needing one new kernel per image size.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== VANISHING / EXPLODING ===================== -->
+          <h2><span class="h-num">2</span>The failure mode: vanishing and exploding gradients</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>Here's the problem with reusing the same weight matrix at every step: backpropagation
+          through time has to multiply by that <em>same</em> matrix once per time step, all the way back
+          to the start of the sequence. Multiplying by the same thing over and over doesn't stay neutral
+          — it compounds, the same way repeatedly applying a stretch or a shrink compounds.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Whisper a sentence down a long line of people, and by the tenth person it's already
+            garbled — small distortions compound with every relay. Now imagine instead that each
+            person is instructed to say everything 5% louder than they heard it: after twenty people,
+            the message is a deafening roar. Repeated small changes, applied over and over along a long
+            chain, either fade to nothing or blow up — there's rarely a stable middle.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>Recall from <a href="01-linear-algebra.html">Section 1</a> that a matrix's
+          <strong>eigenvalues</strong> are the stretch factors along its favoured directions, and that
+          applying the same matrix repeatedly raises those stretch factors to a power. Backpropagation
+          through time does exactly this to the recurrent weight matrix <b>U</b>: the gradient flowing
+          back <b>T</b> steps involves a term that looks roughly like <b>U</b> multiplied by itself
+          <b>T</b> times.</p>
+          $$ \frac{\partial h_T}{\partial h_0} \;\approx\; \prod_{t=1}^{T} U^\top \,\cdot\, \text{(local terms)} $$
+          <p class="gloss"><b>In words:</b> the gradient connecting the last hidden state back to the
+          first has to pass through <b>T</b> copies of (roughly) the same matrix, multiplied together. If
+          <b>U</b>'s dominant eigenvalue is less than 1, that product shrinks toward zero as <b>T</b>
+          grows — the <strong>vanishing gradient</strong> problem, identical in spirit to the
+          eigenvalue example in <a href="01-linear-algebra.html">Section 1</a> and the depth problem in
+          <a href="16-cnns.html">Section 16</a>. If it's greater than 1, the product blows up — the
+          <strong>exploding gradient</strong> problem instead. Either way, the network's early time steps
+          get almost no usable training signal, which means it struggles to learn any dependency that
+          spans a long stretch of the sequence (see <a href="12-training-dynamics.html">Section 12</a>
+          for how this plays out during training).</p>
+
+          <div class="callout pitfall">
+            <div class="callout__label"><span class="ic">▲</span> Watch out</div>
+            <p>This is exactly why plain RNNs are bad at tasks like “does the subject introduced at the
+            start of a long paragraph agree with the verb at the end?” — by the time the gradient (or,
+            at inference time, the hidden state itself) has been pushed through dozens of update steps,
+            information about that early subject has often faded to nearly nothing.</p>
+          </div>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">If the recurrent weight matrix's dominant eigenvalue is 0.9, roughly what fraction of the original gradient survives after 50 time steps, and what does that imply about learning long-range dependencies?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p><code>0.9^50 ≈ 0.005</code> — about half a percent of the original signal survives.
+                Any dependency that requires connecting something 50 steps back to the current step gets
+                a gradient signal roughly 200 times weaker than a dependency just one step back, so the
+                network effectively can't learn it: the training signal needed to strengthen that
+                long-range connection is drowned out before it arrives. This is the concrete reason plain
+                RNNs are said to have a "short memory" in practice, even though the hidden state is, in
+                principle, carrying information forward from every step.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== LSTM ===================== -->
+          <h2><span class="h-num">3</span>LSTMs: gates that choose what to remember</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>The <strong>LSTM</strong> (Long Short-Term Memory) is an RNN variant designed directly
+          against the vanishing-gradient problem. Instead of squashing everything through one
+          <b>tanh</b> update every step, it keeps a separate <strong>memory cell</strong> and uses three
+          learned <strong>gates</strong> — small networks that output a number between 0 and 1 — to
+          control, at every step, what gets forgotten, what gets added, and what gets read out.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Picture keeping a notebook while reading a long report. At every page you make three
+            deliberate decisions: what old notes to <em>cross out</em> because they're no longer
+            relevant (the <strong>forget gate</strong>), what new fact to <em>write down</em> (the
+            <strong>input gate</strong>), and how much of what's in the notebook to actually
+            <em>read back out</em> right now to use (the <strong>output gate</strong>). The notebook
+            itself — the memory cell — persists across pages largely untouched except where you
+            deliberately edit it, instead of being rewritten from scratch every single page.</p>
+          </div>
+
+          <div class="callout definition">
+            <div class="callout__label">Definition</div>
+            <p>A <dfn>gate</dfn>, in an LSTM, is a small learned layer (a sigmoid, so its output is
+            always between 0 and 1) that acts as a per-element “volume knob”: near 0 blocks information
+            from passing, near 1 lets it through unchanged. The forget, input, and output gates are three
+            independent such knobs, each learned to serve a different job.</p>
+          </div>
+
+          <p>We won't derive the full LSTM update here — it's three gates plus a candidate memory update,
+          and the algebra is more bookkeeping than new insight. The one thing worth carrying forward: the
+          memory cell is updated additively (old memory times the forget gate, <em>plus</em> new
+          information times the input gate), which is structurally similar to the
+          <span style="white-space:nowrap">$x + F(x)$</span> skip connection from
+          <a href="16-cnns.html">Section 16</a> — an additive path that lets gradients flow back through
+          many steps without being forced through a repeated multiplication every time. This is what eases
+          (though doesn't fully solve) the vanishing-gradient problem from the section above.</p>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <pre><code class="language-python">import torch
+import torch.nn as nn
+
+lstm = nn.LSTM(input_size=8, hidden_size=16, batch_first=True)
+
+x = torch.randn(4, 10, 8)           # (batch=4, sequence length=10, features=8)
+h0 = torch.zeros(1, 4, 16)
+c0 = torch.zeros(1, 4, 16)          # LSTMs carry a memory cell alongside the hidden state
+
+outputs, (h_last, c_last) = lstm(x, (h0, c0))
+print(outputs.shape)  # torch.Size([4, 10, 16])
+print(c_last.shape)   # torch.Size([1, 4, 16])  -> the memory cell, separate from the hidden state</code></pre>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">A plain RNN updates its entire hidden state by squashing it through tanh every step. Why does an LSTM's additive memory-cell update ease the vanishing-gradient problem better than that?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>A plain RNN's hidden state is <em>rewritten</em> at every step by passing it through
+                a matrix multiply and a squashing nonlinearity — the gradient backward through that step
+                always has to go through that multiplication, which compounds over many steps exactly as
+                shown above. An LSTM's memory cell is updated <em>additively</em> (forget-gated old
+                memory plus input-gated new information), so there's a path for the gradient that doesn't
+                require repeated multiplication by the same matrix — much like the identity path in a
+                residual connection. The gates still have to learn good values, so LSTMs don't eliminate
+                the problem, but the additive path gives gradients a much easier route over long
+                sequences than a plain RNN offers.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== WHY WE MOVED ON ===================== -->
+          <h2><span class="h-num">4</span>Why we moved on: the case for attention</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>LSTMs eased the gradient problem, but they left a different limitation untouched: an RNN, by
+          construction, must process a sequence <strong>one step at a time</strong> — step 50 needs the
+          hidden state from step 49, which needs step 48, all the way back to the start. You cannot
+          compute step 50 before step 49 is done.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>It's the difference between one person reading a book aloud, page by page, versus handing
+            every page to a different reader in a room and letting them all read simultaneously, then
+            comparing notes. The second approach only works if readers can directly reference any other
+            page whenever they need to — not just whatever the previous reader happened to pass along.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>This sequential dependency has a very concrete cost: on modern hardware (GPUs), which are
+          built to do enormous numbers of independent calculations <em>at once</em>, an RNN can't use that
+          parallelism across the time dimension — step 50's calculation must wait for step 49's to
+          finish, no matter how many idle processors are sitting around. Training on long sequences
+          becomes slow simply from this forced serial order, on top of the fact that even LSTMs still
+          degrade on very long-range dependencies.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> The opening for attention</div>
+            <p>What if, instead of forcing information to pass through every intermediate step to get
+            from position 3 to position 300, a model could let position 300 look directly at position 3 —
+            no relay required, and no inherent obstacle to computing many positions at once? That's the
+            idea <a href="18-transformers.html">Section 18</a> builds on: attention mechanisms and the
+            transformer architecture, which replace the sequential hidden state with a way for every
+            position to directly attend to every other position.</p>
+          </div>
+
+          <hr />
+
+          <h2><span class="h-num">5</span>What to carry forward</h2>
+          <ul>
+            <li>An <strong>RNN</strong> reads a sequence step by step, keeping a <strong>hidden state</strong> that's updated by the same reused weights (<span style="white-space:nowrap">$\mathbf{h}_t = \tanh(\mathbf{W}\mathbf{x}_t + \mathbf{U}\mathbf{h}_{t-1} + \mathbf{b})$</span>) at every step.</li>
+            <li><strong>Unrolling</strong> turns the recurrence into a deep chain of identical steps; training it is backpropagation through time.</li>
+            <li>Because the same weight matrix is applied repeatedly, gradients over long sequences <strong>vanish or explode</strong> depending on that matrix's eigenvalues — the same phenomenon as Section 1's eigenvalues and Section 16's deep-network gradient problem.</li>
+            <li><strong>LSTMs</strong> add gates and an additive memory cell to ease (not eliminate) that problem, at the cost of more parameters and computation per step.</li>
+            <li>RNNs (and LSTMs) are inherently <strong>sequential</strong> — they can't be parallelized across time steps — which, together with their still-limited long-range memory, is exactly what motivates attention and transformers next.</li>
+          </ul>
+          <p>Next, we drop the recurrence entirely and see how a model can look at an entire sequence at
+          once.</p>
+
+          <div class="complete-bar" data-complete>
+            <span class="complete-bar__text">Finished this section? Mark it done to fill your progress bar.</span>
+            <button class="btn btn--primary">Mark section complete</button>
+          </div>
+
+          <nav class="pager" data-pager aria-label="Section navigation"></nav>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script defer src="../assets/vendor/katex/katex.min.js"></script>
+  <script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+  <script src="../assets/vendor/highlight/highlight.min.js"></script>
+  <script src="../assets/search-index.js"></script>
+  <script src="../assets/course.js"></script>
+</body>
+</html>

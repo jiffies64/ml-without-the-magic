@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <script>try{var t=localStorage.getItem("z2h-ml-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Language Modeling &amp; GPT · ML Without the Magic</title>
+  <meta name="description" content="How a stack of transformer blocks becomes something that writes: tokenization, embeddings, next-token prediction, the GPT-style decoder, causal masking, and sampling text — end to end." />
+  <link rel="stylesheet" href="../assets/vendor/fonts/fonts.css" />
+  <link rel="stylesheet" href="../assets/course.css" />
+  <link rel="stylesheet" href="../assets/vendor/katex/katex.min.css" />
+</head>
+<body data-slug="19-language-modeling">
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="nav-scrim"></div>
+  <div class="layout">
+    <aside class="sidebar" aria-label="Course navigation">
+      <div class="brand">
+        <div class="brand__kicker">Machine Learning</div>
+        <h1 class="brand__title"><a href="../index.html">Without the Magic</a></h1>
+      </div>
+      <div class="progress">
+        <div class="progress__track"><div class="progress__fill" data-progress-fill></div></div>
+        <div class="progress__label" data-progress-label></div>
+      </div>
+      <nav class="nav" data-nav aria-label="Sections"></nav>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <button class="iconbtn menubtn" data-menu aria-label="Open navigation">☰</button>
+        <div class="topbar__spacer"></div>
+        <span class="topbar__meta">Part 5 · Deep Learning Architectures</span>
+        <button class="iconbtn" data-theme-toggle aria-label="Toggle theme">☾</button>
+      </div>
+
+      <main id="main" class="reading">
+        <header class="lesson-head">
+          <p class="lesson-eyebrow">Part 5 · Deep Learning Architectures <span class="dot"></span> Section 19</p>
+          <h1 class="lesson-title">Language Modeling &amp; GPT</h1>
+          <p class="lesson-standfirst">How a stack of transformer blocks becomes something that writes — end to end, from characters to sampled text.</p>
+          <div class="lesson-meta">
+            <span><b>32 min</b> read</span>
+            <span><b>You'll learn:</b> tokenization · embeddings · next-token prediction · the GPT-style decoder &amp; causal masking</span>
+          </div>
+        </header>
+
+        <div class="prose">
+          <p class="lead">A model that writes essays, answers questions, and drafts code sounds like
+          magic. It is not. Underneath, it does one small thing over and over: given the text so far,
+          it <strong>guesses the next piece</strong>. Do that guess well enough, feed each guess back
+          in, and coherent paragraphs fall out. This section builds that machine from the ground up —
+          from raw characters, to numbers, to a stack of transformer blocks, to sampled words on a
+          screen.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> The one idea to hold onto</div>
+            <p>A language model is a <strong>next-token predictor</strong>. Everything else —
+            tokenization, embeddings, attention, the causal mask, sampling — exists to make that one
+            prediction accurate, and then to run it in a loop. Learn to see the loop and the whole
+            field stops looking mysterious.</p>
+          </div>
+
+          <!-- ===================== WHAT IS AN LM ===================== -->
+          <h2><span class="h-num">1</span>What a language model actually is</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>A <strong>language model</strong> is a function that reads a stretch of text and outputs a
+          probability for <em>every possible next piece of text</em>. Given “the cat sat on the”, it
+          says: “mat” is very likely, “roof” is plausible, “democracy” is almost impossible. That's the
+          entire job. A <dfn>token</dfn> is the small unit it predicts — for now, think of it loosely as
+          a word; we make it precise in a moment.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Your phone keyboard's autocomplete. You type “I'll be there in five” and it offers
+            “minutes” before you've touched another key. It has learned, from mountains of past texts,
+            which word tends to come next. A language model is that same guessing game, scaled up
+            enormously and trained to keep the guesses coherent across whole paragraphs instead of a
+            single word.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>Write the text as a sequence of tokens <span style="white-space:nowrap">$x_1, x_2, \dots, x_T$</span>.
+          The model estimates the probability of the whole sequence by multiplying together the
+          probability of each token given everything before it:</p>
+          $$ P(x_1, x_2, \dots, x_T) = \prod_{t=1}^{T} P(x_t \mid x_1, x_2, \dots, x_{t-1}) $$
+          <p class="gloss"><b>In words:</b> the chance of a whole sentence is the chance of the first
+          token, times the chance of the second <em>given</em> the first, times the chance of the third
+          <em>given</em> the first two, and so on. The big <b>∏</b> (“product”) just means “multiply all
+          these together.” The one factor we actually train the model to produce is
+          <span style="white-space:nowrap">$P(x_t \mid x_{\lt t})$</span> — the next token given the past.
+          Get that factor right and the whole product takes care of itself.</p>
+
+          <div class="callout definition">
+            <div class="callout__label">Definition</div>
+            <p>An <dfn>autoregressive</dfn> model is one that generates a sequence one step at a time,
+            feeding each output back in as input for the next step. “Auto” = self, “regressive” =
+            predicting from earlier values. Every GPT-style model works this way: predict a token,
+            append it, predict the next.</p>
+          </div>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">Why do we condition each token on the tokens <em>before</em> it, rather than modelling <code>P(x_t)</code> on its own?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Because language is about context. On its own, “bank” is a coin flip between a river
+                edge and a place for money. But after “I deposited the cheque at the”, “bank” becomes
+                overwhelmingly the money kind. Conditioning on the past
+                (<span style="white-space:nowrap">$x_1 \dots x_{t-1}$</span>) is what lets the model use
+                context to sharpen every prediction. Modelling each token in isolation would throw all
+                that context away and produce word salad.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== TOKENIZATION ===================== -->
+          <h2><span class="h-num">2</span>Tokenization: turning text into tokens</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>A computer cannot multiply matrices by the letter “q”. Before anything else, we must chop
+          raw text into a fixed list of pieces and give each piece a number. That chopping step is
+          <strong>tokenization</strong>. The obvious question is: what should a piece be — a letter, a
+          word, or something in between?</p>
+
+          <div class="callout definition">
+            <div class="callout__label">Definition</div>
+            <p>A <dfn>token</dfn> is one unit of text the model reads and predicts. The
+            <dfn>vocabulary</dfn> is the fixed, finite set of all tokens the model knows — say 50,000 of
+            them — each assigned a unique integer id from 0 to (vocab size − 1). Tokenizing means
+            rewriting a string as a list of these ids.</p>
+          </div>
+
+          <p class="beat beat--math">Now the trade-off, laid out</p>
+          <p>There are three natural choices for “what is a piece”, and each has a cost:</p>
+
+          <div class="scroll-x">
+          <table>
+            <thead>
+              <tr><th>Scheme</th><th>A token is…</th><th>Vocabulary size</th><th>The catch</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><b>Character</b></td>
+                <td>one letter/symbol</td>
+                <td>tiny (~100)</td>
+                <td>sequences get very long; the model must relearn spelling from scratch, so it wastes
+                capacity on “how are letters glued into words”.</td>
+              </tr>
+              <tr>
+                <td><b>Word</b></td>
+                <td>one whole word</td>
+                <td>huge (millions)</td>
+                <td>any word not seen in training becomes an <dfn>unknown token</dfn> (a single
+                catch-all id for “I've never seen this”) — the model goes blind on new names, typos, and
+                rare words.</td>
+              </tr>
+              <tr>
+                <td><b>Subword (BPE)</b></td>
+                <td>a frequent chunk of characters</td>
+                <td>fixed, chosen (~30k–100k)</td>
+                <td>the sweet spot used by every modern model.</td>
+              </tr>
+            </tbody>
+          </table>
+          </div>
+
+          <p>The winning scheme is <strong>subword</strong> tokenization, most often via an algorithm
+          called <strong>BPE</strong> — <dfn>Byte-Pair Encoding</dfn>. It starts from individual
+          characters and repeatedly merges the most frequent adjacent pair into a new token. Common
+          words like “the” end up as a single token; a rare word like “antidisestablishmentarianism”
+          gets split into several familiar pieces. Because the pieces are chunks of characters, <em>any</em>
+          string can be spelled out from them — so there is never a true unknown word.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Think of LEGO. Whole-word tokens are like buying a pre-built model — great until you need
+            a piece the set doesn't include, and then you're stuck. Single-character tokens are like
+            having only 1×1 bricks — you can build anything, but it takes forever. Subword tokens are the
+            everyday LEGO set: a mix of small and medium bricks. Frequent shapes come pre-assembled,
+            anything unusual you build up from smaller pieces, and you can construct <em>any</em> object
+            without a special part. Fixed box of bricks, unlimited things to build.</p>
+          </div>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> Why subword wins, in one line</div>
+            <p>It gives you a <strong>fixed vocabulary</strong> (so the model's size is bounded),
+            <strong>no unknown words</strong> (any text can be spelled from the pieces), and it
+            <strong>handles rare words by breaking them into common pieces</strong> the model already
+            understands. Small model, total coverage — that's why everyone uses it.</p>
+          </div>
+
+          <p class="beat beat--code">The same thing in code</p>
+          <p>To keep this section self-contained and runnable with no downloads, we'll use the simplest
+          possible tokenizer — <strong>character-level</strong> — for all the code below. The ideas are
+          identical for BPE; only the vocabulary is bigger.</p>
+          <p class="codecap">a character-level tokenizer: text ⇄ token ids</p>
+          <pre><code class="language-python">text = "hello world"
+
+# the vocabulary = the set of distinct characters, sorted for a stable order
+chars = sorted(set(text))              # [' ', 'd', 'e', 'h', 'l', 'o', 'r', 'w']
+vocab_size = len(chars)                # 8
+
+stoi = {c: i for i, c in enumerate(chars)}   # string -> integer id
+itos = {i: c for c, i in stoi.items()}       # integer id -> string
+
+def encode(s):  return [stoi[c] for c in s]        # text  -> list of ids
+def decode(ids): return "".join(itos[i] for i in ids)  # ids -> text
+
+print(encode("hello"))        # [3, 2, 4, 4, 5]
+print(decode([3, 2, 4, 4, 5]))  # 'hello'  -> round-trips exactly</code></pre>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">A word-level model is trained on news from 2010 and then reads a 2024 article mentioning “COVID”. What happens, and how would subword tokenization save it?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>“COVID” never appeared in 2010 training text, so a word-level model has no id for it —
+                it collapses to the single <em>unknown</em> token and loses all information about the
+                word. A subword tokenizer instead spells it from pieces it already knows, e.g.
+                <code>"CO" + "VID"</code> or even letter-by-letter. The model still receives real,
+                meaningful input and can reason about the new word from its parts. This is exactly why
+                subword tokenization keeps working on names, typos, and words invented after training.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== EMBEDDINGS ===================== -->
+          <h2><span class="h-num">3</span>Embeddings: token ids become vectors</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>A token id like <code>3</code> is just a name tag — the number itself carries no meaning
+          (id 3 is not “more” than id 2 in any useful sense). The model needs each token to be a rich
+          <strong>vector</strong> (a list of numbers; see <a href="01-linear-algebra.html">Section 1</a>)
+          that it can learn to fill with meaning. An <strong>embedding</strong> is a lookup table that
+          maps each id to its own learned vector.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>A coat check at a theatre. You hand over your coat and get a numbered ticket — that number
+            is the token id, meaningless on its own. But behind the counter, the number points to a hook
+            holding your actual coat. The embedding table is that rack of hooks: each id points to a full
+            vector of learned features. During training, the staff quietly improve what hangs on each
+            hook so that similar coats end up near each other.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>The embedding table is a matrix <span style="white-space:nowrap">$\mathbf{E} \in \mathbb{R}^{V \times d}$</span>,
+          where <span style="white-space:nowrap">$V$</span> is the vocabulary size and
+          <span style="white-space:nowrap">$d$</span> is the <dfn>embedding dimension</dfn> (how many
+          numbers describe each token). To embed token id <span style="white-space:nowrap">$i$</span>,
+          you simply pick out row <span style="white-space:nowrap">$i$</span> of the table:</p>
+          $$ \text{embed}(i) = \mathbf{E}[i, :] \in \mathbb{R}^{d} $$
+          <p class="gloss"><b>In words:</b> “the embedding of token <b>i</b> is the <b>i</b>-th row of
+          the table <b>E</b>.” No multiplication, just a row lookup. Those rows are ordinary parameters,
+          so <a href="10-backprop.html">backpropagation</a> nudges them during training — tokens that
+          play similar roles drift toward similar vectors.</p>
+
+          <p>There is one thing embeddings alone don't capture: <strong>order</strong>. A plain lookup
+          gives “dog bites man” and “man bites dog” the exact same set of vectors, just shuffled — and
+          the attention that follows (<a href="18-transformers.html">Section 18</a>) treats its inputs
+          as a set, not a sequence. So we <em>add</em> a second vector that encodes each token's
+          <strong>position</strong>:</p>
+          $$ \mathbf{h}_t = \underbrace{\mathbf{E}[x_t,:]}_{\text{what the token is}} \;+\; \underbrace{\mathbf{P}[t,:]}_{\text{where it sits}} $$
+          <p class="gloss"><b>In words:</b> the vector that enters the network for position <b>t</b> is
+          the token's meaning vector plus a position vector <b>P[t]</b> that says “this is slot 0, slot
+          1, slot 2…”. Now the model can tell a first word from a last word. The details of positional
+          encoding live in <a href="18-transformers.html">Section 18</a>; here we just need to know it
+          gets added in.</p>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">token + position embeddings</p>
+          <pre><code class="language-python">import torch
+import torch.nn as nn
+
+vocab_size, d_model, max_len = 8, 32, 16   # 32 numbers per token, up to 16 positions
+
+tok_emb = nn.Embedding(vocab_size, d_model)   # the lookup table E  (8 x 32)
+pos_emb = nn.Embedding(max_len,   d_model)    # one vector per position
+
+ids = torch.tensor([[3, 2, 4, 4, 5]])         # (batch=1, seq_len=5) — "hello"
+B, T = ids.shape
+
+positions = torch.arange(T)                   # [0, 1, 2, 3, 4]
+h = tok_emb(ids) + pos_emb(positions)         # (1, 5, 32): meaning + position
+print(h.shape)                                # torch.Size([1, 5, 32])</code></pre>
+          <p class="gloss"><b>In words:</b> <code>tok_emb(ids)</code> looks up a 32-number vector for
+          each of the 5 tokens, giving shape <code>(1, 5, 32)</code>. <code>pos_emb(positions)</code> has
+          shape <code>(5, 32)</code> and is <em>broadcast-added</em> across the batch — PyTorch stretches
+          it to match. Every token now knows both what it is and where it sits.</p>
+
+          <!-- ===================== OBJECTIVE ===================== -->
+          <h2><span class="h-num">4</span>The objective: next-token prediction</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>How do we <em>train</em> a next-token predictor? We never need a human to label anything —
+          the text labels itself. At every position, the correct answer is simply the token that
+          actually came next. We slide over the text, and at each spot ask the model to predict the
+          following token, then penalise it for being wrong. This is why language models can learn from
+          the raw internet: the supervision is baked into ordinary text.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Flashcard practice where you write your own cards from a book you're reading. Cover the
+            next word, guess it, then slide your hand to reveal the truth and see if you were right. The
+            book grades you for free — every sentence is thousands of self-checking flashcards. That's
+            exactly how a language model studies: the next word is always the answer key.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>At each position the model outputs <dfn>logits</dfn> — one raw score per vocabulary token
+          (a <dfn>logit</dfn> is an unnormalised score, before it's turned into a probability). We pass
+          the logits through <strong>softmax</strong> (a function that squashes a list of scores into
+          positive numbers that sum to 1, i.e. a probability distribution) to get the predicted
+          probability of each possible next token:</p>
+          $$ \hat{p}_t = \text{softmax}(\mathbf{z}_t), \qquad \hat{p}_{t,j} = \frac{e^{z_{t,j}}}{\sum_{k=1}^{V} e^{z_{t,k}}} $$
+          <p class="gloss"><b>In words:</b> <b>z</b><sub>t</sub> is the row of <b>V</b> raw scores at
+          position <b>t</b>. Softmax exponentiates each score (making it positive) and divides by the
+          total, so the outputs are all between 0 and 1 and add to 1 — a real probability for every
+          token in the vocabulary.</p>
+
+          <p>We want the probability the model assigned to the <em>true</em> next token to be high. The
+          standard penalty for that is <strong>cross-entropy loss</strong> (introduced in
+          <a href="04-information-theory.html">Section 4</a>) — the negative log probability of the
+          correct token, averaged over every position:</p>
+          $$ L = -\frac{1}{T}\sum_{t=1}^{T} \log \hat{p}_{t,\, x_{t+1}} $$
+          <p class="gloss"><b>In words:</b> for each position <b>t</b>, look up the probability the
+          model gave to the token that actually came next
+          (<span style="white-space:nowrap">$x_{t+1}$</span>), take its <b>log</b>, flip the sign, and
+          average over all positions. If the model was confident and right, that probability is near 1,
+          its log is near 0, and the loss is tiny. If it was confident and <em>wrong</em>, the
+          probability is near 0, its log dives to −∞, and the loss is huge. Minimising this drives the
+          model to put probability on the real next token.</p>
+
+          <div class="callout definition">
+            <div class="callout__label">Definition</div>
+            <p><dfn>Teacher forcing</dfn> is the training trick of feeding the model the <em>true</em>
+            previous tokens at every position — not the model's own earlier guesses. So when predicting
+            token 5, it sees the real tokens 1–4 even if it would have gotten token 4 wrong. This lets
+            every position be predicted in parallel from correct context, which makes training fast and
+            stable. (At generation time there is no answer key, so we must feed back the model's own
+            outputs — the mismatch is a known quirk, but teacher forcing is worth it.)</p>
+          </div>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">next-token cross-entropy with a shifted target</p>
+          <pre><code class="language-python">import torch
+import torch.nn.functional as F
+
+# logits: the model's raw scores. shape (batch, seq_len, vocab_size)
+logits = torch.randn(1, 5, 8)          # 1 sequence, 5 positions, vocab of 8
+targets = torch.tensor([[2, 4, 4, 5, 1]])   # the TRUE next token at each position
+
+# cross_entropy wants (N, vocab) logits and (N,) targets, so flatten the batch+time axes
+B, T, V = logits.shape
+loss = F.cross_entropy(logits.reshape(B * T, V), targets.reshape(B * T))
+print(loss)     # a single scalar; ~log(8)=2.08 at random init, driven down by training</code></pre>
+          <p class="gloss"><b>In words:</b> <code>F.cross_entropy</code> does softmax <em>and</em> the
+          negative-log-probability step in one numerically safe call, so we hand it raw logits, never
+          softmaxed ones. We flatten the 5 positions into 5 independent
+          (prediction, true-next-token) pairs and average their losses. The targets are just the inputs
+          shifted left by one — position <b>t</b> is asked to predict what really sat at <b>t+1</b>.</p>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">At the very start of training, weights are random, so the model spreads probability evenly over all <code>V = 50257</code> tokens. What loss do you expect, and why is that a good sanity check?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>If every token gets probability <code>1/V</code>, the loss at each position is
+                <code>−log(1/V) = log(V)</code>. For <code>V = 50257</code> that's
+                <code>log(50257) ≈ 10.8</code>. Seeing your loss start near <code>ln(V)</code> and fall
+                from there confirms the model is initialised sanely and the loss is wired up correctly.
+                If it starts far from <code>ln(V)</code>, something is wrong — often a bug in how logits
+                or targets are shaped.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== GPT ARCHITECTURE ===================== -->
+          <h2><span class="h-num">5</span>The GPT-style decoder, and the causal mask</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>Now we assemble the model. A <strong>GPT</strong> (Generative Pre-trained Transformer) is
+          <dfn>decoder-only</dfn>: it is just a stack of identical <strong>transformer blocks</strong>
+          (the attention-plus-feed-forward units from <a href="18-transformers.html">Section 18</a>),
+          followed by one final linear layer that turns each position's vector into vocab-size logits.
+          Embeddings go in the bottom, logits come out the top, and every block in between lets each
+          position gather information from the others.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> The whole shape, top to bottom</div>
+            <p>token ids → <strong>embeddings + positions</strong> → <strong>N transformer blocks</strong>
+            (each = masked self-attention, then a feed-forward layer, with residual connections) →
+            <strong>final linear layer</strong> to size <span style="white-space:nowrap">$V$</span> →
+            <strong>logits</strong> → softmax → probabilities. Training minimises next-token
+            cross-entropy over those probabilities; generation samples from them.</p>
+          </div>
+
+          <p>But there is a trap. Attention lets every position look at every other position. During
+          training we hand the model the whole sentence at once (teacher forcing). If position 3 is
+          allowed to peek at position 4 while trying to <em>predict</em> position 4, it will just copy
+          the answer — and learn nothing. We must forbid looking ahead.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>An exam where the answers are printed on the next page. If students may flip ahead, the
+            test measures nothing — everyone “predicts” perfectly by reading the answer. The
+            <strong>causal mask</strong> is the invigilator's rule: you may reread everything you've
+            already written, but you may not turn the page. Each word must be guessed from the words
+            before it, never the ones after.</p>
+          </div>
+
+          <p class="beat beat--math">Deriving the causal mask</p>
+          <p>Recall from <a href="18-transformers.html">Section 18</a> that self-attention first
+          computes a grid of <dfn>attention scores</dfn> — a matrix
+          <span style="white-space:nowrap">$\mathbf{S} \in \mathbb{R}^{T \times T}$</span> where
+          <span style="white-space:nowrap">$S_{ij}$</span> says how much the token at position
+          <span style="white-space:nowrap">$i$</span> (the one asking) wants to attend to the token at
+          position <span style="white-space:nowrap">$j$</span> (the one being read):</p>
+          $$ \mathbf{S} = \frac{\mathbf{Q}\mathbf{K}^{\top}}{\sqrt{d_k}} $$
+          <p class="gloss"><b>In words:</b> <b>Q</b> holds each position's “query” (what am I looking
+          for?) and <b>K</b> holds each position's “key” (what do I offer?). Their dot products fill the
+          grid <b>S</b>; the <span style="white-space:nowrap">$\sqrt{d_k}$</span> just keeps the numbers
+          from getting too large. Row <b>i</b> of <b>S</b> is position <b>i</b>'s wish-list over all
+          positions <b>j</b>.</p>
+
+          <p>“Position <span style="white-space:nowrap">$i$</span> must not attend to future position
+          <span style="white-space:nowrap">$j \gt i$</span>” means: kill every entry where the column is
+          to the right of the diagonal. Softmax is applied to each row to turn scores into weights, and
+          softmax sends <span style="white-space:nowrap">$-\infty$</span> to a weight of exactly
+          <strong>0</strong> (because <span style="white-space:nowrap">$e^{-\infty} = 0$</span>). So we
+          don't delete the future entries — we set their <em>scores</em> to
+          <span style="white-space:nowrap">$-\infty$</span> before the softmax:</p>
+          $$ S^{\text{masked}}_{ij} = \begin{cases} S_{ij} & j \le i \quad(\text{past or self}) \\[4pt] -\infty & j \gt i \quad(\text{future}) \end{cases} $$
+          <p class="gloss"><b>In words:</b> keep a score if the column <b>j</b> is at or before the row
+          <b>i</b> (a token may read itself and everything earlier); replace it with
+          <span style="white-space:nowrap">$-\infty$</span> if <b>j</b> is later. After softmax those
+          <span style="white-space:nowrap">$-\infty$</span> entries become zero weight, so no
+          information flows backward in time.</p>
+
+          <p>For a length-5 sequence the mask is this lower-triangular pattern — a
+          <span style="white-space:nowrap">$\checkmark$</span> means “allowed to attend”, a
+          <span style="white-space:nowrap">$-\infty$</span> means “blocked”:</p>
+          $$ \begin{array}{c|ccccc} i \backslash j & 0 & 1 & 2 & 3 & 4 \\ \hline
+             0 & \checkmark & -\infty & -\infty & -\infty & -\infty \\
+             1 & \checkmark & \checkmark & -\infty & -\infty & -\infty \\
+             2 & \checkmark & \checkmark & \checkmark & -\infty & -\infty \\
+             3 & \checkmark & \checkmark & \checkmark & \checkmark & -\infty \\
+             4 & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark \end{array} $$
+          <p class="gloss"><b>In words:</b> row 0 (the first token) may look only at itself. Row 4 (the
+          last token) may look at all five. Every row sees itself and everything to its left, nothing to
+          its right. This lower-triangular shape is <em>the</em> defining feature of a decoder — it is
+          what makes the model causal, i.e. only influenced by the past.</p>
+
+          <p class="beat beat--code">The mask in PyTorch</p>
+          <p class="codecap">building the causal mask and applying it to scores</p>
+          <pre><code class="language-python">import torch
+
+T = 5
+# lower-triangular ones: allowed[i, j] = 1 when j &lt;= i, else 0
+allowed = torch.tril(torch.ones(T, T))
+print(allowed)
+# tensor([[1., 0., 0., 0., 0.],
+#         [1., 1., 0., 0., 0.],
+#         [1., 1., 1., 0., 0.],
+#         [1., 1., 1., 1., 0.],
+#         [1., 1., 1., 1., 1.]])
+
+scores = torch.randn(T, T)                       # raw attention scores S
+scores = scores.masked_fill(allowed == 0, float("-inf"))  # blocked -> -inf
+weights = torch.softmax(scores, dim=-1)          # each row sums to 1; future = 0
+print(weights[0])   # tensor([1., 0., 0., 0., 0.]) -> token 0 attends only to itself</code></pre>
+          <p class="gloss"><b>In words:</b> <code>torch.tril</code> keeps the lower triangle (past and
+          self) and zeroes the upper triangle (future). <code>masked_fill</code> writes
+          <span style="white-space:nowrap">$-\infty$</span> everywhere the future lives, and softmax over
+          the last dimension turns each row into weights that sum to 1 with the future entries at exactly
+          0. Row 0 attends only to itself, which is precisely what the mask math promised.</p>
+
+          <div class="callout pitfall">
+            <div class="callout__label"><span class="ic">▲</span> Watch out</div>
+            <p>The mask must be applied to the <em>scores</em>, before softmax — not to the weights
+            after. If you zero out the weights afterwards instead, the surviving weights no longer sum
+            to 1 (softmax already normalised them including the future), and every prediction is
+            silently miscalibrated. Mask first, softmax second.</p>
+          </div>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">Without the causal mask, a decoder trains to almost zero loss in a few steps but generates gibberish at test time. Why?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>With no mask, position <b>t</b> can attend to position <b>t+1</b> — which holds the
+                very token it's being asked to predict. The model learns the trivial shortcut “copy the
+                next input”, so training loss collapses. But at generation time the future doesn't exist
+                yet (that's what we're trying to produce), so the shortcut has nothing to copy and the
+                model falls apart. The causal mask forces it to actually <em>learn to predict</em>
+                instead of cheating, which is the only skill that transfers to generation.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== GENERATION ===================== -->
+          <h2><span class="h-num">6</span>Generation: from logits to written text</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>A trained model is a next-token predictor; writing is just running it in a loop. Feed in the
+          prompt, get logits for the next token, turn them into probabilities, <strong>pick one</strong>,
+          append it to the sequence, and feed the whole thing back in. Repeat until you've written
+          enough. The only real decision is <em>how</em> you pick from the probabilities.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Improvising a story around a campfire, one word at a time. After each word your mind holds
+            a shortlist of plausible next words with rough odds. Always blurting out the single most
+            likely word makes for a flat, repetitive tale; occasionally taking a less obvious word makes
+            it lively but riskier. <strong>Temperature</strong> is the dial between “play it safe” and
+            “surprise me”.</p>
+          </div>
+
+          <p class="beat beat--math">Greedy, sampling, and temperature</p>
+          <p><strong>Greedy decoding</strong> always takes the highest-probability token
+          (<span style="white-space:nowrap">$\arg\max$</span>). It's deterministic and safe but tends to
+          loop and sound robotic. <strong>Sampling</strong> instead draws a token at random <em>in
+          proportion to its probability</em> — likely tokens are picked often, rare ones occasionally —
+          which gives variety and life. <strong>Temperature</strong>
+          (<span style="white-space:nowrap">$\tau$</span>) reshapes the distribution before we sample by
+          dividing the logits:</p>
+          $$ \hat{p}_j = \text{softmax}\!\left(\frac{\mathbf{z}}{\tau}\right)_j = \frac{e^{z_j/\tau}}{\sum_{k} e^{z_k/\tau}} $$
+          <p class="gloss"><b>In words:</b> divide every logit by <b>τ</b> before softmax.
+          When <span style="white-space:nowrap">$\tau \lt 1$</span> the gaps between scores grow, so the
+          top token dominates — the model is <em>more confident and greedier</em>. When
+          <span style="white-space:nowrap">$\tau \gt 1$</span> the gaps shrink, probabilities flatten
+          toward equal, and the model is <em>more random and adventurous</em>. As
+          <span style="white-space:nowrap">$\tau \to 0$</span> sampling collapses to pure greedy; at
+          <span style="white-space:nowrap">$\tau = 1$</span> you sample from the model's raw
+          distribution.</p>
+
+          <div class="callout definition">
+            <div class="callout__label">Definition</div>
+            <p><dfn>Temperature</dfn> is a single positive number that controls randomness in sampling.
+            Low temperature (e.g. 0.2) = confident, focused, repetitive. High temperature (e.g. 1.3) =
+            diverse, creative, error-prone. It is the most common knob you'll turn when using a
+            language model.</p>
+          </div>
+
+          <p class="beat beat--code">The generation loop in PyTorch</p>
+          <p class="codecap">sample tokens one at a time, with temperature</p>
+          <pre><code class="language-python">import torch
+
+@torch.no_grad()                        # generation is inference: no gradients needed
+def generate(model, idx, max_new_tokens, block_size, temperature=1.0):
+    # idx: (batch, current_length) tensor of token ids — the prompt
+    for _ in range(max_new_tokens):
+        idx_cond = idx[:, -block_size:]         # keep only the last block_size tokens
+        logits = model(idx_cond)                # (batch, length, vocab)
+        logits = logits[:, -1, :] / temperature # take the LAST position, scale by temp
+        probs = torch.softmax(logits, dim=-1)   # (batch, vocab) — a distribution
+        next_id = torch.multinomial(probs, num_samples=1)  # sample one token per row
+        idx = torch.cat([idx, next_id], dim=1)  # append and loop
+    return idx</code></pre>
+          <p class="gloss"><b>In words:</b> at each step we run the model, keep only the logits at the
+          <em>last</em> position (the prediction for what comes next), divide by temperature, softmax to
+          a probability distribution, and <code>torch.multinomial</code> draws one token in proportion
+          to those probabilities. We glue it onto the sequence and repeat. <code>idx_cond</code> trims
+          the input to the model's maximum context length <code>block_size</code> so it never overflows.
+          Swap the sampling line for <code>logits.argmax(dim=-1)</code> and you have greedy decoding.</p>
+
+          <div class="callout pitfall">
+            <div class="callout__label"><span class="ic">▲</span> Watch out</div>
+            <p>Only the logits at the <strong>last</strong> position matter for generation — that's the
+            model's guess for the next token. Beginners sometimes sample from every position or from
+            position 0; you'd be sampling predictions for tokens you already have. Always slice
+            <code>logits[:, -1, :]</code>.</p>
+          </div>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">You set <code>temperature = 0.01</code>. How does the output behave, and is it different from greedy decoding?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Dividing logits by 0.01 multiplies them by 100, blowing the gaps between scores wide
+                open. After softmax, the single top token gets essentially all the probability mass, so
+                <code>multinomial</code> picks it almost every time. The output becomes effectively
+                deterministic and matches greedy decoding in practice — because
+                <span style="white-space:nowrap">$\tau \to 0$</span> <em>is</em> the limit that turns
+                sampling into <span style="white-space:nowrap">$\arg\max$</span>. Very low temperature is
+                a common way to get near-greedy, focused output while keeping the same sampling code.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== FULL MODEL CODE ===================== -->
+          <h2><span class="h-num">7</span>Putting it together: a minimal GPT block</h2>
+
+          <p class="beat beat--code">One decoder block, wired end to end</p>
+          <p>Here is a single transformer block with <em>built-in causal masking</em>, plus the tiny
+          model head that produces logits. It reuses the attention idea from
+          <a href="18-transformers.html">Section 18</a>; the only new ingredient is the mask we
+          derived just above. This is exactly the unit you'll scale up — and route between experts — in the
+          capstone, <a href="22-moe.html">Section 22</a>.</p>
+          <pre><code class="language-python">import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class CausalSelfAttention(nn.Module):
+    def __init__(self, d_model, n_heads, block_size):
+        super().__init__()
+        assert d_model % n_heads == 0
+        self.n_heads = n_heads
+        self.qkv = nn.Linear(d_model, 3 * d_model)   # produce Q, K, V in one matmul
+        self.proj = nn.Linear(d_model, d_model)      # mix heads back together
+        # a constant lower-triangular mask, saved with the model but not trained
+        self.register_buffer("mask", torch.tril(torch.ones(block_size, block_size)))
+
+    def forward(self, x):                            # x: (B, T, d_model)
+        B, T, C = x.shape
+        q, k, v = self.qkv(x).split(C, dim=2)        # each (B, T, C)
+        # reshape into heads: (B, n_heads, T, head_dim)
+        q = q.view(B, T, self.n_heads, C // self.n_heads).transpose(1, 2)
+        k = k.view(B, T, self.n_heads, C // self.n_heads).transpose(1, 2)
+        v = v.view(B, T, self.n_heads, C // self.n_heads).transpose(1, 2)
+
+        att = (q @ k.transpose(-2, -1)) / (k.size(-1) ** 0.5)   # scores S: (B, h, T, T)
+        att = att.masked_fill(self.mask[:T, :T] == 0, float("-inf"))  # block the future
+        att = F.softmax(att, dim=-1)                 # weights, future -> 0
+        y = att @ v                                  # (B, h, T, head_dim)
+        y = y.transpose(1, 2).reshape(B, T, C)       # re-merge the heads
+        return self.proj(y)
+
+class Block(nn.Module):
+    def __init__(self, d_model, n_heads, block_size):
+        super().__init__()
+        self.ln1 = nn.LayerNorm(d_model)             # normalise before attention
+        self.attn = CausalSelfAttention(d_model, n_heads, block_size)
+        self.ln2 = nn.LayerNorm(d_model)
+        self.mlp = nn.Sequential(                    # position-wise feed-forward
+            nn.Linear(d_model, 4 * d_model), nn.GELU(),
+            nn.Linear(4 * d_model, d_model),
+        )
+
+    def forward(self, x):
+        x = x + self.attn(self.ln1(x))               # residual add-on around attention
+        x = x + self.mlp(self.ln2(x))                # residual add-on around the MLP
+        return x
+
+class MiniGPT(nn.Module):
+    def __init__(self, vocab_size, d_model=64, n_heads=4, n_layers=2, block_size=32):
+        super().__init__()
+        self.block_size = block_size
+        self.tok_emb = nn.Embedding(vocab_size, d_model)
+        self.pos_emb = nn.Embedding(block_size, d_model)
+        self.blocks = nn.ModuleList(
+            [Block(d_model, n_heads, block_size) for _ in range(n_layers)]
+        )
+        self.ln_f = nn.LayerNorm(d_model)
+        self.head = nn.Linear(d_model, vocab_size)   # final linear -> logits
+
+    def forward(self, idx):                          # idx: (B, T) token ids
+        B, T = idx.shape
+        pos = torch.arange(T, device=idx.device)
+        x = self.tok_emb(idx) + self.pos_emb(pos)    # (B, T, d_model)
+        for block in self.blocks:
+            x = block(x)
+        x = self.ln_f(x)
+        return self.head(x)                          # (B, T, vocab_size) logits
+
+# smoke test: shapes must line up end to end
+model = MiniGPT(vocab_size=8)
+idx = torch.zeros(1, 5, dtype=torch.long)            # a length-5 prompt of zeros
+logits = model(idx)
+print(logits.shape)                                  # torch.Size([1, 5, 8])</code></pre>
+          <p class="gloss"><b>In words:</b> ids become token+position vectors; each
+          <code>Block</code> runs masked self-attention and a feed-forward layer, each wrapped in a
+          <em>residual connection</em> (<code>x + ...</code>, which lets gradients flow cleanly, see
+          <a href="18-transformers.html">Section 18</a>) and preceded by <em>layer norm</em> (which
+          rescales each vector to a stable range). The final linear <code>head</code> maps every
+          position to <code>vocab_size</code> logits. The smoke test confirms the promised shape
+          <code>(batch, seq_len, vocab)</code> — feed those logits into cross-entropy to train the model,
+          or into the sampling loop from earlier in this section to generate text.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> That's a real language model</div>
+            <p>The code above, trained on enough text with the cross-entropy loss and run through the
+            generation loop, genuinely writes. GPT-scale models differ only in size — thousands of
+            times more blocks, dimensions, and data — plus engineering to train them. The architecture
+            you just read is the same one. In <a href="22-moe.html">Section 22</a> we swap each block's
+            single feed-forward layer for a <em>mixture of experts</em> to grow capacity without
+            growing the cost of every token.</p>
+          </div>
+
+          <hr />
+
+          <h2><span class="h-num">8</span>What to carry forward</h2>
+          <ul>
+            <li>A <strong>language model</strong> predicts the next token given the previous ones; run
+            that predictor in a loop and it writes.</li>
+            <li><strong>Subword tokenization</strong> (BPE) is the sweet spot: a fixed vocabulary, no
+            unknown words, rare words handled by breaking them into familiar pieces.</li>
+            <li><strong>Embeddings</strong> turn each token id into a learned vector via a lookup table;
+            we <em>add</em> positional vectors so order matters.</li>
+            <li>Training is <strong>next-token prediction</strong> — cross-entropy over the vocabulary
+            at every position — with <strong>teacher forcing</strong> feeding the true past.</li>
+            <li>A <strong>GPT</strong> is a stack of transformer blocks plus a final linear layer to
+            logits. The <strong>causal mask</strong> sets future scores to
+            <span style="white-space:nowrap">$-\infty$</span> so no position can cheat by reading ahead.</li>
+            <li><strong>Generation</strong> = logits → softmax → sample → append → repeat, with
+            <strong>temperature</strong> dialing between greedy/confident and random/creative.</li>
+          </ul>
+          <p>You now have every moving part of a GPT. Next we scale it up cleverly: the capstone builds a
+          <a href="22-moe.html">mixture-of-experts</a> model that adds capacity while keeping each token
+          cheap.</p>
+
+          <div class="complete-bar" data-complete>
+            <span class="complete-bar__text">Finished this section? Mark it done to fill your progress bar.</span>
+            <button class="btn btn--primary">Mark section complete</button>
+          </div>
+
+          <nav class="pager" data-pager aria-label="Section navigation"></nav>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script defer src="../assets/vendor/katex/katex.min.js"></script>
+  <script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+  <script src="../assets/vendor/highlight/highlight.min.js"></script>
+  <script src="../assets/search-index.js"></script>
+  <script src="../assets/course.js"></script>
+</body>
+</html>

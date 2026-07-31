@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <script>try{var t=localStorage.getItem("z2h-ml-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Machine Learning Without the Magic</title>
+  <meta name="description" content="A free, textbook-quality course that takes you from vectors and derivatives all the way to building a Mixture-of-Experts transformer from scratch in PyTorch." />
+
+  <link rel="stylesheet" href="assets/vendor/fonts/fonts.css" />
+  <link rel="stylesheet" href="assets/course.css" />
+</head>
+<body data-slug="">
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="nav-scrim"></div>
+
+  <div class="layout">
+    <!-- Sidebar (built by JS from the manifest) -->
+    <aside class="sidebar" aria-label="Course navigation">
+      <div class="brand">
+        <div class="brand__kicker">Machine Learning</div>
+        <h1 class="brand__title"><a href="index.html">Without the Magic</a></h1>
+      </div>
+      <div class="progress">
+        <div class="progress__track"><div class="progress__fill" data-progress-fill></div></div>
+        <div class="progress__label" data-progress-label></div>
+      </div>
+      <nav class="nav" data-nav aria-label="Sections"></nav>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <button class="iconbtn menubtn" data-menu aria-label="Open navigation">☰</button>
+        <div class="topbar__spacer"></div>
+        <span class="topbar__meta">23 sections · ~11 hrs of reading</span>
+        <button class="iconbtn" data-theme-toggle aria-label="Toggle theme">☾</button>
+      </div>
+
+      <main id="main" class="home">
+        <!-- HERO: the most characteristic image in ML — a loss going down -->
+        <section class="hero">
+          <div>
+            <p class="hero__eyebrow">A build-it-yourself course</p>
+            <h2 class="hero__title">Watch the <em>loss</em> go down.</h2>
+            <p class="hero__sub">
+              Start with what a vector is. End by coding a Mixture-of-Experts transformer
+              from a research paper. Every idea arrives three ways: a plain-English picture,
+              the math derived line by line, then the smallest PyTorch that does the same thing.
+            </p>
+            <div class="hero__cta">
+              <a class="btn btn--primary" href="sections/01-linear-algebra.html">Start Part 1 →</a>
+              <a class="btn btn--ghost" href="#syllabus">Browse the full syllabus</a>
+              <span class="hero__note">No prerequisites beyond high-school algebra.</span>
+            </div>
+          </div>
+          <figure class="hero__plot" aria-hidden="true">
+            <svg viewBox="0 0 420 260" width="100%" role="img" aria-label="A training loss curve descending over epochs">
+              <!-- grid -->
+              <g stroke="var(--hairline)" stroke-width="1">
+                <line x1="40" y1="30"  x2="400" y2="30" />
+                <line x1="40" y1="90"  x2="400" y2="90" />
+                <line x1="40" y1="150" x2="400" y2="150" />
+                <line x1="40" y1="210" x2="400" y2="210" />
+              </g>
+              <!-- axes -->
+              <g stroke="var(--hairline-strong)" stroke-width="1.5">
+                <line x1="40" y1="20" x2="40" y2="210" />
+                <line x1="40" y1="210" x2="400" y2="210" />
+              </g>
+              <!-- loss curve: fast drop then plateau -->
+              <path id="loss-curve" fill="none" stroke="var(--violet)" stroke-width="3"
+                    stroke-linecap="round"
+                    d="M40,40 C90,45 100,150 150,168 S230,196 280,200 T400,204" />
+              <!-- a couple of noisy validation dots -->
+              <g fill="var(--amber)">
+                <circle cx="150" cy="160" r="3" /><circle cx="220" cy="190" r="3" />
+                <circle cx="300" cy="199" r="3" /><circle cx="370" cy="202" r="3" />
+              </g>
+              <text x="40" y="228" fill="var(--ink-faint)" font-size="11" font-family="Inter, sans-serif">epoch 0</text>
+              <text x="350" y="228" fill="var(--ink-faint)" font-size="11" font-family="Inter, sans-serif">epoch N</text>
+              <text x="8" y="120" fill="var(--ink-faint)" font-size="11" font-family="Inter, sans-serif" transform="rotate(-90 12,120)">loss</text>
+            </svg>
+            <figcaption>Training loss (line) with validation checkpoints (dots) — the picture every section is quietly working toward.</figcaption>
+          </figure>
+        </section>
+
+        <!-- Course promise -->
+        <section style="max-width:44rem;">
+          <p class="lead">Most ML material picks a lane: all math and no code, or all code and no
+          understanding. This course refuses to. You will never read <em>“it can be shown that.”</em>
+          We show it — then translate every equation into one plain sentence, and give every idea a
+          real-life parallel so it actually sticks.</p>
+        </section>
+
+        <!-- Parts grid (built by JS) -->
+        <section id="syllabus" class="parts-grid" data-parts></section>
+      </main>
+    </div>
+  </div>
+
+  <!-- KaTeX + highlight.js (vendored locally) -->
+  <link rel="stylesheet" href="assets/vendor/katex/katex.min.css" />
+  <script defer src="assets/vendor/katex/katex.min.js"></script>
+  <script defer src="assets/vendor/katex/auto-render.min.js"></script>
+  <script src="assets/vendor/highlight/highlight.min.js"></script>
+  <script src="assets/search-index.js"></script>
+  <script src="assets/course.js"></script>
+  <script>
+    /* Build the parts grid from the shared manifest */
+    (function () {
+      const holder = document.querySelector("[data-parts]");
+      if (!holder || !window.COURSE) return;
+      let html = "";
+      for (const part of window.COURSE.PARTS) {
+        html += `<div class="part-block">
+          <div class="part-block__head">
+            <span class="part-block__num">${part.n}</span>
+            <h3 class="part-block__title">${part.title}</h3>
+            ${part.deep ? '<span class="part-block__deep">Goes deepest</span>' : ''}
+          </div>
+          <div class="card-list">`;
+        for (const s of part.sections) {
+          html += `<a class="card" data-card="${s.slug}" href="${window.COURSE.sectionHref(s.slug)}">
+            <div class="card__num">${s.n}</div>
+            <div class="card__title">${s.title}</div>
+            <div class="card__meta">
+              <span>${s.min} min</span>
+              <span class="done" data-card-done style="display:none">✓ done</span>
+            </div>
+          </a>`;
+        }
+        html += `</div></div>`;
+      }
+      holder.innerHTML = html;
+      // boot()'s refreshProgress() (fired on DOMContentLoaded, after these cards exist)
+      // toggles the "✓ done" badges from persisted progress — nothing to do here.
+    })();
+  </script>
+</body>
+</html>

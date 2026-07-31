@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <script>try{var t=localStorage.getItem("z2h-ml-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Linear Algebra for ML · ML Without the Magic</title>
+  <meta name="description" content="Vectors, matrices, the dot product, matrix multiplication as a transformation, norms, and the intuition behind eigenvalues — the language ML is written in." />
+  <link rel="stylesheet" href="../assets/vendor/fonts/fonts.css" />
+  <link rel="stylesheet" href="../assets/course.css" />
+  <link rel="stylesheet" href="../assets/vendor/katex/katex.min.css" />
+</head>
+<body data-slug="01-linear-algebra">
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="nav-scrim"></div>
+  <div class="layout">
+    <aside class="sidebar" aria-label="Course navigation">
+      <div class="brand">
+        <div class="brand__kicker">Machine Learning</div>
+        <h1 class="brand__title"><a href="../index.html">Without the Magic</a></h1>
+      </div>
+      <div class="progress">
+        <div class="progress__track"><div class="progress__fill" data-progress-fill></div></div>
+        <div class="progress__label" data-progress-label></div>
+      </div>
+      <nav class="nav" data-nav aria-label="Sections"></nav>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <button class="iconbtn menubtn" data-menu aria-label="Open navigation">☰</button>
+        <div class="topbar__spacer"></div>
+        <span class="topbar__meta">Part 1 · Math Foundations</span>
+        <button class="iconbtn" data-theme-toggle aria-label="Toggle theme">☾</button>
+      </div>
+
+      <main id="main" class="reading">
+        <header class="lesson-head">
+          <p class="lesson-eyebrow">Part 1 · Math Foundations <span class="dot"></span> Section 1</p>
+          <h1 class="lesson-title">Linear Algebra for ML</h1>
+          <p class="lesson-standfirst">A neural network is, underneath, a stack of vectors being pushed through matrices. Learn to read that sentence and you can read almost anything in ML.</p>
+          <div class="lesson-meta">
+            <span><b>28 min</b> read</span>
+            <span><b>You'll learn:</b> vectors · dot products · matrices as transformations · norms · eigenvalues</span>
+          </div>
+        </header>
+
+        <div class="prose">
+          <p class="lead">Every piece of data you will ever feed a model — an image, a sentence, a
+          row in a spreadsheet — first becomes a <strong>list of numbers</strong>. Linear algebra
+          is simply the set of rules for working with those lists efficiently. It is the grammar
+          of machine learning, and the good news is you already have the intuition; we just need
+          to attach the notation to it.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> The one idea to hold onto</div>
+            <p>Data becomes <strong>vectors</strong>. Operations on data become <strong>matrices</strong>.
+            Learning is the search for the right numbers to put inside those matrices. That's the whole
+            game — everything below is detail.</p>
+          </div>
+
+          <!-- ===================== VECTORS ===================== -->
+          <h2><span class="h-num">1</span>Vectors: a point, and an arrow</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>A <strong>vector</strong> is just an ordered list of numbers. That's the boring
+          definition. The useful one: a vector is an <em>arrow</em> in space that points from the
+          origin (the center, position zero) to some spot. The numbers tell you how far to walk
+          along each direction to reach that spot.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Think of a grocery order: <em>2 apples, 1 loaf of bread, 3 coffees</em>. Written as a
+            vector that's <code>[2, 1, 3]</code>. Each slot always means the same thing (slot 1 is
+            always apples), and the order never changes. A vector is nothing scarier than a labelled
+            shopping list where you've agreed to drop the labels and just remember the order.</p>
+          </div>
+
+          <p>We write a vector as a column of numbers and give it a bold, lowercase name:</p>
+          $$ \mathbf{x} = \begin{bmatrix} 2 \\ 1 \\ 3 \end{bmatrix} \in \mathbb{R}^{3} $$
+          <p class="gloss"><b>In words:</b> “<b>x</b> is a vector living in <b>ℝ³</b>” — that symbol
+          just means “a list of 3 real numbers.” The little 3 is the <em>dimension</em>: how many
+          numbers are in the list. An image with 784 pixels is a vector in ℝ⁷⁸⁴.</p>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>Two things you can do to vectors, and both are exactly what they look like. You can
+          <strong>add</strong> them (slot by slot) and you can <strong>scale</strong> them (multiply
+          every slot by one number, called a <dfn>scalar</dfn>):</p>
+          $$ \mathbf{a}+\mathbf{b} = \begin{bmatrix} a_1+b_1 \\ a_2+b_2 \end{bmatrix}, \qquad
+             c\,\mathbf{a} = \begin{bmatrix} c\,a_1 \\ c\,a_2 \end{bmatrix} $$
+          <p class="gloss"><b>In words:</b> adding walks one arrow, then the other, tip to tail.
+          Scaling by <b>c</b> stretches the arrow to <b>c</b> times its length (and flips it if
+          <b>c</b> is negative). A <b>scalar</b> is just a plain single number, as opposed to a list.</p>
+
+          <!-- ===================== DOT PRODUCT ===================== -->
+          <h2><span class="h-num">2</span>The dot product: how aligned are two arrows?</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>The <strong>dot product</strong> takes two vectors and returns a single number that
+          measures <em>how much they point the same way</em>. Big positive number: they point in
+          similar directions. Zero: they're at right angles (totally unrelated). Negative: they point
+          in opposing directions. This one operation is doing quiet work inside almost every model
+          you'll ever build.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>A dating app scores your profile against someone else's: <em>+3 for shared love of
+            hiking, +2 for both liking jazz, −1 because one of you hates cats</em>. Add those up and
+            you get a single compatibility score. That summed-up score <strong>is</strong> a dot
+            product — multiply matching slots, then add everything together. A high score means
+            “aligned”; a score near zero means “no strong relationship either way.”</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>Multiply the vectors slot by slot, then add up all the results:</p>
+          $$ \mathbf{a}\cdot\mathbf{b} \;=\; \sum_{i=1}^{n} a_i\,b_i \;=\; a_1b_1 + a_2b_2 + \dots + a_nb_n $$
+          <p class="gloss"><b>In words:</b> the big Σ (“sigma”) just says “add up the following as
+          <b>i</b> counts from 1 to <b>n</b>.” So <b>a·b</b> = (pair up the slots, multiply each pair,
+          sum the products). The output is always a single number, no matter how long the vectors are.</p>
+
+          <p>There is a second, geometric formula for the exact same number, and it's the one that
+          reveals <em>why</em> the dot product measures alignment:</p>
+          $$ \mathbf{a}\cdot\mathbf{b} = \lVert\mathbf{a}\rVert\,\lVert\mathbf{b}\rVert\cos\theta $$
+          <p class="gloss"><b>In words:</b> the dot product equals (length of <b>a</b>) × (length of
+          <b>b</b>) × the cosine of the angle <b>θ</b> between them. Because <b>cos</b> is 1 when the
+          angle is 0° and drops to 0 at 90°, the dot product is largest when the arrows are parallel
+          and exactly zero when they are perpendicular. That's the alignment meter, made precise.</p>
+
+          <div class="callout definition">
+            <div class="callout__label">Definition</div>
+            <p>Two vectors are <dfn>orthogonal</dfn> when their dot product is zero. “Orthogonal” is
+            the mathematician's word for <em>at a right angle</em>, i.e. carrying no shared direction.
+            It shows up constantly — it's the precise way to say “these two features are unrelated.”</p>
+          </div>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">dot product, two ways</p>
+          <pre><code class="language-python">import torch
+
+a = torch.tensor([1.0, 2.0, 3.0])
+b = torch.tensor([4.0, 5.0, 6.0])
+
+# element-wise multiply, then sum — literally the definition
+print((a * b).sum())        # tensor(32.)   = 1*4 + 2*5 + 3*6
+
+# the idiomatic one-liner every codebase uses
+print(torch.dot(a, b))      # tensor(32.)</code></pre>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">Vectors <code>u = [1, 0]</code> and <code>v = [0, 1]</code>: what is <code>u · v</code>, and what does the result tell you geometrically?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p><code>u · v = (1)(0) + (0)(1) = 0</code>. A dot product of zero means the two arrows
+                are <strong>orthogonal</strong> — at a perfect right angle. And indeed, <code>[1,0]</code>
+                points along the x-axis while <code>[0,1]</code> points straight up the y-axis; they
+                share no direction at all. This is exactly why <code>[1,0]</code> and <code>[0,1]</code>
+                are called the standard <em>basis</em> of the 2D plane: two independent directions you
+                can mix to reach any point.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== MATRICES ===================== -->
+          <h2><span class="h-num">3</span>Matrices as transformations</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>A <strong>matrix</strong> is a grid of numbers — a stack of vectors, if you like. But the
+          real insight, the one that makes deep learning click, is this: <strong>a matrix is a machine
+          that takes a vector in and returns a different vector out.</strong> It rotates, stretches,
+          squishes, and reflects space. When you multiply a matrix by a vector, you are asking the
+          machine “where does this point end up after the transformation?”</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>A photo-editing slider is a transformation. “Increase brightness” takes every pixel and
+            maps it to a new value. “Rotate 90°” takes every point and sends it somewhere new, in a
+            consistent, predictable way. A matrix is exactly that: one fixed rule applied to every input
+            vector. Feed it a different picture, same rule runs — that reusable rule is the whole point.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>A matrix has rows and columns; we name it with a bold capital and write its shape as
+          <em>(rows × columns)</em>:</p>
+          $$ \mathbf{W} = \begin{bmatrix} w_{11} & w_{12} \\ w_{21} & w_{22} \end{bmatrix} \in \mathbb{R}^{2\times 2} $$
+          <p>To transform a vector, we do <strong>matrix–vector multiplication</strong>. The rule: each
+          output slot is the dot product of one <em>row</em> of the matrix with the input vector.</p>
+          $$ \mathbf{W}\mathbf{x} =
+             \begin{bmatrix} w_{11} & w_{12} \\ w_{21} & w_{22} \end{bmatrix}
+             \begin{bmatrix} x_1 \\ x_2 \end{bmatrix} =
+             \begin{bmatrix} w_{11}x_1 + w_{12}x_2 \\ w_{21}x_1 + w_{22}x_2 \end{bmatrix} $$
+          <p class="gloss"><b>In words:</b> the top output number is (row 1) · (x). The bottom output
+          number is (row 2) · (x). So a matrix is just <em>several dot products stacked up</em> — and
+          you already understand dot products. Row 1 of <b>W</b> asks one question about <b>x</b>; row 2
+          asks another; the answers stack into the output vector.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> Why this is the whole of deep learning</div>
+            <p>A single layer of a neural network is exactly <span style="white-space:nowrap">$\mathbf{y} = \mathbf{W}\mathbf{x} + \mathbf{b}$</span>
+            — transform the input with a matrix <b>W</b>, then shift it by a vector <b>b</b> (the
+            <em>bias</em>). Stack a few of these with a bit of nonlinearity between them and you have a
+            deep network — we build neurons, layers, and nonlinearity properly in
+            <a href="09-neurons.html">Section 9</a>. When we say a model “learns,” we mean it is searching for the numbers to write
+            inside <b>W</b> and <b>b</b>.</p>
+          </div>
+
+          <h3>Matrix × matrix = do one transformation, then the next</h3>
+          <p>Multiplying two matrices means <em>composing</em> their transformations: apply the right
+          one first, then the left one. This is why order matters (<span style="white-space:nowrap">$\mathbf{AB}\neq\mathbf{BA}$</span> in general — rotating then
+          stretching is not the same as stretching then rotating). The shape rule is the one thing you
+          must memorize, because 90% of real ML bugs are shape mismatches:</p>
+
+          <div class="callout definition">
+            <div class="callout__label">The shape rule</div>
+            <p>To multiply <span style="white-space:nowrap">$(m\times n)\times(n\times p)$</span> the
+            <strong>inner numbers must match</strong> (both <b>n</b>). The result has the shape of the
+            <strong>outer numbers</strong>: <span style="white-space:nowrap">$(m\times p)$</span>. Read
+            it as: “the middle two cancel, the outer two survive.”</p>
+          </div>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">a matrix transforming a vector</p>
+          <pre><code class="language-python">import torch
+
+W = torch.tensor([[2.0, 0.0],     # stretch x by 2, leave y alone
+                  [0.0, 1.0]])
+x = torch.tensor([3.0, 4.0])
+
+y = W @ x                 # '@' is matrix multiplication in Python
+print(y)                  # tensor([6., 4.])  -> x doubled, y unchanged
+
+# shapes are everything. print them when confused:
+A = torch.randn(2, 3)     # (2 x 3)
+B = torch.randn(3, 5)     # (3 x 5)   inner 3s match
+print((A @ B).shape)      # torch.Size([2, 5])  -> outer numbers survive</code></pre>
+
+          <div class="callout pitfall">
+            <div class="callout__label"><span class="ic">▲</span> The bug you will hit first</div>
+            <p><code>RuntimeError: mat1 and mat2 shapes cannot be multiplied (2x3 and 5x3)</code>.
+            The inner numbers (3 and 5) don't match. Ninety percent of the time the fix is to
+            <em>transpose</em> one matrix — flip its rows and columns with <code>.T</code> — so the
+            inner dimensions line up. When in doubt, <code>print(tensor.shape)</code> on every line.</p>
+          </div>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">You have a batch of 64 images, each flattened to a 784-length vector, stored as a matrix <code>X</code> of shape (64, 784). You want to pass them through a layer with weight matrix <code>W</code>. What shape must <code>W</code> be to produce 10 outputs per image, and what's the output shape?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>We compute <code>X @ W</code> with <code>X</code> of shape (64, 784). For the inner
+                numbers to match, <code>W</code> must start with 784: its shape is <strong>(784, 10)</strong>.
+                By the shape rule, (64, <s>784</s>) × (<s>784</s>, 10) → the outer numbers survive, so the
+                output is <strong>(64, 10)</strong>: 10 numbers for each of the 64 images. This is exactly
+                the shape of a linear layer that turns pixels into 10 class scores — you just designed the
+                last layer of a digit classifier.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== NORMS ===================== -->
+          <h2><span class="h-num">4</span>Norms: measuring the size of a vector</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>A <strong>norm</strong> answers a simple question: “how big is this vector?” It collapses a
+          whole list of numbers into a single measure of length or magnitude. We need this constantly —
+          to measure how far a prediction is from the truth, or how large a model's weights have grown.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Two ways to measure the distance from your home to a friend's flat. The <strong>L2</strong>
+            way is the straight-line “as the crow flies” distance — what a ruler on a map shows. The
+            <strong>L1</strong> way is the “taxicab” distance — you can only drive along the street grid,
+            so you add up the blocks east plus the blocks north. Same start and end, two honest but
+            different notions of “how far,” and ML uses both on purpose.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>The <strong>L2 norm</strong> (the default, “Euclidean length”) is the Pythagorean theorem
+          in any number of dimensions — square each slot, add them, take the square root:</p>
+          $$ \lVert\mathbf{x}\rVert_2 = \sqrt{\sum_{i=1}^{n} x_i^{2}} = \sqrt{x_1^2 + x_2^2 + \dots + x_n^2} $$
+          <p>The <strong>L1 norm</strong> just adds up the sizes (absolute values) of the slots — no
+          squaring, no square root:</p>
+          $$ \lVert\mathbf{x}\rVert_1 = \sum_{i=1}^{n} |x_i| = |x_1| + |x_2| + \dots + |x_n| $$
+          <p class="gloss"><b>In words:</b> L2 punishes one big value harshly (because it squares it),
+          so it prefers many small values over one large one. L1 treats all values evenly and, as
+          you'll see in <a href="07-overfitting.html">Section 7</a>, has a knack for pushing weights all
+          the way to exactly zero. That single difference is the entire reason we have two flavours of
+          <em>regularization</em> (a technique for keeping models simple), so keep it in your pocket.</p>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <pre><code class="language-python">import torch
+x = torch.tensor([3.0, 4.0])
+
+print(torch.norm(x, p=2))   # tensor(5.)   sqrt(3^2 + 4^2) = sqrt(25)
+print(torch.norm(x, p=1))   # tensor(7.)   |3| + |4|</code></pre>
+
+          <!-- ===================== EIGEN ===================== -->
+          <h2><span class="h-num">5</span>Eigenvalues: the directions a matrix leaves alone</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>We said a matrix stretches and rotates space. For most input directions, the arrow comes out
+          pointing somewhere new. But almost every matrix has a few special directions that it
+          <em>doesn't</em> rotate — it only stretches or shrinks them, leaving them pointing the same way.
+          Those special directions are <strong>eigenvectors</strong>, and the amount each one gets
+          stretched is its <strong>eigenvalue</strong>. (“Eigen” is German for “own” or “characteristic”
+          — these are the matrix's <em>own</em> favoured directions.)</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Spin a globe. Almost every city on the surface swings around to a new position. But the two
+            poles stay put — they sit exactly on the axis of rotation. That axis is the globe's
+            eigenvector: the one direction the “spin” transformation leaves pointing the same way.
+            Eigenvectors are the poles of whatever a matrix does.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>The defining equation is short and says exactly what we described in words:</p>
+          $$ \mathbf{A}\mathbf{v} = \lambda\mathbf{v} $$
+          <p class="gloss"><b>In words:</b> “applying the matrix <b>A</b> to its special vector <b>v</b>
+          gives back the <em>same</em> vector <b>v</b>, merely scaled by the number <b>λ</b> (lambda).”
+          The transformation <b>A</b> — which normally rotates things — acts on <b>v</b> like plain
+          multiplication by a number. No new direction, just a stretch by <b>λ</b>.</p>
+
+          <p>Why should you care, before we've even built a model? Because eigenvalues quietly explain a
+          lot of ML behaviour you'll meet later:</p>
+          <ul>
+            <li><strong>PCA</strong> (Principal Component Analysis, a way to compress data) finds the
+            eigenvectors of your data — the directions along which the data varies most, so you can keep
+            those and throw the rest away.</li>
+            <li><strong>Exploding and vanishing gradients</strong> (a training failure we'll hit in
+            <a href="17-sequence-models.html">Section 17</a>) happen when repeated matrix multiplications
+            have eigenvalues bigger or smaller than 1 — the same stretch applied over and over blows up
+            or fades to nothing.</li>
+          </ul>
+
+          <p class="beat beat--code">Seeing it in PyTorch</p>
+          <pre><code class="language-python">import torch
+
+A = torch.tensor([[2.0, 0.0],
+                  [0.0, 3.0]])          # a pure stretch: x by 2, y by 3
+
+vals = torch.linalg.eigvals(A).real
+print(vals)                            # tensor([2., 3.])  the two stretch factors
+
+# check the definition on the x-axis direction v = [1, 0]:
+v = torch.tensor([1.0, 0.0])
+print(A @ v)                           # tensor([2., 0.]) == 2 * v   -> eigenvalue 2</code></pre>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">A matrix has an eigenvalue of 0.5 along some direction. If you apply that matrix to a vector pointing in that direction, over and over, 20 times — what happens to the vector's length?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Each application multiplies the length by 0.5, so after 20 applications the length is
+                <code>0.5²⁰ ≈ 0.00000095</code> of what it started as — practically zero. The vector
+                <em>vanishes</em>. Flip the eigenvalue to 2 instead and you'd get <code>2²⁰ ≈ 1,000,000</code>×
+                — it <em>explodes</em>. This is precisely the vanishing/exploding-gradient problem that
+                makes deep and recurrent networks hard to train, and it's why eigenvalues near 1 are so
+                prized. You just previewed one of the deepest issues in the whole course.</p>
+              </div>
+            </details>
+          </div>
+
+          <hr />
+
+          <h2><span class="h-num">6</span>What to carry forward</h2>
+          <ul>
+            <li><strong>Vectors</strong> are lists of numbers you can picture as arrows; data becomes vectors.</li>
+            <li>The <strong>dot product</strong> multiplies matching slots and sums them — an alignment meter that returns one number.</li>
+            <li>A <strong>matrix</strong> is a reusable transformation; matrix–vector multiply is just several dot products stacked. One neural layer is <span style="white-space:nowrap">$\mathbf{Wx}+\mathbf{b}$</span>.</li>
+            <li>The <strong>shape rule</strong>: inner dimensions must match, outer dimensions survive. Print shapes to kill bugs.</li>
+            <li><strong>Norms</strong> measure vector size (L2 = straight line, L1 = taxicab); <strong>eigenvalues</strong> are the stretch factors along a matrix's favoured directions.</li>
+          </ul>
+          <p>Next we'll learn how to <em>change</em> those numbers on purpose — which means calculus, and
+          the single most important idea in the whole course: the gradient.</p>
+
+          <div class="complete-bar" data-complete>
+            <span class="complete-bar__text">Finished this section? Mark it done to fill your progress bar.</span>
+            <button class="btn btn--primary">Mark section complete</button>
+          </div>
+
+          <nav class="pager" data-pager aria-label="Section navigation"></nav>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script defer src="../assets/vendor/katex/katex.min.js"></script>
+  <script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+  <script src="../assets/vendor/highlight/highlight.min.js"></script>
+  <script src="../assets/search-index.js"></script>
+  <script src="../assets/course.js"></script>
+</body>
+</html>

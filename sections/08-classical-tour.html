@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <script>try{var t=localStorage.getItem("z2h-ml-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>A Tour of Classical Models · ML Without the Magic</title>
+  <meta name="description" content="A fast, no-math tour of k-nearest neighbors, decision trees, ensembles, and SVMs — one clear intuition and one everyday parallel for each, plus when to reach for which." />
+  <link rel="stylesheet" href="../assets/vendor/fonts/fonts.css" />
+  <link rel="stylesheet" href="../assets/course.css" />
+  <link rel="stylesheet" href="../assets/vendor/katex/katex.min.css" />
+</head>
+<body data-slug="08-classical-tour">
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="nav-scrim"></div>
+  <div class="layout">
+    <aside class="sidebar" aria-label="Course navigation">
+      <div class="brand">
+        <div class="brand__kicker">Machine Learning</div>
+        <h1 class="brand__title"><a href="../index.html">Without the Magic</a></h1>
+      </div>
+      <div class="progress">
+        <div class="progress__track"><div class="progress__fill" data-progress-fill></div></div>
+        <div class="progress__label" data-progress-label></div>
+      </div>
+      <nav class="nav" data-nav aria-label="Sections"></nav>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <button class="iconbtn menubtn" data-menu aria-label="Open navigation">☰</button>
+        <div class="topbar__spacer"></div>
+        <span class="topbar__meta">Part 2 · Classical ML</span>
+        <button class="iconbtn" data-theme-toggle aria-label="Toggle theme">☾</button>
+      </div>
+
+      <main id="main" class="reading">
+        <header class="lesson-head">
+          <p class="lesson-eyebrow">Part 2 · Classical ML <span class="dot"></span> Section 8</p>
+          <h1 class="lesson-title">A Tour of Classical Models</h1>
+          <p class="lesson-standfirst">Before neural networks, machine learning already worked — meet the four ideas that still quietly win on everyday tabular data.</p>
+          <div class="lesson-meta">
+            <span><b>16 min</b> read</span>
+            <span><b>You'll learn:</b> k-nearest neighbors · decision trees · ensembles · SVM intuition</span>
+          </div>
+        </header>
+
+        <div class="prose">
+          <p class="lead">This section is a fast tour, on purpose. No derivations — just one solid intuition and
+          one everyday parallel per model, so you know what each one is doing and when to reach for it. We'll go
+          deep on neural networks for the rest of the course; these classical models are still the right choice
+          for a huge share of real, structured (tabular) data problems.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> The one idea to hold onto</div>
+            <p>Each model below makes a different bet about how to turn "examples I've seen" into "a prediction for
+            something new." Knowing the bet each one makes is enough to know when to use it — you don't need to
+            derive it to use it well.</p>
+          </div>
+
+          <!-- ===================== KNN ===================== -->
+          <h2><span class="h-num">1</span>k-Nearest Neighbors: ask the closest examples</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p><strong>k-Nearest Neighbors (kNN)</strong> has almost no "training" step at all — it just remembers
+          every labeled example. To predict on something new, it finds the <b>k</b> stored examples closest to it
+          (measured by ordinary distance — the L2 norm from <a href="01-linear-algebra.html">Section 1</a>) and
+          takes a majority vote of their labels.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>You've just moved to a new neighborhood and want a restaurant recommendation. You don't consult a
+            general-purpose critic — you ask the few neighbors who live <em>closest</em> to you, on the theory
+            that people nearby tend to have similar taste and know the same local spots. Whatever most of them
+            recommend is your answer. That's kNN: no theory about restaurants in general, just "ask the nearest
+            ones and go with the majority."</p>
+          </div>
+
+          <div class="callout pitfall">
+            <div class="callout__label"><span class="ic">▲</span> Watch out: the curse of dimensionality</div>
+            <p>With very many features, almost every pair of points ends up roughly the same distance apart, so
+            "closest" stops meaning much — kNN quietly degrades as dimensions pile up.</p>
+          </div>
+
+          <p class="beat beat--code">The same thing in code</p>
+          <pre><code class="language-python">from sklearn.neighbors import KNeighborsClassifier
+
+model = KNeighborsClassifier(n_neighbors=5)
+model.fit(X_train, y_train)          # "fit" just stores the data -- no real learning happens
+pred = model.predict(X_new)          # for each new point: find its 5 closest neighbors, vote</code></pre>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">Why does kNN get slower at prediction time as your training set grows, unlike a trained decision tree or SVM?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Because kNN has no real training phase — all the "work" is deferred to prediction time. Every
+                single prediction requires measuring the distance from the new point to <em>every</em> stored
+                training example to find the closest <b>k</b>. A decision tree or SVM instead spends effort once,
+                up front, to build a compact rule (a tree of splits, or a boundary defined by a few support
+                vectors), so predicting afterward is fast regardless of how large the original training set was.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== TREES ===================== -->
+          <h2><span class="h-num">2</span>Decision trees: a flowchart of yes/no questions</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>A <strong>decision tree</strong> predicts by asking a series of simple yes/no questions about the
+          features ("is age &gt; 30?", "is income &gt; 50k?"), branching on the answer, and repeating until it
+          reaches a leaf that holds the prediction. Training a tree just means choosing, at each branch, the
+          question that best separates the classes.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>It's the game of <strong>20 Questions</strong>. "Is it alive?" "Is it bigger than a breadbox?" Each
+            answer cuts the space of possibilities roughly in half, and a handful of well-chosen questions
+            narrows a huge range of options down to one guess. A decision tree is exactly this game played
+            automatically, with the questions chosen from the training data.</p>
+          </div>
+
+          <p>Trees are wonderfully <strong>interpretable</strong> — you can print the whole flowchart and read off
+          exactly why it made a prediction. But left alone, they <strong>overfit easily</strong>: given enough
+          questions, a tree can carve out a tiny leaf for every single training example, memorizing the data
+          instead of learning the pattern (exactly the failure mode from <a href="07-overfitting.html">Section 7</a>).</p>
+
+          <p class="beat beat--code">The same thing in code</p>
+          <pre><code class="language-python">from sklearn.tree import DecisionTreeClassifier
+
+model = DecisionTreeClassifier(max_depth=4)   # cap the depth so it can't ask endless questions
+model.fit(X_train, y_train)</code></pre>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">Why does limiting <code>max_depth</code> help a decision tree generalize better?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Depth controls the tree's capacity: an unlimited tree can keep splitting until every leaf holds
+                a single training example, which means it has memorized the training set's noise along with its
+                pattern (high variance). Capping the depth forces the tree to stop asking questions early, keeping
+                only the splits that separate large, meaningful groups — trading a bit of training accuracy for a
+                model that holds up on new data.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== ENSEMBLES ===================== -->
+          <h2><span class="h-num">3</span>Ensembles: combine many weak models</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>A single tree is unstable and prone to overfitting. <strong>Ensembles</strong> fix this by combining
+          many models instead of trusting one, in two different ways.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p><strong>Bagging</strong> (used in <strong>random forests</strong>) is the wisdom-of-the-crowd fact
+            that a county fair uses to guess an ox's weight: ask one person and they might be way off, but average
+            hundreds of independent guesses and the errors cancel out, leaving a surprisingly accurate number. A
+            random forest trains many trees, each on a random subset of the data and features, then averages
+            their votes. <strong>Boosting</strong> is different: it's like a series of tutors, where each new
+            tutor looks specifically at the mistakes the previous tutors' combined advice got wrong, and focuses
+            entirely on fixing those. Each new model is trained to correct the ensemble's current errors, and the
+            models are added together rather than simply averaged.</p>
+          </div>
+
+          <p class="beat beat--code">The same thing in code</p>
+          <pre><code class="language-python">from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+
+forest = RandomForestClassifier(n_estimators=200)   # bagging: many trees, average their votes
+forest.fit(X_train, y_train)
+
+boosted = GradientBoostingClassifier(n_estimators=200)  # boosting: each tree fixes the last one's errors
+boosted.fit(X_train, y_train)</code></pre>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">A random forest and a gradient boosting model both use decision trees underneath. What's the key structural difference in how they combine those trees?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>A random forest trains its trees <strong>independently and in parallel</strong>, each on a
+                random subset of data and features, then averages their votes — the trees don't know about each
+                other. Gradient boosting trains its trees <strong>sequentially</strong>: each new tree is trained
+                specifically to correct the errors the ensemble-so-far is still making, then gets added on top.
+                Bagging mainly reduces variance (averaging cancels noise); boosting mainly reduces bias (each step
+                directly attacks remaining errors).</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== SVM ===================== -->
+          <h2><span class="h-num">4</span>SVM intuition: the widest street between classes</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>A <strong>support vector machine (SVM)</strong> for classification looks for the line (or, in higher
+          dimensions, the flat boundary called a <dfn>hyperplane</dfn>) that separates the two classes with the
+          <strong>widest possible margin</strong> — the biggest empty gap on either side before you hit a
+          training point.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Imagine drawing the widest possible straight road between two neighborhoods, without the road
+            touching a single house on either side. Many roads would separate the neighborhoods, but the widest
+            one gives you the most buffer if a new house is built close to the boundary later. An SVM finds
+            exactly that widest street; the houses closest to its edges — the ones that would get clipped first if
+            the road narrowed — are called the <dfn>support vectors</dfn>, and they're the only points that
+            actually determine where the road goes.</p>
+          </div>
+
+          <p>Real data is rarely neatly separable by a straight line. The <strong>kernel trick</strong> handles
+          this in one clean move: it lifts the data into a higher-dimensional space (for example, adding each
+          point's squared distance from the center as a new feature) where a straight boundary in that higher
+          space can separate classes that were tangled together in the original space — then that boundary maps
+          back down to a curved one in the space you started with. Crucially, the kernel trick computes the
+          effect of this lift without ever explicitly building the higher-dimensional points, which is what
+          keeps it fast.</p>
+
+          <p class="beat beat--code">The same thing in code</p>
+          <pre><code class="language-python">from sklearn.svm import SVC
+
+model = SVC(kernel="rbf")     # "rbf" kernel = the lift-into-higher-dimensions trick
+model.fit(X_train, y_train)</code></pre>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">Why are only the "support vectors" — and not every training point — needed to describe the final SVM boundary?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>The boundary is defined purely by finding the widest possible margin, and the width of that
+                margin is limited only by whichever points sit closest to it on each side. Move a point that's
+                already far from the boundary and the widest street doesn't change at all — it was never
+                constraining the margin. Move one of the closest points and the street's position and width shift
+                immediately. So only those closest points (the support vectors) matter for describing the
+                boundary; the rest could be deleted after training with no effect on the model.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== COMPARISON ===================== -->
+          <h2><span class="h-num">5</span>When to use what</h2>
+          <div class="scroll-x">
+            <table>
+              <thead>
+                <tr>
+                  <th>Model</th>
+                  <th>Strength</th>
+                  <th>Weakness</th>
+                  <th>When to reach for it</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>k-Nearest Neighbors</td>
+                  <td>Simple, no training step, adapts to any shape of boundary</td>
+                  <td>Slow at prediction time on large data; degrades in high dimensions</td>
+                  <td>Quick baseline on small, low-dimensional datasets</td>
+                </tr>
+                <tr>
+                  <td>Decision tree</td>
+                  <td>Interpretable, handles mixed feature types, no feature scaling needed</td>
+                  <td>Overfits easily; unstable (small data changes → different tree)</td>
+                  <td>When you (or a regulator) need to read the exact rule</td>
+                </tr>
+                <tr>
+                  <td>Random forest (bagging)</td>
+                  <td>Much more stable and accurate than a single tree; resists overfitting</td>
+                  <td>Less interpretable; slower and heavier than one tree</td>
+                  <td>Strong, low-effort default for tabular data</td>
+                </tr>
+                <tr>
+                  <td>Gradient boosting</td>
+                  <td>Usually the most accurate classical model on tabular data</td>
+                  <td>More hyperparameters to tune; trains sequentially (slower to fit); can overfit if pushed too far</td>
+                  <td>Squeezing out the best possible accuracy on structured data</td>
+                </tr>
+                <tr>
+                  <td>SVM</td>
+                  <td>Strong with a clear margin; kernel trick handles non-linear boundaries; works with few samples relative to features</td>
+                  <td>Doesn't scale well to huge datasets; needs feature scaling</td>
+                  <td>Small-to-medium datasets, especially with a clean or kernel-recoverable margin</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <hr />
+
+          <h2><span class="h-num">6</span>What to carry forward</h2>
+          <ul>
+            <li><strong>kNN</strong> predicts by majority vote among the closest stored examples — no real training.</li>
+            <li><strong>Decision trees</strong> are readable yes/no flowcharts that overfit easily on their own.</li>
+            <li><strong>Ensembles</strong> fix that: bagging/random forests average many independent trees (wisdom of the crowd); boosting chains models that each fix the last one's mistakes.</li>
+            <li><strong>SVMs</strong> find the widest-margin boundary, and the kernel trick lets that boundary be curved by lifting data into a higher dimension first.</li>
+            <li>None of this required deep math — the same intuitions (closeness, splitting, voting, margins) carry a long way in practice.</li>
+          </ul>
+
+          <p>Next we leave the classical toolkit behind and build the <strong>neuron</strong> — the single
+          unit every deep network is made of — in <a href="09-neurons.html">Section 9</a>.</p>
+
+          <div class="complete-bar" data-complete>
+            <span class="complete-bar__text">Finished this section? Mark it done to fill your progress bar.</span>
+            <button class="btn btn--primary">Mark section complete</button>
+          </div>
+
+          <nav class="pager" data-pager aria-label="Section navigation"></nav>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script defer src="../assets/vendor/katex/katex.min.js"></script>
+  <script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+  <script src="../assets/vendor/highlight/highlight.min.js"></script>
+  <script src="../assets/search-index.js"></script>
+  <script src="../assets/course.js"></script>
+</body>
+</html>

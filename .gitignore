@@ -1,0 +1,14 @@
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# local tooling (build scripts fetch these; they are not source)
+node_modules/
+package-lock.json
+
+# scratch
+*.log
+tmp/

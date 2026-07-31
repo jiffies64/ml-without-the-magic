@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <script>try{var t=localStorage.getItem("z2h-ml-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Overfitting &amp; Regularization · ML Without the Magic</title>
+  <meta name="description" content="Why a model that aces its training data can still fail in the real world, and the tools — train/val/test splits, cross-validation, and L1/L2 regularization — that keep it honest." />
+  <link rel="stylesheet" href="../assets/vendor/fonts/fonts.css" />
+  <link rel="stylesheet" href="../assets/course.css" />
+  <link rel="stylesheet" href="../assets/vendor/katex/katex.min.css" />
+</head>
+<body data-slug="07-overfitting">
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="nav-scrim"></div>
+  <div class="layout">
+    <aside class="sidebar" aria-label="Course navigation">
+      <div class="brand">
+        <div class="brand__kicker">Machine Learning</div>
+        <h1 class="brand__title"><a href="../index.html">Without the Magic</a></h1>
+      </div>
+      <div class="progress">
+        <div class="progress__track"><div class="progress__fill" data-progress-fill></div></div>
+        <div class="progress__label" data-progress-label></div>
+      </div>
+      <nav class="nav" data-nav aria-label="Sections"></nav>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <button class="iconbtn menubtn" data-menu aria-label="Open navigation">☰</button>
+        <div class="topbar__spacer"></div>
+        <span class="topbar__meta">Part 2 · Classical ML</span>
+        <button class="iconbtn" data-theme-toggle aria-label="Toggle theme">☾</button>
+      </div>
+
+      <main id="main" class="reading">
+        <header class="lesson-head">
+          <p class="lesson-eyebrow">Part 2 · Classical ML <span class="dot"></span> Section 7</p>
+          <h1 class="lesson-title">Overfitting &amp; Regularization</h1>
+          <p class="lesson-standfirst">A model that scores 100% on its training data has told you nothing yet — this section is about the honest number, the one measured on data the model has never seen, and how to protect it.</p>
+          <div class="lesson-meta">
+            <span><b>26 min</b> read</span>
+            <span><b>You'll learn:</b> generalization · bias–variance · L1/L2 regularization · train/val/test · cross-validation</span>
+          </div>
+        </header>
+
+        <div class="prose">
+          <p class="lead">Every model can be made to fit the data it was trained on almost perfectly — that part
+          is easy, and it is also nearly meaningless. What we actually care about is whether the model works on
+          <strong>new</strong> data it has never touched: tomorrow's customer, the next photo, a sentence it
+          hasn't read. This section is about that gap, why it opens up, and the concrete tools that close it.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> The one idea to hold onto</div>
+            <p>The only score that matters is performance on data the model never saw during training. Every idea
+            below — splitting your data, cross-validation, regularization — exists purely to protect that one
+            honest number from being fooled.</p>
+          </div>
+
+          <!-- ===================== GENERALIZATION ===================== -->
+          <h2><span class="h-num">1</span>Generalization: doing well on data you haven't seen</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p><strong>Generalization</strong> is a model's ability to perform well on new, unseen examples — not
+          just the ones it was trained on. A model that generalizes has learned the actual pattern in the data.
+          A model that hasn't has instead memorized the specific examples, including their noise and quirks.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Two students prepare for a history exam. One <strong>memorizes</strong> last year's exam paper word
+            for word — every date, every answer, in order. The other actually <strong>understands</strong> the
+            period: causes, consequences, how events connect. Give both students last year's exact paper and the
+            memorizer wins easily. Give them this year's paper, with the same material asked differently, and the
+            memorizer collapses while the one who understood does fine. The memorizer <em>overfit</em> to one
+            specific paper; the other <em>generalized</em> to the subject itself.</p>
+          </div>
+
+          <div class="callout definition">
+            <div class="callout__label">Definition</div>
+            <p><dfn>Overfitting</dfn> is when a model fits the training data too closely — including its noise
+            and one-off quirks — so training error keeps dropping while error on new data gets worse.
+            <dfn>Underfitting</dfn> is the opposite: the model is too simple to capture even the real pattern, so
+            it does poorly on both the training data and new data. In between sits <dfn>model capacity</dfn> — a
+            rough measure of how flexible a model is, i.e. how complicated a pattern it's able to represent. A
+            straight line has low capacity; a deep tree with a thousand splits has very high capacity.</p>
+          </div>
+
+          <p>Capacity is the dial that controls both failure modes. Turn it too low and the model can't represent
+          the real pattern — it underfits. Turn it too high and the model has so much flexibility that, with only
+          a finite training set, it starts fitting the random noise in that specific set — it overfits. There's a
+          sweet spot in between, and finding it is most of what this section is about.</p>
+
+          <p class="beat beat--code">Seeing it happen</p>
+          <p class="codecap">fitting the same noisy data with three model capacities</p>
+          <pre><code class="language-python">import numpy as np
+
+rng = np.random.default_rng(0)
+x = np.linspace(-3, 3, 20)
+y = 0.5 * x**2 + rng.normal(0, 1, size=x.shape)   # true pattern: a parabola, plus noise
+
+x_test = np.linspace(-3, 3, 200)
+y_test = 0.5 * x_test**2                          # noise-free, for a fair test score
+
+for degree in (1, 2, 15):
+    coeffs = np.polyfit(x, y, degree)
+    train_mse = np.mean((np.polyval(coeffs, x) - y) ** 2)
+    test_mse = np.mean((np.polyval(coeffs, x_test) - y_test) ** 2)
+    print(f"degree {degree:2d}: train MSE {train_mse:.3f}   test MSE {test_mse:.3f}")
+
+# degree  1 (a line): can't bend to match a parabola -> both train and test error stay high (underfit)
+# degree  2 (a parabola): matches the true pattern -> train and test error both low and close together
+# degree 15: bends through nearly every noisy point -> train error near zero, test error much worse
+#            than degree 2 -- it learned the noise, not the pattern (overfit)</code></pre>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">A model reaches 99% accuracy on its training set but only 61% on its validation set. Is this overfitting or underfitting, and what's a sensible first fix?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>This is <strong>overfitting</strong> — near-perfect training performance next to much worse
+                performance on data the model didn't train on is the signature. The model has enough capacity to
+                memorize the training set rather than learn the general pattern. Sensible first fixes: reduce
+                capacity (a smaller model, fewer tree splits), add regularization (covered later in this section),
+                collect more training data (harder to memorize a bigger set), or stop training earlier before it
+                starts fitting noise.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== SPLITS + CV ===================== -->
+          <h2><span class="h-num">2</span>Train / validation / test — and cross-validation</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>If you only ever measure your model on the data it trained on, you have no way to detect
+          overfitting — the memorizer always looks brilliant on the paper it memorized. So we split the data
+          into three separate pots, each with a different job, and we never let them mix.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Studying for a real exam has three phases. You do <strong>practice questions</strong> to learn the
+            material (the <strong>training set</strong>). You then sit a <strong>mock exam</strong> to see how
+            you're doing and decide what to restudy or which strategy to change (the <strong>validation set</strong>).
+            Finally, you sit the <strong>real exam</strong> exactly once (the <strong>test set</strong>) — its
+            whole value comes from the fact that you never adjusted your studying based on it. If you somehow saw
+            the real exam early and kept "improving" based on it, your final grade would no longer tell you
+            anything honest about how well you actually know the material.</p>
+          </div>
+
+          <div class="callout definition">
+            <div class="callout__label">Definition</div>
+            <p>The <dfn>training set</dfn> is what the model directly learns its numbers from. The <dfn>validation
+            set</dfn> is held out during training and used to make decisions — which model, which settings (called
+            <dfn>hyperparameters</dfn>: choices you pick before training, like capacity or the regularization
+            strength below). The <dfn>test set</dfn> is touched exactly once, at the very end, to report a final,
+            unbiased number. If you tune anything based on the test set, you've quietly turned it into a second
+            validation set, and your reported score stops being trustworthy.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>With only one validation split, your estimate of "how good is this model" depends on which examples
+          happened to land in that split — a small, unlucky validation set can make a good model look bad, or vice
+          versa. <strong>k-fold cross-validation</strong> fixes this by rotating which slice is held out, so every
+          example gets used for validation exactly once:</p>
+          $$ \text{CV score} = \frac{1}{k}\sum_{i=1}^{k} \text{score}\big(\text{model trained on all folds except } i,\ \text{evaluated on fold } i\big) $$
+          <p class="gloss"><b>In words:</b> split the training data into <b>k</b> equal-sized folds (5 and 10 are
+          the common choices). Train <b>k</b> separate times, each time leaving out a different fold to validate
+          on, then average the <b>k</b> validation scores. Every example gets validated on exactly once, so the
+          final average is far less sensitive to one unlucky split — and you also get a spread across the
+          <b>k</b> scores, telling you how stable the estimate is.</p>
+
+          <p class="beat beat--code">The same thing in code</p>
+          <pre><code class="language-python">import numpy as np
+from sklearn.model_selection import KFold
+
+X = np.arange(20).reshape(10, 2)          # 10 training examples, 2 features each
+kf = KFold(n_splits=5, shuffle=True, random_state=0)
+
+for fold, (train_idx, val_idx) in enumerate(kf.split(X)):
+    print(f"fold {fold}: {len(train_idx)} rows train, {len(val_idx)} rows validate")
+
+# 5 folds of 10 rows -> each validation fold has 2 rows, each training fold has the other 8.
+# By the end, every one of the 10 rows has served as validation data exactly once.</code></pre>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">While tuning a model, you check test-set accuracy after every change and keep the version that scores highest on the test set. What's wrong with this, even though you never trained on the test set directly?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>You never trained on it, but you <strong>selected</strong> based on it — and selection is a
+                form of fitting. Across enough attempts, some version will score well on the test set purely by
+                luck (matching its particular noise), and picking "the best on the test set" is indistinguishable
+                from tuning on it. The reported number stops estimating real-world performance and starts
+                estimating "how well did I get lucky on this one fixed sample." The fix is to do all that tuning
+                against the validation set (or cross-validation), and touch the test set only once, at the very
+                end, to report the final number.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== BIAS-VARIANCE ===================== -->
+          <h2><span class="h-num">3</span>The bias–variance tradeoff</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>Overfitting and underfitting are two flavors of a deeper split: a model's test error comes from two
+          separate sources, <strong>bias</strong> and <strong>variance</strong>, and they trade off against each
+          other as capacity changes.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Picture a dartboard. <strong>High bias</strong> is a thrower whose darts land in a tight little
+            cluster — but that cluster is off in the upper-left corner, nowhere near the bullseye. Consistent, but
+            consistently wrong: a systematic error. <strong>High variance</strong> is a thrower whose darts scatter
+            all over the board — sometimes near the bullseye, sometimes far from it, with no consistency at all.
+            A great model is the rare thrower who is both consistent <em>and</em> centered on the bullseye; a bad
+            one can fail in either direction, or both.</p>
+          </div>
+
+          <div class="callout definition">
+            <div class="callout__label">Definition</div>
+            <p><dfn>Bias</dfn> is systematic error: the model's assumptions are too simple to capture the real
+            pattern, so its predictions are wrong in the same direction no matter what training data it sees
+            (an underfitting straight line, forced to fit a curve, is high-bias). <dfn>Variance</dfn> is
+            sensitivity to the particular training set: retrain on a slightly different sample and the predictions
+            swing wildly (a deep, unconstrained tree that carves itself around every training point is
+            high-variance).</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>Suppose the true relationship is <span style="white-space:nowrap">$y = f(x) + \epsilon$</span>, where
+          <span style="white-space:nowrap">$\epsilon$</span> is random noise with mean 0 and variance
+          <span style="white-space:nowrap">$\sigma^2$</span> (irreducible — no model can predict pure noise).
+          We train a model on a random training set <b>D</b>, getting a prediction
+          <span style="white-space:nowrap">$\hat f_D(x)$</span> at some test point <b>x</b>. Let
+          <span style="white-space:nowrap">$\bar f(x) = \mathbb{E}_D[\hat f_D(x)]$</span> be the <em>average</em>
+          prediction you'd get if you retrained on many different random training sets. Then the expected squared
+          error at <b>x</b>, averaged over training sets, splits cleanly into three pieces:</p>
+          $$ \begin{aligned}
+          \mathbb{E}_D\big[(y - \hat f_D(x))^2\big]
+          &= \mathbb{E}_D\big[\big((f(x)-\bar f(x)) + (\bar f(x)-\hat f_D(x)) + \epsilon\big)^2\big] \\
+          &= \underbrace{(f(x)-\bar f(x))^2}_{\text{Bias}^2} \;+\; \underbrace{\mathbb{E}_D\big[(\bar f(x)-\hat f_D(x))^2\big]}_{\text{Variance}} \;+\; \underbrace{\sigma^2}_{\text{irreducible noise}}
+          \end{aligned} $$
+          <p class="gloss"><b>In words:</b> the cross terms vanish when you average over many retrainings, because
+          the noise <span style="white-space:nowrap">$\epsilon$</span> has mean zero and is independent of the
+          data, and <span style="white-space:nowrap">$\hat f_D(x)$</span> deviates from its own average
+          <span style="white-space:nowrap">$\bar f(x)$</span> in both directions equally. What's left is three
+          additive pieces: how far off-center your average prediction is (<b>bias²</b>), how much predictions
+          swing between different training sets (<b>variance</b>), and noise you could never predict no matter
+          how good the model is (<b>σ²</b>). Total test error is the sum of all three — you can trade bias for
+          variance, but you can never drive either below zero, and you can never remove the noise floor.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> The tradeoff</div>
+            <p>Raising model capacity (a deeper tree, more parameters, a higher-degree polynomial) typically
+            <strong>lowers bias</strong> — the model can now represent the true pattern more closely — but
+            <strong>raises variance</strong> — it also has more freedom to chase the noise in whatever training
+            set it happens to see. Total test error, plotted against capacity, is usually U-shaped: too little
+            capacity and bias dominates, too much and variance dominates, with a minimum somewhere in the middle.
+            Regularization, up next, is a way to buy back some of that variance without fully giving up capacity.</p>
+          </div>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">A single straight line is fit to clearly curved data, and separately, a deep unregularized decision tree is fit to the same data. Which one is high-bias/low-variance, and which is low-bias/high-variance?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>The straight line is <strong>high-bias, low-variance</strong>: it's too simple to bend to the
+                curve (systematic error, the same wrong shape no matter what sample you train it on), but retrain
+                it on a different sample and you'll get almost the same line back — it's stable. The deep tree is
+                <strong>low-bias, high-variance</strong>: it's flexible enough to fit the curve closely on
+                average, but it also carves itself around whichever specific noisy points it happened to see, so a
+                different training sample produces a noticeably different tree.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== REGULARIZATION ===================== -->
+          <h2><span class="h-num">4</span>Regularization: penalizing the size of the weights</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p><dfn>Regularization</dfn> is a way to fight overfitting directly: add an extra term to the loss that
+          penalizes weights for being <em>large</em>, on top of the usual term that penalizes wrong predictions.
+          A model can still use every weight, but it now pays a price for using it aggressively, which pushes it
+          toward simpler, smoother solutions that are less likely to be chasing noise. The penalty is measured
+          with the norms from <a href="01-linear-algebra.html">Section 1</a> — L2 or L1, applied to the weights.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Put yourself on a strict monthly budget. With plenty of room to spend, you buy everything that
+            seems even a little useful. Under a tight budget, you're forced to make choices: some small,
+            marginal purchases get <strong>cut to zero</strong> entirely (you decide you don't need them at all),
+            while the purchases you keep, you trim down a little across the board to stay under the limit. L1
+            regularization behaves like the first kind of budgeting — it zeroes out the marginal weights entirely.
+            L2 behaves like the second — it trims everything down a bit, but rarely cuts anything all the way
+            to nothing.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p><strong>L2 regularization</strong> (also called <dfn>ridge</dfn>, or <dfn>weight decay</dfn> when
+          used with gradient descent) adds the squared L2 norm of the weights to the loss:</p>
+          $$ L_{\text{ridge}}(\boldsymbol\theta) = L_{\text{data}}(\boldsymbol\theta) + \lambda \lVert\boldsymbol\theta\rVert_2^2 = L_{\text{data}}(\boldsymbol\theta) + \lambda\sum_i \theta_i^2 $$
+          <p class="gloss"><b>In words:</b> <span style="white-space:nowrap">$L_{\text{data}}$</span> is
+          the ordinary loss measuring wrong predictions; <span style="white-space:nowrap">$\lambda$</span>
+          (lambda, a hyperparameter you choose) controls how strongly we punish large weights. Take the gradient
+          of this loss with respect to one weight <span style="white-space:nowrap">$\theta_i$</span> and plug it
+          into a gradient descent step with learning rate <span style="white-space:nowrap">$\alpha$</span>:</p>
+          $$ \theta_i \leftarrow \theta_i - \alpha\Big(\frac{\partial L_{\text{data}}}{\partial \theta_i} + 2\lambda\theta_i\Big) = \underbrace{(1 - 2\alpha\lambda)}_{\text{shrink factor} \lt 1}\,\theta_i \;-\; \alpha\frac{\partial L_{\text{data}}}{\partial \theta_i} $$
+          <p class="gloss"><b>In words:</b> every single update multiplies the weight by a shrink factor slightly
+          less than 1, <em>before</em> applying the usual data-driven update. That's why L2 is nicknamed "weight
+          decay" — the weight quietly decays toward zero every step, on top of whatever the data pushes it toward.
+          Because the shrink is proportional to the weight's own size, it acts on every weight, but never fully
+          zeroes one out — a smaller and smaller nudge as the weight approaches zero, never quite finishing.</p>
+
+          <p><strong>L1 regularization</strong> (also called <dfn>lasso</dfn>) instead adds the L1 norm:</p>
+          $$ L_{\text{lasso}}(\boldsymbol\theta) = L_{\text{data}}(\boldsymbol\theta) + \lambda \lVert\boldsymbol\theta\rVert_1 = L_{\text{data}}(\boldsymbol\theta) + \lambda\sum_i |\theta_i| $$
+          <p class="gloss"><b>In words:</b> the penalty's gradient with respect to <span style="white-space:nowrap">$\theta_i$</span>
+          is just <span style="white-space:nowrap">$\lambda\cdot\text{sign}(\theta_i)$</span> — a <em>constant</em>
+          push toward zero, the same size whether the weight is huge or tiny. Unlike L2's shrink-by-a-fraction,
+          this is shrink-by-a-fixed-amount every step, so a small weight can get pushed straight through zero and
+          the optimizer sets it to exactly zero and leaves it there. That's L1 doing <dfn>feature selection</dfn>:
+          deciding certain inputs are simply not worth using.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> Why L1 zeroes weights and L2 doesn't: the geometric reason</div>
+            <p>Both penalties can be viewed as a budget: keep the total penalty under some limit <b>t</b> while
+            minimizing the data loss. The L2 budget <span style="white-space:nowrap">$\sum\theta_i^2 \le t$</span>
+            traces out a smooth <strong>circle</strong> (or sphere, in higher dimensions) around the origin. The
+            L1 budget <span style="white-space:nowrap">$\sum|\theta_i| \le t$</span> traces out a
+            <strong>diamond</strong> — a shape with sharp corners that sit exactly on the axes (where one weight
+            is zero and the rest aren't). As the loss's contour lines expand outward from their unconstrained
+            best point, the first place they touch the constraint region is, for a smooth circle, almost never
+            exactly on an axis — but for a diamond, the corners stick out further than the flat edges, so contours
+            very often make first contact right at a corner. Touching at a corner means at least one weight is
+            <em>exactly</em> zero. The circle has no corners to land on, so L2 shrinks everything smoothly instead.</p>
+          </div>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">L2 via <code>weight_decay</code>, L1 added to the loss by hand</p>
+          <pre><code class="language-python">import torch
+import torch.nn as nn
+
+model = nn.Linear(10, 1)
+criterion = nn.MSELoss()
+x = torch.randn(32, 10)
+y = torch.randn(32, 1)
+
+# L2 / ridge / "weight decay": built into the optimizer. Every step also
+# shrinks each weight by a factor of (1 - lr * weight_decay), pulling it toward 0.
+optimizer = torch.optim.SGD(model.parameters(), lr=0.01, weight_decay=1e-4)
+loss = criterion(model(x), y)
+loss.backward()
+optimizer.step()
+
+# L1 / lasso: |w| has no clean gradient at w = 0, so there's no optimizer
+# flag for it -- add the penalty to the loss by hand instead.
+optimizer.zero_grad()
+l1_penalty = sum(p.abs().sum() for p in model.parameters())
+loss = criterion(model(x), y) + 1e-4 * l1_penalty
+loss.backward()
+optimizer.step()</code></pre>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">You train the same linear model twice, once with L1 and once with L2 regularization, at strengths tuned to give similar validation accuracy. The L1 model ends up with many weights at exactly 0.0000; the L2 model has no exact zeros, just many small values. Why?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>L1's penalty gradient is a constant push toward zero regardless of the weight's size, so small
+                weights get driven straight through zero and stay there — geometrically, the diamond-shaped L1
+                constraint region has corners sitting exactly on the axes, and the loss contours tend to first
+                touch the constraint at one of those corners, which means some weight is exactly zero. L2's
+                penalty gradient is proportional to the weight's own size, so the push gets weaker and weaker as
+                the weight shrinks — it approaches zero but the constraint region is a smooth circle with no
+                corners to land on, so it never quite gets there. This is why L1 is used for feature selection and
+                L2 is used for general-purpose smoothing.</p>
+              </div>
+            </details>
+          </div>
+
+          <hr />
+
+          <h2><span class="h-num">5</span>What to carry forward</h2>
+          <ul>
+            <li><strong>Generalization</strong> means doing well on unseen data. <strong>Overfitting</strong>
+            fits the training data's noise; <strong>underfitting</strong> is too simple to fit the real pattern.
+            <strong>Capacity</strong> is the dial between them.</li>
+            <li><strong>Train / validation / test</strong> have separate jobs: train learns the weights, validation
+            tunes decisions, test is touched exactly once for an honest final number. <strong>k-fold
+            cross-validation</strong> rotates the held-out slice so every example validates exactly once.</li>
+            <li>Test error decomposes into <strong>bias² + variance + irreducible noise</strong>. More capacity
+            usually trades bias for variance; the goal is the sweet spot that minimizes the sum.</li>
+            <li><strong>L2 (ridge)</strong> shrinks every weight smoothly by a fraction each step ("weight decay").
+            <strong>L1 (lasso)</strong> pushes by a constant amount and can drive weights to exactly zero, because
+            its constraint region is a diamond with corners on the axes rather than a smooth circle.</li>
+          </ul>
+          <p>Next, we zoom out from any single algorithm and take a broad tour of the classical models — kNN,
+          decision trees, ensembles, and SVMs — to build intuition for when and why each one is the right tool, in
+          <a href="08-classical-tour.html">Section 8</a>.</p>
+
+          <div class="complete-bar" data-complete>
+            <span class="complete-bar__text">Finished this section? Mark it done to fill your progress bar.</span>
+            <button class="btn btn--primary">Mark section complete</button>
+          </div>
+
+          <nav class="pager" data-pager aria-label="Section navigation"></nav>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script defer src="../assets/vendor/katex/katex.min.js"></script>
+  <script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+  <script src="../assets/vendor/highlight/highlight.min.js"></script>
+  <script src="../assets/search-index.js"></script>
+  <script src="../assets/course.js"></script>
+</body>
+</html>

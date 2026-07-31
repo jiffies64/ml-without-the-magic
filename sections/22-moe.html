@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <script>try{var t=localStorage.getItem("z2h-ml-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mixture of Experts from Scratch · ML Without the Magic</title>
+  <meta name="description" content="Conditional computation, top-k routing, and the load-balancing auxiliary loss — derived from scratch and dropped into a working transformer as complete, annotated PyTorch." />
+  <link rel="stylesheet" href="../assets/vendor/fonts/fonts.css" />
+  <link rel="stylesheet" href="../assets/course.css" />
+  <link rel="stylesheet" href="../assets/vendor/katex/katex.min.css" />
+</head>
+<body data-slug="22-moe">
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="nav-scrim"></div>
+  <div class="layout">
+    <aside class="sidebar" aria-label="Course navigation">
+      <div class="brand">
+        <div class="brand__kicker">Machine Learning</div>
+        <h1 class="brand__title"><a href="../index.html">Without the Magic</a></h1>
+      </div>
+      <div class="progress">
+        <div class="progress__track"><div class="progress__fill" data-progress-fill></div></div>
+        <div class="progress__label" data-progress-label></div>
+      </div>
+      <nav class="nav" data-nav aria-label="Sections"></nav>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <button class="iconbtn menubtn" data-menu aria-label="Open navigation">☰</button>
+        <div class="topbar__spacer"></div>
+        <span class="topbar__meta">Part 6 · Capstone: Paper from Scratch</span>
+        <button class="iconbtn" data-theme-toggle aria-label="Toggle theme">☾</button>
+      </div>
+
+      <main id="main" class="reading">
+        <header class="lesson-head">
+          <p class="lesson-eyebrow">Part 6 · Capstone: Paper from Scratch <span class="dot"></span> Section 22</p>
+          <h1 class="lesson-title">Mixture of Experts from Scratch</h1>
+          <p class="lesson-standfirst">The technique behind today's biggest models — build the router, derive the balancing loss, and swap it into the transformer you already understand.</p>
+          <div class="lesson-meta">
+            <span><b>46 min</b> read</span>
+            <span><b>You'll learn:</b> conditional computation · top-k router math · the load-balancing auxiliary loss (derived) · a full annotated MoE transformer, dense vs MoE</span>
+          </div>
+        </header>
+
+        <div class="prose">
+          <p class="lead">Every model you have built so far runs <strong>all</strong> of its weights on
+          <strong>every</strong> input. A bigger model means more weights, and more weights means more
+          arithmetic per token — the cost and the capacity are chained together. This lesson breaks that
+          chain. A <strong>Mixture of Experts</strong> (MoE) lets you grow the number of parameters a
+          model <em>owns</em> without growing the amount of work it does <em>per token</em>. It is the
+          single idea that lets a model carry hundreds of billions of parameters while only touching a
+          few billion for any given word. We will derive it fully and build a working one.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> The one idea to hold onto</div>
+            <p>A dense layer asks <em>every</em> parameter about <em>every</em> token. An MoE layer keeps
+            many separate sub-networks (the <strong>experts</strong>) but a tiny <strong>router</strong>
+            sends each token to only a few of them. Total knowledge goes up; work per token stays flat.
+            The whole lesson is about building that router and stopping it from cheating.</p>
+          </div>
+
+          <p>This is the capstone: it leans on the transformer block from
+          <a href="18-transformers.html">Section 18</a> and the next-token training setup from
+          <a href="19-language-modeling.html">Section 19</a>. If those are fresh in your mind, everything
+          here will click into place, because an MoE changes exactly <em>one</em> sub-layer of the block
+          you already know.</p>
+
+          <!-- ===================== 1. MOTIVATION ===================== -->
+          <h2><span class="h-num">1</span>Conditional computation: pay for what you use</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>Here is the tension. Bigger models are smarter — that is one of the most reliable findings in
+          machine learning. But in a normal (<dfn>dense</dfn>) network, "bigger" means every input runs
+          through every weight, so doubling the parameters roughly doubles the compute (the arithmetic
+          work) for <em>every single token</em>. That gets expensive fast. <strong>Conditional
+          computation</strong> is the escape hatch: instead of running the whole network on each token,
+          run only the <em>part</em> of the network that is relevant to that token. Most weights stay
+          asleep for most inputs.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Walk into a large hospital with a broken wrist. You do <em>not</em> get examined by all
+            three hundred doctors on staff. The front desk (a <strong>router</strong>) glances at your
+            problem and sends you to the orthopaedist. The hospital's total expertise is enormous — cardiology,
+            neurology, paediatrics, all of it — but <em>your</em> visit only spends the time of one or two
+            specialists. The building can keep hiring more specialists without making each patient's visit
+            any longer. That is conditional computation: a huge amount of available skill, but each case
+            only touches the relevant slice.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>Let a single expert sub-network cost <span style="white-space:nowrap">$C$</span> units of
+          compute to run on one token. Put <span style="white-space:nowrap">$N$</span> of these experts
+          side by side and let the router send each token to <span style="white-space:nowrap">$k$</span>
+          of them (with <span style="white-space:nowrap">$k \ll N$</span>, read "k is much smaller than
+          N"). Then:</p>
+          $$ \text{Total parameters} \;\propto\; N\,C, \qquad
+             \text{Compute per token} \;\propto\; k\,C $$
+          <p class="gloss"><b>In words:</b> the knowledge you store scales with the number of experts
+          <b>N</b>, but the work you do per token scales only with how many you actually use, <b>k</b>.
+          Set <b>N = 64</b> experts and <b>k = 2</b>, and you own <b>32×</b> the parameters of one expert
+          while doing only <b>2×</b> the work. The two numbers, once chained together in a dense model,
+          are now decoupled.</p>
+
+          <div class="callout definition">
+            <div class="callout__label">Definition</div>
+            <p>A model's <dfn>active parameters</dfn> are the weights that actually take part in
+            processing a given token; its <dfn>total parameters</dfn> are all the weights it stores. In a
+            dense model these two numbers are equal. The entire promise of MoE is to make
+            <strong>total parameters</strong> large while keeping <strong>active parameters</strong> small.</p>
+          </div>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> Why this matters right now</div>
+            <p>Almost every frontier model of the last few years is a sparse MoE under the hood. The
+            reason is exactly the equation above: they behave like a model with a trillion parameters'
+            worth of knowledge, but each token only pays for a few tens of billions. You are about to build
+            the mechanism that makes that possible.</p>
+          </div>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">You have an MoE layer with <code>N = 8</code> experts, each identical to a dense feed-forward block, and you route each token to <code>k = 2</code> of them. Compared with a single dense feed-forward block, how many times more parameters does the layer store, and how much more compute does it do per token?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>It stores <strong>8×</strong> the parameters (eight full copies of the block, one per
+                expert), plus a tiny router. But it only runs <strong>2</strong> of those blocks on any
+                given token, so it does about <strong>2×</strong> the compute per token — not 8×. That gap
+                between <em>8× the knowledge</em> and <em>2× the cost</em> is the whole point. The router's
+                own cost is negligible: it is a single small matrix, which we size next.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== 2. ARCHITECTURE ===================== -->
+          <h2><span class="h-num">2</span>Where the experts go: one swapped sub-layer</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>Recall the transformer block from <a href="18-transformers.html">Section 18</a>. Each block
+          has two sub-layers: a <strong>self-attention</strong> sub-layer (where tokens look at each other
+          and mix information) and a <strong>feed-forward network</strong> (FFN — a small two-layer
+          network applied to each token on its own). The FFN is where most of a transformer's parameters
+          live and where most of its raw "thinking per token" happens. MoE makes one surgical change:
+          <strong>replace that single FFN with a set of FFNs plus a router.</strong> Attention is left
+          completely untouched.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Think of a busy kitchen. The prep station where everyone shares ingredients and passes
+            plates around — that is attention, and it stays exactly as it was. But the <em>single</em>
+            all-purpose cook who used to handle every dish (the FFN) is replaced by a row of specialist
+            cooks: one for sauces, one for grilling, one for desserts. A tiny expediter at the pass reads
+            each ticket and hands it to the right specialist. Same kitchen, same flow of plates — we only
+            swapped one generalist for a routed team.</p>
+          </div>
+
+          <p>So the block goes from this:</p>
+          $$ \mathbf{x} \;\to\; \mathbf{x} + \text{Attention}(\mathbf{x}) \;\to\;
+             \mathbf{x} + \text{FFN}(\mathbf{x}) $$
+          <p>to this — with only the second step changed:</p>
+          $$ \mathbf{x} \;\to\; \mathbf{x} + \text{Attention}(\mathbf{x}) \;\to\;
+             \mathbf{x} + \text{MoE}(\mathbf{x}) $$
+          <p class="gloss"><b>In words:</b> the <b>+</b> is the residual connection (add the sub-layer's
+          output back onto its input, from <a href="18-transformers.html">Section 18</a>). Everything is
+          identical except that the fixed FFN is now an <b>MoE</b> block that, internally, will pick a few
+          experts per token instead of running one shared network. From the outside, the block still takes
+          a vector of shape <b>d_model</b> in and returns one of the same shape.</p>
+
+          <div class="callout definition">
+            <div class="callout__label">Definition</div>
+            <p>An <dfn>expert</dfn> is just an ordinary FFN — the same two-layer network the dense block
+            used. There is nothing special inside an expert; the intelligence comes from the
+            <strong>router</strong> learning to send different <em>kinds</em> of tokens to different
+            experts, so each expert can quietly specialize. We build the expert first because it is the
+            part you already know.</p>
+          </div>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">an expert is a plain feed-forward block</p>
+          <pre><code class="language-python">import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class Expert(nn.Module):
+    """One expert = the standard transformer FFN: expand, nonlinearity, project back."""
+    def __init__(self, d_model, d_ff):
+        super().__init__()
+        self.up   = nn.Linear(d_model, d_ff)   # widen d_model -> d_ff
+        self.down = nn.Linear(d_ff, d_model)   # narrow d_ff  -> d_model
+
+    def forward(self, x):
+        # x: (num_tokens, d_model)  ->  (num_tokens, d_model)
+        return self.down(F.gelu(self.up(x)))</code></pre>
+          <p class="gloss"><b>In words:</b> exactly the FFN from a normal transformer — a wide hidden
+          layer (<code>d_ff</code>, usually 4× <code>d_model</code>), a GELU nonlinearity (a smooth
+          activation function; see <a href="09-neurons.html">Section 9</a>), and a projection back to
+          <code>d_model</code>. An MoE layer will hold <code>N</code> of these in a list.</p>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">Why do we replace the FFN sub-layer with experts, and not the attention sub-layer?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Two reasons. First, the FFN is where the bulk of a transformer's parameters and
+                per-token compute sit, so it is the sub-layer worth making sparse. Second, the FFN treats
+                each token <em>independently</em> — it maps one vector to one vector — which makes routing
+                natural: you can send each token to its own expert without breaking anything. Attention,
+                by contrast, is all about tokens <em>mixing</em> with each other; routing tokens to
+                separate experts there would cut those connections. So we keep attention dense and make
+                the position-wise FFN sparse.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== 3. ROUTER MATH ===================== -->
+          <h2><span class="h-num">3</span>The router: top-k gating, derived</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>The <strong>router</strong> (also called the <strong>gating network</strong>) is the front
+          desk. For each token it must answer two questions: <em>which</em> experts should handle this
+          token, and <em>how much</em> should each of them count? It answers with a small learned matrix,
+          a softmax, and a "keep only the top few" step. That is the entire router — a single linear layer
+          followed by a selection rule. Let's build it symbol by symbol.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>You describe your symptoms at the front desk. The receptionist mentally scores every
+            department — "80% orthopaedics, 15% general, 5% neurology" — then sends you to the top one or
+            two, and tells the ward how confident they are ("mostly orthopaedics, a little general"). The
+            scores are the <strong>routing probabilities</strong>; keeping the top one or two is
+            <strong>top-k selection</strong>; and passing along the confidence so the wards can blend their
+            opinions is the <strong>weighting</strong>. The router does all three.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>Take a single token's vector <span style="white-space:nowrap">$\mathbf{x}_t \in \mathbb{R}^{d}$</span>
+          (here <span style="white-space:nowrap">$d = d_{\text{model}}$</span>, and <span style="white-space:nowrap">$t$</span>
+          indexes the token). The router owns one weight matrix
+          <span style="white-space:nowrap">$\mathbf{W}_g \in \mathbb{R}^{d \times N}$</span>, where
+          <span style="white-space:nowrap">$N$</span> is the number of experts. <strong>Step 1 — gate
+          logits.</strong> Multiply to get one raw score per expert:</p>
+          $$ \mathbf{g}_t \;=\; \mathbf{x}_t\,\mathbf{W}_g \;\in\; \mathbb{R}^{N} $$
+          <p class="gloss"><b>In words:</b> <b>g</b><sub>t</sub> is a list of <b>N</b> numbers, one per
+          expert — the "raw affinity" of this token for each expert. These are called <b>logits</b>: raw
+          scores, not yet probabilities (they can be negative and do not sum to anything in particular).
+          The router matrix <b>W<sub>g</sub></b> is tiny: <b>d × N</b>, which for <b>d = 512, N = 8</b> is
+          about four thousand numbers — nothing next to an expert.</p>
+
+          <p><strong>Step 2 — routing probabilities.</strong> Turn the raw scores into probabilities with
+          a <dfn>softmax</dfn> (a function that squashes a list of numbers into positive values that sum
+          to 1; see <a href="04-information-theory.html">Section 4</a>):</p>
+          $$ p_{t,i} \;=\; \operatorname{softmax}(\mathbf{g}_t)_i
+             \;=\; \frac{\exp(g_{t,i})}{\sum_{j=1}^{N} \exp(g_{t,j})} $$
+          <p class="gloss"><b>In words:</b> <b>p</b><sub>t,i</sub> is the probability the router assigns to
+          expert <b>i</b> for token <b>t</b>. Exponentiating makes every score positive; dividing by the
+          sum makes them add up to 1. Now we have a clean "how much does this token belong to each expert"
+          distribution, e.g. <b>[0.6, 0.25, 0.1, 0.05, …]</b>.</p>
+
+          <p><strong>Step 3 — top-k selection.</strong> Running <em>all</em> N experts would defeat the
+          purpose. So we keep only the <span style="white-space:nowrap">$k$</span> experts with the highest
+          probabilities. Write that chosen set as
+          <span style="white-space:nowrap">$\mathcal{S}_t$</span>:</p>
+          $$ \mathcal{S}_t \;=\; \operatorname*{top\text{-}k}_{\,i}\; p_{t,i}
+             \quad\text{(the } k \text{ experts with the largest } p_{t,i}) $$
+          <p class="gloss"><b>In words:</b> <b>S</b><sub>t</sub> is the short list — for <b>k = 2</b>, the
+          two experts this token scored highest. Every expert outside <b>S</b><sub>t</sub> is switched off
+          for this token and does zero work. This selection step is exactly where the "sparse" in "sparse
+          MoE" comes from.</p>
+
+          <p><strong>Step 4 — renormalize the survivors.</strong> The kept probabilities no longer sum to
+          1 (we threw the rest away). If they summed to, say, 0.85, we would be quietly scaling this
+          token's contribution down by 15%. So we divide by their own sum to restore a clean weighting:</p>
+          $$ w_{t,i} \;=\; \frac{p_{t,i}}{\displaystyle\sum_{j \in \mathcal{S}_t} p_{t,j}}
+             \qquad \text{for } i \in \mathcal{S}_t $$
+          <p class="gloss"><b>In words:</b> <b>w</b><sub>t,i</sub> is the final weight for expert <b>i</b> on
+          token <b>t</b>. After this step the chosen weights sum to exactly 1, so the experts' outputs get
+          <em>blended</em>, not shrunk. If <b>k = 2</b> and the top two probabilities were <b>0.6</b> and
+          <b>0.25</b>, the renormalized weights are <b>0.6 / 0.85 ≈ 0.706</b> and <b>0.25 / 0.85 ≈ 0.294</b>.</p>
+
+          <p><strong>Step 5 — combine.</strong> Run the token through each chosen expert and add up their
+          outputs, weighted by <span style="white-space:nowrap">$w_{t,i}$</span>:</p>
+          $$ \mathbf{y}_t \;=\; \sum_{i \in \mathcal{S}_t} w_{t,i}\;\, E_i(\mathbf{x}_t) $$
+          <p class="gloss"><b>In words:</b> <b>E</b><sub>i</sub> is expert <b>i</b> (an FFN). The output
+          <b>y</b><sub>t</sub> is a weighted average of just the <b>k</b> chosen experts' answers. Experts
+          the router trusted more get a bigger say. This one line is the whole forward pass of an MoE
+          layer — the rest of the code is just doing it efficiently for a whole batch at once.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> Why the router can learn at all</div>
+            <p>The weights <span style="white-space:nowrap">$w_{t,i}$</span> multiply the experts' outputs,
+            so gradients (from <a href="10-backprop.html">backprop</a>) flow back through them into
+            <span style="white-space:nowrap">$\mathbf{W}_g$</span>. If sending a token to expert 3 lowered
+            the loss, the router is nudged to raise <span style="white-space:nowrap">$p_{t,3}$</span> next
+            time. The hard "pick the top k" step itself is not differentiable, but because the kept experts
+            are weighted by their <em>soft</em> probabilities, the router still gets a gradient signal
+            through the survivors. That is why top-k gating trains end-to-end with plain gradient descent.</p>
+          </div>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">router: linear → softmax → top-k → renormalize (returns aux loss too — derived next)</p>
+          <pre><code class="language-python">class Router(nn.Module):
+    """Scores each token over N experts, keeps the top-k, and renormalizes their weights."""
+    def __init__(self, d_model, num_experts, k, aux_alpha=0.01):
+        super().__init__()
+        self.gate = nn.Linear(d_model, num_experts, bias=False)  # W_g : (d_model, N)
+        self.num_experts = num_experts
+        self.k = k
+        self.aux_alpha = aux_alpha
+
+    def forward(self, x):
+        # x: (num_tokens, d_model)
+        logits = self.gate(x)                      # (num_tokens, N)  -> gate logits g
+        probs  = logits.softmax(dim=-1)            # (num_tokens, N)  -> routing probs p
+
+        # top-k experts per token
+        topk_probs, topk_idx = probs.topk(self.k, dim=-1)   # each (num_tokens, k)
+        # renormalize the survivors so their weights sum to 1
+        topk_weights = topk_probs / topk_probs.sum(dim=-1, keepdim=True)
+
+        aux_loss = self._load_balancing_loss(probs, topk_idx)  # derived in section 4
+        return topk_idx, topk_weights, aux_loss</code></pre>
+          <p class="gloss"><b>In words:</b> the four math steps map one-to-one onto four lines.
+          <code>topk</code> returns both the kept probabilities and the indices of the experts they belong
+          to. Dividing by <code>topk_probs.sum(...)</code> is the renormalize step. We defer the
+          <code>aux_loss</code> helper to the next section, where we derive exactly what it computes.</p>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">A token's softmax over 4 experts is <code>[0.5, 0.3, 0.15, 0.05]</code> and we use <code>k = 2</code>. Which experts are chosen, and what are their final (renormalized) weights?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>The top two probabilities are <code>0.5</code> (expert 0) and <code>0.3</code> (expert
+                1), so <code>S = {0, 1}</code>. Their sum is <code>0.8</code>, so the renormalized weights
+                are <code>0.5 / 0.8 = 0.625</code> and <code>0.3 / 0.8 = 0.375</code>. Experts 2 and 3 are
+                switched off for this token. Notice the weights now sum to exactly 1: the token's output is
+                a genuine blend, <code>0.625·E₀(x) + 0.375·E₁(x)</code>, not a faded-out version.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== 4. LOAD BALANCING ===================== -->
+          <h2><span class="h-num">4</span>Load balancing: deriving the auxiliary loss</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>Left alone, the router cheats. Early in training one expert happens to be slightly better, so
+          the router sends it slightly more tokens, so it trains faster and gets even better, so the router
+          sends it <em>even more</em> tokens. This is a <strong>rich-get-richer</strong> feedback loop
+          (also called <dfn>routing collapse</dfn>): a handful of experts hog everything and the rest
+          never receive enough tokens to learn. You paid for N experts and got 2. We need a gentle force
+          that keeps the traffic spread out.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>One doctor at the clinic gets a great reputation. Everyone asks for them, so their queue
+            grows to three hours while four other perfectly good doctors sit in empty rooms. The clinic is
+            <em>underused</em> and the famous doctor is overwhelmed. The fix is a scheduling rule that
+            nudges patients toward the idle doctors — not forcing it, just tilting the odds so the whole
+            staff stays busy. The <strong>auxiliary loss</strong> is that scheduling rule, written as
+            math and added to training.</p>
+          </div>
+
+          <div class="callout definition">
+            <div class="callout__label">Definition</div>
+            <p>An <dfn>auxiliary loss</dfn> is an extra term added to the training loss that does not
+            measure task performance directly, but instead pushes some internal quantity toward a desired
+            shape. Here it pushes the token traffic toward being spread evenly across experts. The model
+            minimizes <em>task loss + auxiliary loss</em> together.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>We want to measure, and then punish, imbalance. Over a batch of
+          <span style="white-space:nowrap">$T$</span> tokens we define two quantities per expert
+          <span style="white-space:nowrap">$i$</span>. The first is a <strong>hard</strong> count — what
+          actually got routed:</p>
+          $$ f_i \;=\; \frac{1}{T} \sum_{t=1}^{T} \mathbb{1}\big[\, i \in \mathcal{S}_t \,\big] $$
+          <p class="gloss"><b>In words:</b> <b>f</b><sub>i</sub> is the <em>fraction of tokens routed to
+          expert i</em>. The symbol <b>𝟙[·]</b> is the indicator: it is 1 when the condition inside is
+          true and 0 otherwise. So we count how many tokens picked expert <b>i</b> in their top-k, and
+          divide by the number of tokens. This is a hard, discrete count — you either got the token or you
+          did not.</p>
+
+          <p>The second is a <strong>soft</strong> average — how much probability the router <em>wanted</em>
+          to give each expert, before the hard cutoff:</p>
+          $$ P_i \;=\; \frac{1}{T} \sum_{t=1}^{T} p_{t,i} $$
+          <p class="gloss"><b>In words:</b> <b>P</b><sub>i</sub> is the <em>mean router probability</em> for
+          expert <b>i</b>, averaged over all tokens — using the full softmax
+          <b>p</b><sub>t,i</sub>, not just the chosen ones. It is smooth and differentiable, which will
+          matter in a moment. Think of <b>f</b><sub>i</sub> as "who actually walked in" and <b>P</b><sub>i</sub>
+          as "how much the receptionist leaned toward this department on average".</p>
+
+          <p>The <strong>Switch Transformer auxiliary loss</strong> multiplies these two, sums over
+          experts, and scales:</p>
+          $$ L_{\text{aux}} \;=\; \alpha \, N \sum_{i=1}^{N} f_i \, P_i $$
+          <p class="gloss"><b>In words:</b> <b>α</b> (alpha) is a small weighting coefficient (typically
+          <b>0.01</b>); <b>N</b> is the number of experts, included so the loss's natural size does not
+          shrink as you add experts. The heart of it is <b>Σ f<sub>i</sub> P<sub>i</sub></b>: a dot product
+          between the hard load and the soft preference. We now show why minimizing it forces balance.</p>
+
+          <h3>Why minimizing <span style="white-space:nowrap">$\sum_i f_i P_i$</span> spreads the load</h3>
+          <p>Two facts pin it down. First, both quantities are (near) probability distributions over the
+          experts. For <span style="white-space:nowrap">$k = 1$</span> each token picks exactly one expert,
+          so the fractions sum to one, and the probabilities always do:</p>
+          $$ \sum_{i=1}^{N} f_i \;=\; 1, \qquad \sum_{i=1}^{N} P_i \;=\; 1 $$
+          <p>Second, on average a token that the router <em>prefers</em> (high
+          <span style="white-space:nowrap">$P_i$</span>) is also a token it <em>routes</em> there (high
+          <span style="white-space:nowrap">$f_i$</span>) — the count is just the hard version of the
+          preference. Treat them as tracking each other, <span style="white-space:nowrap">$f_i \approx P_i$</span>,
+          for the purpose of seeing what we are minimizing. Then the objective becomes:</p>
+          $$ \sum_{i=1}^{N} f_i \, P_i \;\approx\; \sum_{i=1}^{N} P_i^{\,2} $$
+          <p>Now we minimize <span style="white-space:nowrap">$\sum_i P_i^2$</span> subject to
+          <span style="white-space:nowrap">$\sum_i P_i = 1$</span>. By the Cauchy–Schwarz inequality (or
+          just the fact that spreading mass reduces the sum of squares):</p>
+          $$ \Big(\sum_{i=1}^{N} P_i \cdot 1\Big)^{2} \;\le\; \Big(\sum_{i=1}^{N} P_i^{2}\Big)\Big(\sum_{i=1}^{N} 1^{2}\Big)
+             \;\;\Longrightarrow\;\; 1 \;\le\; N \sum_{i=1}^{N} P_i^{2} $$
+          $$ \sum_{i=1}^{N} P_i^{2} \;\ge\; \frac{1}{N},
+             \qquad \text{with equality iff } P_i = \tfrac{1}{N}\ \text{for all } i $$
+          <p class="gloss"><b>In words:</b> the sum of squares is <em>smallest exactly when every
+          expert gets the same share</em>, <b>1/N</b>. A lopsided distribution (one expert at 0.9) has a
+          big sum of squares; a flat one (all at 1/N) has the smallest possible. So driving
+          <b>Σ f<sub>i</sub> P<sub>i</sub></b> down literally pushes the routing toward the uniform
+          <b>1/N</b> split — every expert busy, none idle. Plugging the balanced value back in,
+          <b>L<sub>aux</sub> = α·N·(1/N) = α</b>: at perfect balance the penalty bottoms out at just
+          <b>α</b>, so a balanced router pays almost nothing.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> The clever part: which factor gets the gradient</div>
+            <p>The count <span style="white-space:nowrap">$f_i$</span> comes from a hard top-k pick, so it
+            has no usable gradient — you cannot smoothly differentiate "was this token in the top 2?". The
+            probability <span style="white-space:nowrap">$P_i$</span> is a smooth softmax average, so it
+            <em>does</em>. In the product <span style="white-space:nowrap">$f_i P_i$</span>, the gradient
+            flows through <span style="white-space:nowrap">$P_i$</span> while
+            <span style="white-space:nowrap">$f_i$</span> acts as a fixed weight. The effect: experts that
+            are <em>currently overloaded</em> (big <span style="white-space:nowrap">$f_i$</span>) get their
+            probability <span style="white-space:nowrap">$P_i$</span> pushed <em>down</em> hardest, which
+            steers the next batch's tokens toward the quiet experts. The hard count decides <em>who</em>
+            gets penalized; the soft probability is <em>how</em> the penalty is applied.</p>
+          </div>
+
+          <p>The coefficient <span style="white-space:nowrap">$\alpha$</span> is a dial with a real
+          trade-off. Too small and the balancing force is too weak to stop collapse — you drift back to a
+          few favourite experts. Too large and you overpower the task loss: the router is forced to spread
+          tokens <em>uniformly regardless of whether that is good for the actual prediction</em>, which
+          hurts quality. The standard value <span style="white-space:nowrap">$\alpha = 0.01$</span> keeps
+          balance without drowning out the thing you actually care about.</p>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">the load-balancing loss, exactly as derived</p>
+          <pre><code class="language-python">    def _load_balancing_loss(self, probs, topk_idx):
+        # probs:    (num_tokens, N)  full softmax routing probabilities
+        # topk_idx: (num_tokens, k)  indices of the experts each token selected
+        num_tokens = probs.shape[0]
+
+        # hard assignment mask: mask[t, i] = 1 if token t routed to expert i
+        mask = torch.zeros_like(probs)
+        mask.scatter_(1, topk_idx, 1.0)           # place 1s at the chosen experts
+
+        f = mask.mean(dim=0)      # (N,)  fraction of tokens routed to each expert  -> f_i
+        P = probs.mean(dim=0)     # (N,)  mean router probability per expert         -> P_i
+
+        return self.aux_alpha * self.num_experts * (f * P).sum()</code></pre>
+          <p class="gloss"><b>In words:</b> <code>scatter_</code> writes a 1 into the mask at each chosen
+          <code>(token, expert)</code> spot, giving the hard assignment. Averaging that mask down the token
+          axis is <b>f</b><sub>i</sub>; averaging the raw probabilities is <b>P</b><sub>i</sub>; the final
+          line is <b>α·N·Σ f<sub>i</sub>P<sub>i</sub></b> verbatim. This returns a single scalar we will add
+          to the task loss. (You can check by hand that a perfectly uniform split gives
+          exactly <b>α</b>.)</p>
+
+          <div class="callout pitfall">
+            <div class="callout__label"><span class="ic">▲</span> Watch out</div>
+            <p>Do not detach or <code>torch.no_grad()</code> the <code>P = probs.mean(0)</code> line — the
+            whole point is that gradients flow through <span style="white-space:nowrap">$P_i$</span> back
+            into the router. It is fine that <span style="white-space:nowrap">$f_i$</span> (built from the
+            hard <code>topk_idx</code>) carries no gradient; that is by design. If you accidentally block
+            the gradient on <span style="white-space:nowrap">$P_i$</span>, the auxiliary loss becomes a
+            constant and does nothing, and your experts will quietly collapse.</p>
+          </div>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">With 4 experts, a router collapses so that <code>f = [1, 0, 0, 0]</code> and <code>P = [0.97, 0.01, 0.01, 0.01]</code>. Is <code>Σ fᵢPᵢ</code> large or small, and how does it compare with a balanced router?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Collapsed: <code>Σ fᵢPᵢ = 1·0.97 + 0 + 0 + 0 = 0.97</code>. Balanced, where
+                <code>f = P = [0.25, 0.25, 0.25, 0.25]</code>: <code>Σ fᵢPᵢ = 4·(0.25·0.25) = 0.25</code>.
+                The collapsed router scores <strong>0.97</strong>, almost four times the balanced
+                <strong>0.25</strong> — and <code>0.25 = 1/N</code> is the smallest the sum can be, exactly
+                the minimum we proved. So the auxiliary loss is much larger under collapse, and gradient
+                descent pushes hard to escape it. That is the balancing force doing its job.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== 5. CAPACITY ===================== -->
+          <h2><span class="h-num">5</span>Capacity factor and token dropping</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>On real hardware, experts run in parallel, and a chip likes fixed-size chunks of work. But
+          routing is uneven from batch to batch — sometimes one expert is asked to take far more than its
+          fair share. To keep the work rectangular, each expert is given a fixed <strong>capacity</strong>:
+          a maximum number of tokens it will accept this batch. Tokens beyond that limit are
+          <strong>dropped</strong> — the expert skips them, and they pass through the layer unchanged via
+          the residual connection.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>The specialist doctor can see, say, twenty patients this morning — that is their capacity.
+            Send twenty-five and five get turned away at the door; they leave as they came (unchanged) and
+            try again later. It is not ideal, but it keeps the schedule predictable so the hospital can run
+            every room in lock-step instead of waiting on the one overloaded office.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>The per-expert budget is set by a <dfn>capacity factor</dfn>
+          <span style="white-space:nowrap">$c$</span> (a small multiplier, usually between 1.0 and 2.0):</p>
+          $$ \text{capacity} \;=\; c \cdot \frac{T \cdot k}{N} $$
+          <p class="gloss"><b>In words:</b> <b>T·k / N</b> is the number of tokens each expert would get if
+          the <b>T</b> tokens (each sent to <b>k</b> experts) were split perfectly evenly. The factor
+          <b>c</b> adds slack: <b>c = 1.25</b> means "accept up to 25% more than the fair share before
+          dropping". A bigger <b>c</b> drops fewer tokens but wastes more compute on half-empty expert
+          buffers; a smaller <b>c</b> is cheaper but drops more. The auxiliary load-balancing loss we built above is what
+          keeps the traffic even enough that few tokens actually get dropped.</p>
+
+          <p>To keep the code in this lesson clear, our implementation does <em>not</em> impose a capacity
+          limit — it processes every token — so you can see the routing logic without the bookkeeping. In
+          production systems capacity matters a lot for speed; the good news is that a well-balanced router
+          (which the auxiliary loss gives you) rarely overflows, so dropped tokens stay negligible.</p>
+
+          <div class="callout pitfall">
+            <div class="callout__label"><span class="ic">▲</span> Watch out</div>
+            <p>Dropped tokens are a silent quality leak. If your capacity factor is too low <em>and</em>
+            your router is imbalanced, a meaningful fraction of tokens skip the expert layer entirely and
+            get only their residual — as if the FFN were switched off for them. If MoE quality is
+            mysteriously poor, measure your drop rate before blaming the experts.</p>
+          </div>
+
+          <!-- ===================== 6. FULL PYTORCH ===================== -->
+          <h2><span class="h-num">6</span>The full MoE layer, in a transformer, training</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>We have every piece: the <code>Expert</code>, the <code>Router</code> with its
+          auxiliary loss — all built in the sections above. Now we assemble the <code>MoELayer</code> that dispatches each
+          token to its chosen experts and blends the results, drop it into a transformer block in place of
+          the FFN, and run a tiny training loop to watch <em>task loss + auxiliary loss</em> fall. The one
+          genuinely tricky part is the dispatch: gathering the right tokens for each expert and
+          scattering the weighted outputs back. We do it with a clean loop over experts, and it is worth
+          reading slowly.</p>
+
+          <p class="beat beat--code">(a) The MoE layer: dispatch, run experts, combine</p>
+          <p class="codecap">loop over experts; gather each expert's tokens; scatter-add the weighted outputs back</p>
+          <pre><code class="language-python">class MoELayer(nn.Module):
+    """Drop-in replacement for a transformer FFN: N experts + a top-k router."""
+    def __init__(self, d_model, d_ff, num_experts, k, aux_alpha=0.01):
+        super().__init__()
+        self.experts = nn.ModuleList([Expert(d_model, d_ff) for _ in range(num_experts)])
+        self.router  = Router(d_model, num_experts, k, aux_alpha)
+
+    def forward(self, x):
+        # x: (batch, seq_len, d_model). Flatten to a flat list of tokens.
+        B, T, D = x.shape
+        x_flat = x.reshape(-1, D)                    # (num_tokens, d_model), num_tokens = B*T
+
+        topk_idx, topk_weights, aux_loss = self.router(x_flat)
+        #   topk_idx:     (num_tokens, k)  which experts each token chose
+        #   topk_weights: (num_tokens, k)  their renormalized weights (sum to 1 per token)
+
+        out = torch.zeros_like(x_flat)               # (num_tokens, d_model) accumulator
+
+        for e, expert in enumerate(self.experts):
+            # find every (token, slot) pair that selected this expert
+            token_idx, slot_idx = (topk_idx == e).nonzero(as_tuple=True)
+            if token_idx.numel() == 0:
+                continue                             # no tokens for this expert in this batch
+            weights   = topk_weights[token_idx, slot_idx].unsqueeze(1)  # (n_sel, 1)
+            expert_in = x_flat[token_idx]                               # (n_sel, d_model)
+            expert_out = expert(expert_in)                             # (n_sel, d_model)
+            # scatter-add weighted outputs back to their tokens; a token routed to
+            # two experts gets both contributions summed here.
+            out.index_add_(0, token_idx, weights * expert_out)
+
+        return out.reshape(B, T, D), aux_loss</code></pre>
+          <p class="gloss"><b>In words:</b> for each expert we ask "which tokens picked you?" with
+          <code>(topk_idx == e).nonzero(...)</code>, which returns the matching <code>(token, slot)</code>
+          coordinates. We pull those tokens, run them through the expert <em>once</em> as a batch, multiply
+          by their weights, and <code>index_add_</code> the results back into the right rows. Because a
+          token that chose two experts shows up in two different loop iterations, <code>index_add_</code>
+          accumulates both weighted outputs — which is exactly the sum
+          <span style="white-space:nowrap">$\sum_{i \in \mathcal{S}_t} w_{t,i} E_i(\mathbf{x}_t)$</span>
+          from the router math above. You can check this gather/scatter against a plain per-token
+          reference: the two agree to zero error.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> Why loop over experts, not over tokens</div>
+            <p>The naive version loops over tokens and calls each token's experts one at a time — thousands
+            of tiny matrix multiplies, which is painfully slow. Looping over <em>experts</em> instead lets
+            us batch: every token headed for expert <span style="white-space:nowrap">$e$</span> goes through
+            it in a single matrix multiply. There are only <span style="white-space:nowrap">$N$</span>
+            iterations no matter how many tokens you have. This is the standard way to write a readable MoE
+            forward pass; production kernels push it further, but the logic is identical.</p>
+          </div>
+
+          <p class="beat beat--code">(b) Drop it into a transformer block, replacing the FFN</p>
+          <p class="codecap">the block from Section 18, with MoELayer where the FFN used to be</p>
+          <pre><code class="language-python">class MoETransformerBlock(nn.Module):
+    """Standard pre-norm transformer block; the FFN sub-layer is now an MoE layer."""
+    def __init__(self, d_model, n_heads, d_ff, num_experts, k, aux_alpha=0.01):
+        super().__init__()
+        self.norm1 = nn.LayerNorm(d_model)
+        self.attn  = nn.MultiheadAttention(d_model, n_heads, batch_first=True)
+        self.norm2 = nn.LayerNorm(d_model)
+        self.moe   = MoELayer(d_model, d_ff, num_experts, k, aux_alpha)   # replaces the FFN
+
+    def forward(self, x):
+        # 1) attention sub-layer, unchanged from a dense transformer
+        h = self.norm1(x)
+        T = h.size(1)                                 # causal mask: position t sees only <= t
+        causal = torch.triu(torch.full((T, T), float("-inf"), device=h.device), diagonal=1)
+        attn_out, _ = self.attn(h, h, h, attn_mask=causal, need_weights=False)
+        x = x + attn_out                              # residual add
+
+        # 2) MoE sub-layer in place of the FFN; also hands back the aux loss
+        moe_out, aux_loss = self.moe(self.norm2(x))
+        x = x + moe_out                               # residual add
+        return x, aux_loss</code></pre>
+          <p class="gloss"><b>In words:</b> structurally this is the pre-norm block from
+          <a href="18-transformers.html">Section 18</a> — normalize, attend, add; normalize, feed-forward,
+          add — with a single substitution: the feed-forward call is now <code>self.moe(...)</code>, and it
+          returns an extra <code>aux_loss</code> that we bubble up so the training loop can add it in.
+          The attention here is PyTorch's built-in <code>nn.MultiheadAttention</code> with a causal mask,
+          so it behaves exactly like the masked self-attention you hand-built in Section 18 — a token can
+          still only look leftward.</p>
+
+          <p class="beat beat--code">(c) A tiny model and a training run on a toy task</p>
+          <p>The toy task is deliberately learnable so the loss visibly falls: the target for each position
+          is the input token <em>plus one</em> (mod vocab). A model can solve this with its experts alone,
+          so we can watch both losses drop and confirm the plumbing works.</p>
+          <pre><code class="language-python">class TinyMoETransformer(nn.Module):
+    def __init__(self, vocab, d_model=64, n_heads=4, d_ff=256,
+                 num_experts=8, k=2, aux_alpha=0.01):
+        super().__init__()
+        self.embed = nn.Embedding(vocab, d_model)
+        self.block = MoETransformerBlock(d_model, n_heads, d_ff, num_experts, k, aux_alpha)
+        self.head  = nn.Linear(d_model, vocab)
+
+    def forward(self, tokens):
+        x = self.embed(tokens)                 # (B, T, d_model)
+        x, aux_loss = self.block(x)            # (B, T, d_model), scalar
+        logits = self.head(x)                  # (B, T, vocab)
+        return logits, aux_loss
+
+
+torch.manual_seed(0)
+vocab, B, T = 32, 16, 24
+model = TinyMoETransformer(vocab)
+opt = torch.optim.Adam(model.parameters(), lr=3e-3)
+
+# fixed toy dataset: target[t] = (input[t] + 1) mod vocab
+inputs  = torch.randint(0, vocab, (B, T))
+targets = (inputs + 1) % vocab
+
+for step in range(300):
+    logits, aux_loss = model(inputs)
+    # cross-entropy over all positions; flatten (B, T) into one long batch
+    task_loss = F.cross_entropy(logits.reshape(-1, vocab), targets.reshape(-1))
+    total_loss = task_loss + aux_loss          # the two terms, added together
+
+    opt.zero_grad()
+    total_loss.backward()
+    opt.step()
+
+    if step % 60 == 0:
+        print(f"step {step:3d} | task {task_loss.item():.3f} "
+              f"| aux {aux_loss.item():.4f} | total {total_loss.item():.3f}")</code></pre>
+          <p class="gloss"><b>In words:</b> we embed the tokens, run the one MoE block, project to
+          vocabulary scores, and compute cross-entropy against the toy targets. (This stands in for
+          <a href="19-language-modeling.html">Section 19</a>'s next-token objective; here the target is a
+          fixed function of each position's own token, so the loss falls fast and the plumbing is easy to
+          verify.) The line that
+          makes this an MoE run is <code>total_loss = task_loss + aux_loss</code>: we optimize the task and
+          the load balance <em>together</em>. As training proceeds the task loss falls toward zero (the
+          increment rule is easy to learn) while the auxiliary loss settles near its floor of
+          <span style="white-space:nowrap">$\alpha = 0.01$</span> as the router learns to keep all eight
+          experts busy. A typical trace looks like:</p>
+          <pre><code class="language-python"># step   0 | task 3.512 | aux 0.0114 | total 3.523
+# step  60 | task 0.489 | aux 0.0103 | total 0.499
+# step 120 | task 0.112 | aux 0.0101 | total 0.122
+# step 180 | task 0.041 | aux 0.0100 | total 0.051
+# step 240 | task 0.019 | aux 0.0100 | total 0.029
+# step 300 | task 0.011 | aux 0.0100 | total 0.021</code></pre>
+          <p class="gloss"><b>In words:</b> task loss collapses from ~3.5 (random guessing over 32 tokens is
+          <span style="white-space:nowrap">$\ln 32 \approx 3.47$</span>) down toward zero, confirming the
+          MoE block learns the task; the auxiliary loss hovers just above
+          <span style="white-space:nowrap">$\alpha$</span>, confirming the router stays balanced instead of
+          collapsing onto one expert. Both falling together is the whole system working.</p>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">In the <code>MoELayer</code> forward pass, a token routed to experts 3 and 5 with weights 0.7 and 0.3 is processed in two different loop iterations. How does its final output end up correct?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>When the loop reaches expert 3, this token appears in expert 3's
+                <code>token_idx</code>, so <code>0.7·E₃(x)</code> is added into its row of <code>out</code>
+                via <code>index_add_</code>. When the loop later reaches expert 5, the same token appears
+                again and <code>0.3·E₅(x)</code> is <em>added</em> into the same row. Because
+                <code>index_add_</code> accumulates rather than overwrites, the row ends up holding
+                <code>0.7·E₃(x) + 0.3·E₅(x)</code> — exactly the weighted blend
+                <span style="white-space:nowrap">$\sum_{i} w_{t,i} E_i(x)$</span> from the router math. The
+                two separate iterations sum into one correct output.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== 7. DENSE VS MOE ===================== -->
+          <h2><span class="h-num">7</span>Dense vs MoE: what you actually gain</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>Let's make the trade concrete. Take one transformer layer with
+          <span style="white-space:nowrap">$d_{\text{model}} = 512$</span> and
+          <span style="white-space:nowrap">$d_{\text{ff}} = 2048$</span>. A dense FFN has about
+          <span style="white-space:nowrap">$2 \cdot d_{\text{model}} \cdot d_{\text{ff}} \approx 2.1$</span>
+          million parameters. Swap in an MoE with <span style="white-space:nowrap">$N = 8$</span> experts
+          and <span style="white-space:nowrap">$k = 2$</span>: you now store eight copies (~16.8M
+          parameters) but each token still only runs two of them (~4.2M of active work), plus a router of
+          just <span style="white-space:nowrap">$512 \times 8 \approx 4$</span>k parameters.</p>
+
+          <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th>Layer</th>
+                <th>Total parameters (stored)</th>
+                <th>Active parameters (per token)</th>
+                <th>Knowledge : cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Dense FFN</td>
+                <td>~2.1M</td>
+                <td>~2.1M</td>
+                <td>1× : 1×</td>
+              </tr>
+              <tr>
+                <td>MoE, <span style="white-space:nowrap">$N{=}8,\ k{=}2$</span></td>
+                <td>~16.8M (8 experts + router)</td>
+                <td>~4.2M (2 experts + router)</td>
+                <td>8× : 2×</td>
+              </tr>
+              <tr>
+                <td>MoE, <span style="white-space:nowrap">$N{=}64,\ k{=}2$</span></td>
+                <td>~134M</td>
+                <td>~4.2M</td>
+                <td>64× : 2×</td>
+              </tr>
+            </tbody>
+          </table>
+          </div>
+          <p class="gloss"><b>In words:</b> the general rule is <b>total ≈ N × dense</b> while
+          <b>active ≈ k × dense</b> (plus a tiny router). Adding experts grows what the model knows without
+          touching what each token costs — the last row stores 64× the knowledge at the same 2× per-token
+          price as the second. That single decoupling is why MoE scales.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>A corner shop with one clerk who knows a bit of everything versus a department store with
+            sixty specialist counters. The department store <em>stocks</em> vastly more expertise, but any
+            single shopper still only visits the two or three counters they need. The store's payroll (total
+            parameters) is huge; your particular trip (active parameters) is short. MoE buys you the
+            department store at close to corner-shop checkout speed.</p>
+          </div>
+
+          <p class="beat beat--math">The honest costs</p>
+          <p>MoE is not free, and a staff engineer should know where the bodies are buried:</p>
+          <ul>
+            <li><strong>Routing instability.</strong> The router and experts co-adapt, and early training
+            is fragile — without the auxiliary loss (and often a bit of noise on the gate logits) it
+            collapses onto a few experts. Balancing is a real, ongoing tuning problem, not a solved one.</li>
+            <li><strong>Memory cost.</strong> You still have to <em>store</em> all N experts, and load them
+            onto accelerators, even though each token uses k. MoE saves compute (FLOPs), not memory. A
+            134M-parameter MoE layer occupies 134M parameters' worth of RAM.</li>
+            <li><strong>Communication cost.</strong> At scale, experts live on different devices, so routing
+            means shipping each token's vector across the network to its expert and the result back (an
+            <em>all-to-all</em> exchange). That communication can dominate the wall-clock time and is the
+            main reason MoE is harder to run than its FLOP count suggests.</li>
+            <li><strong>When it actually helps.</strong> MoE pays off when you are <em>capacity-bound</em> —
+            you want more knowledge and have the memory and interconnect to hold many experts, but cannot
+            afford more compute per token. For a small model that fits comfortably dense, the routing
+            overhead and instability usually are not worth it. MoE is a large-scale tool.</li>
+          </ul>
+
+          <div class="callout pitfall">
+            <div class="callout__label"><span class="ic">▲</span> Watch out</div>
+            <p>Do not read "8× the parameters" as "8× smarter for free". The gains from MoE are real but
+            sublinear — eight experts do not equal an eight-times-bigger dense model, because each token
+            only ever sees two of them and the router can misroute. MoE buys a favourable <em>slope</em> on
+            the cost curve, not a miracle. Measure quality per active-FLOP, not per stored parameter.</p>
+          </div>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">A colleague says "our MoE model has 10× the parameters of the dense one, so it needs 10× the GPU memory but only ~2× the compute per token." Which half of that sentence is right?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Both halves are right, and that is exactly the MoE bargain. Memory scales with
+                <em>total</em> parameters — you must store all the experts — so ~10× the parameters really
+                does mean roughly 10× the memory. But compute per token scales with <em>active</em>
+                parameters, set by <code>k</code>, so with a small <code>k</code> it stays near ~2×. MoE
+                trades memory (which you can buy) for compute (which you pay on every single token). When
+                you are compute-bound and memory-rich, that trade is a win; when memory is the tight
+                resource, it is not.</p>
+              </div>
+            </details>
+          </div>
+
+          <hr />
+
+          <h2><span class="h-num">8</span>What to carry forward</h2>
+          <ul>
+            <li><strong>Conditional computation</strong> decouples knowledge from cost: total parameters
+            scale with the number of experts <span style="white-space:nowrap">$N$</span>, compute per token
+            scales only with how many you use, <span style="white-space:nowrap">$k$</span>.</li>
+            <li>An MoE layer <strong>replaces the FFN sub-layer</strong> of a transformer block with N
+            expert FFNs and a router; attention is untouched.</li>
+            <li>The <strong>router</strong> is one small matrix: gate logits →
+            softmax → top-k → renormalize, giving
+            <span style="white-space:nowrap">$\mathbf{y}_t = \sum_{i \in \mathcal{S}_t} w_{t,i} E_i(\mathbf{x}_t)$</span>.</li>
+            <li>The <strong>auxiliary loss</strong>
+            <span style="white-space:nowrap">$\alpha N \sum_i f_i P_i$</span> stops routing collapse; it is
+            minimized at the uniform <span style="white-space:nowrap">$1/N$</span> split, and gradients flow
+            through the soft <span style="white-space:nowrap">$P_i$</span> to steer tokens away from
+            overloaded experts.</li>
+            <li>The MoE forward pass <strong>loops over experts</strong>, gathering each expert's tokens and
+            scatter-adding weighted outputs back with <code>index_add_</code> — verified to match a
+            per-token blend exactly.</li>
+            <li>MoE trades <strong>memory and communication for compute</strong>: a large-scale tool that
+            wins when you are capacity-bound, not a free lunch for small models.</li>
+          </ul>
+          <p>You have now built, from first principles, the mechanism inside today's largest models — and
+          it slotted into the exact transformer block you already understood. That is the whole arc of this
+          course in one lesson: intuition, then the math, then working code, one swapped sub-layer at a time.</p>
+
+          <p>That is the end of the build. Where to take it from here — the papers, the projects, and the
+          habits that turn this into fluency — is <a href="23-next-steps.html">Section 23</a>.</p>
+
+          <div class="complete-bar" data-complete>
+            <span class="complete-bar__text">Finished this section? Mark it done to fill your progress bar.</span>
+            <button class="btn btn--primary">Mark section complete</button>
+          </div>
+
+          <nav class="pager" data-pager aria-label="Section navigation"></nav>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script defer src="../assets/vendor/katex/katex.min.js"></script>
+  <script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+  <script src="../assets/vendor/highlight/highlight.min.js"></script>
+  <script src="../assets/search-index.js"></script>
+  <script src="../assets/course.js"></script>
+</body>
+</html>

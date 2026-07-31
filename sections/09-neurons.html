@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <script>try{var t=localStorage.getItem("z2h-ml-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Neurons, Layers, Activations · ML Without the Magic</title>
+  <meta name="description" content="The artificial neuron as a weighted vote through a switch, layers as a single matrix multiply, the common activation functions, and the proof that without nonlinearity depth buys you nothing." />
+  <link rel="stylesheet" href="../assets/vendor/fonts/fonts.css" />
+  <link rel="stylesheet" href="../assets/course.css" />
+  <link rel="stylesheet" href="../assets/vendor/katex/katex.min.css" />
+</head>
+<body data-slug="09-neurons">
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="nav-scrim"></div>
+  <div class="layout">
+    <aside class="sidebar" aria-label="Course navigation">
+      <div class="brand">
+        <div class="brand__kicker">Machine Learning</div>
+        <h1 class="brand__title"><a href="../index.html">Without the Magic</a></h1>
+      </div>
+      <div class="progress">
+        <div class="progress__track"><div class="progress__fill" data-progress-fill></div></div>
+        <div class="progress__label" data-progress-label></div>
+      </div>
+      <nav class="nav" data-nav aria-label="Sections"></nav>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <button class="iconbtn menubtn" data-menu aria-label="Open navigation">☰</button>
+        <div class="topbar__spacer"></div>
+        <span class="topbar__meta">Part 3 · Neural Nets from Scratch</span>
+        <button class="iconbtn" data-theme-toggle aria-label="Toggle theme">☾</button>
+      </div>
+
+      <main id="main" class="reading">
+        <header class="lesson-head">
+          <p class="lesson-eyebrow">Part 3 · Neural Nets from Scratch <span class="dot"></span> Section 9</p>
+          <h1 class="lesson-title">Neurons, Layers, Activations</h1>
+          <p class="lesson-standfirst">A neuron is a weighted vote passed through a switch — and without that switch, depth is a lie.</p>
+          <div class="lesson-meta">
+            <span><b>28 min</b> read</span>
+            <span><b>You'll learn:</b> the artificial neuron · layers as matrices · activation functions · why nonlinearity is essential</span>
+          </div>
+        </header>
+
+        <div class="prose">
+          <p class="lead">Everything you have built so far — vectors, matrices, dot products — was
+          preparation for this one small object: the <strong>neuron</strong>. A neuron takes a handful
+          of numbers, weighs them, adds them up, and then passes the result through a little switch. Wire
+          a few thousand of these together and you have a neural network. This section builds the neuron,
+          stacks neurons into layers, and then proves the single most important fact about them: the
+          switch is not optional. Remove it and a hundred layers collapse into one.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> The one idea to hold onto</div>
+            <p>One neuron is <span style="white-space:nowrap">$\text{activation}(\mathbf{w}^\top\mathbf{x} + b)$</span>
+            — a weighted sum passed through a nonlinear switch. A layer runs many neurons at once, which is
+            just a matrix multiply. And the switch — the <strong>activation</strong> — is the only thing
+            that lets stacking layers buy you real power. That's the whole section; everything below is why.</p>
+          </div>
+
+          <!-- ===================== THE NEURON ===================== -->
+          <h2><span class="h-num">1</span>The artificial neuron: a weighted vote through a switch</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>A <strong>neuron</strong> makes one small decision. It looks at several input numbers, decides
+          how much each one matters, adds up its weighted opinion, and then squashes that total through a
+          switch that decides how strongly to “fire.” Big weighted total → strong output. Small or
+          negative total → weak or zero output. That's it. The cleverness of a network is not in any one
+          neuron; it's in wiring many simple ones together.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Deciding whether to go outside is a weighted vote. The weather matters a lot to you (big
+            weight), whether you have plans matters somewhat (medium weight), your energy level matters a
+            little (small weight). You tally up the weighted evidence — and you only actually get off the
+            couch once that tally crosses some personal threshold. Below the threshold you stay in; above
+            it you go. A neuron is exactly that: weigh the factors, sum them, fire only past a point.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>Write the inputs as a vector <span style="white-space:nowrap">$\mathbf{x} \in \mathbb{R}^{n}$</span>
+          (a list of <b>n</b> numbers). Give the neuron a matching list of <strong>weights</strong>
+          <span style="white-space:nowrap">$\mathbf{w} \in \mathbb{R}^{n}$</span> and a single extra number
+          <b>b</b>, the <strong>bias</strong>. The neuron computes:</p>
+          $$ y = \text{activation}\!\left( \mathbf{w}^\top\mathbf{x} + b \right)
+             = \text{activation}\!\left( \sum_{i=1}^{n} w_i x_i + b \right) $$
+          <p class="gloss"><b>In words:</b> the piece <span style="white-space:nowrap">$\mathbf{w}^\top\mathbf{x}$</span>
+          is just the <em>dot product</em> from <a href="01-linear-algebra.html">Section 1</a> — multiply
+          each input by its weight and add the results, giving one number (“how much do I care, in total?”).
+          Then add the bias <b>b</b> to shift that number up or down, and finally push the whole thing
+          through the <b>activation</b> — the switch — to get the neuron's output <b>y</b>.</p>
+
+          <div class="callout definition">
+            <div class="callout__label">Definition</div>
+            <p>A <dfn>weight</dfn> <span style="white-space:nowrap">$w_i$</span> says how much input
+            <span style="white-space:nowrap">$x_i$</span> matters, and in which direction — a large positive
+            weight means “this input pushes the output up,” a negative weight means “this input pushes it
+            down.” The <dfn>bias</dfn> <b>b</b> is a constant offset added to every input; it sets the
+            neuron's default lean, i.e. how big the weighted sum must be before the neuron starts to fire.
+            The <dfn>activation</dfn> is a fixed nonlinear function — the switch — applied to that sum.</p>
+          </div>
+
+          <p>The raw number <em>before</em> the activation, <span style="white-space:nowrap">$z = \mathbf{w}^\top\mathbf{x} + b$</span>,
+          shows up so often it has a name: the <strong>pre-activation</strong> (some texts call it the
+          <em>logit</em> when it is the final score before a probability). Keep the two apart in your head:
+          <b>z</b> is the weighted vote, <b>y = activation(z)</b> is the vote after the switch.</p>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">one neuron by hand</p>
+          <pre><code class="language-python">import torch
+
+x = torch.tensor([0.6, -1.2, 2.0])     # three inputs
+w = torch.tensor([1.5,  0.3, -0.8])    # a weight per input
+b = torch.tensor(0.1)                  # one bias
+
+z = torch.dot(w, x) + b                # pre-activation: the weighted vote
+y = torch.relu(z)                      # push it through the switch (ReLU)
+
+print(z)     # tensor(-1.05)   0.6*1.5 + (-1.2)*0.3 + 2.0*(-0.8) + 0.1
+print(y)     # tensor(0.)      negative vote -> neuron stays silent</code></pre>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">If every weight in a neuron were <code>0</code>, what would its output be for <em>any</em> input, and what does that tell you about the bias?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>With all weights zero, <span style="white-space:nowrap">$\mathbf{w}^\top\mathbf{x} = 0$</span>
+                no matter what <b>x</b> is, so the pre-activation is just <b>b</b> and the output is a
+                constant <span style="white-space:nowrap">$\text{activation}(b)$</span> — the neuron ignores
+                its inputs entirely. That's the point of the bias: it's the neuron's output when the
+                weighted evidence is silent, its baseline lean. Weights decide how the inputs move the
+                output; the bias decides where the output sits when the inputs say nothing.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== LAYERS ===================== -->
+          <h2><span class="h-num">2</span>Layers: many neurons at once is one matrix multiply</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>One neuron gives you one number. Usually you want many — one neuron asking “does this look
+          like a wheel?”, another “does this look like a window?”, another “is there fur?”. A
+          <strong>layer</strong> is simply a row of neurons, all looking at the same input at the same
+          time, each with its own weights and bias, each producing its own number. Their outputs stack
+          into a new vector, which becomes the input to the next layer.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>A loan application lands on a desk with a panel of reviewers. One reviewer cares mostly about
+            income, another mostly about credit history, another about existing debt. They all read the
+            <em>same</em> application but weigh it differently, and each writes down a score. The panel's
+            set of scores is richer than any single reviewer's opinion. A layer is that panel: same input
+            to everyone, different weights per member, a vector of scores out.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>Here is the beautiful part. Stacking neurons doesn't need any new machinery — it is exactly the
+          matrix–vector multiply from <a href="01-linear-algebra.html">Section 1</a>. Put each neuron's
+          weight vector as a <em>row</em> of a matrix <b>W</b>, collect the biases into a vector <b>b</b>,
+          and one line does the whole layer:</p>
+          $$ \mathbf{h} = \text{activation}\!\left( \mathbf{W}\mathbf{x} + \mathbf{b} \right) $$
+          <p class="gloss"><b>In words:</b> row <b>i</b> of <b>W</b> is the weights of neuron <b>i</b>, so
+          <span style="white-space:nowrap">$\mathbf{W}\mathbf{x}$</span> computes every neuron's weighted
+          vote in a single multiply (one dot product per row). Add the bias vector, apply the activation to
+          every slot, and out comes <b>h</b> — the layer's output vector, one number per neuron.</p>
+
+          <p>The shapes are the whole story, so let's pin them down. Suppose the input has <b>n</b> features
+          and the layer has <b>m</b> neurons:</p>
+          $$ \underbrace{\mathbf{W}}_{m \times n}\;
+             \underbrace{\mathbf{x}}_{n \times 1}
+             \;+\; \underbrace{\mathbf{b}}_{m \times 1}
+             \;=\; \underbrace{\mathbf{h}}_{m \times 1} $$
+          <p class="gloss"><b>In words:</b> <b>W</b> has one row per neuron (<b>m</b> rows) and one column
+          per input feature (<b>n</b> columns). By the shape rule — inner numbers match, outer numbers
+          survive — an <span style="white-space:nowrap">$(m\times n)$</span> matrix times an
+          <span style="white-space:nowrap">$(n\times 1)$</span> vector gives an
+          <span style="white-space:nowrap">$(m\times 1)$</span> vector. So a layer maps <b>n</b> numbers in
+          to <b>m</b> numbers out; you pick <b>m</b> when you design the network.</p>
+
+          <p>In practice you rarely push one example through at a time. You send a whole <strong>batch</strong>
+          (a bundle of examples processed together for speed). Stack <b>N</b> input vectors as the rows of a
+          matrix <span style="white-space:nowrap">$\mathbf{X}$</span> of shape
+          <span style="white-space:nowrap">$(N \times n)$</span>, and the layer becomes
+          <span style="white-space:nowrap">$\mathbf{H} = \text{activation}(\mathbf{X}\mathbf{W}^\top + \mathbf{b})$</span>,
+          producing an <span style="white-space:nowrap">$(N \times m)$</span> output — one row of answers
+          per example. (This row-of-examples convention is why PyTorch's <code>Linear</code> layer stores
+          its weight as <span style="white-space:nowrap">$(m \times n)$</span> and multiplies by
+          <span style="white-space:nowrap">$\mathbf{W}^\top$</span> under the hood.)</p>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">A layer takes a 784-length image vector and has 128 neurons. What are the shapes of <code>W</code>, <code>b</code>, and the output <code>h</code> for a single image?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>The layer maps <span style="white-space:nowrap">$n = 784$</span> inputs to
+                <span style="white-space:nowrap">$m = 128$</span> neurons. So <b>W</b> is
+                <strong>(128, 784)</strong> — one row per neuron, one column per input feature — the bias
+                <b>b</b> is <strong>(128,)</strong> — one per neuron — and the output <b>h</b> is
+                <strong>(128,)</strong>. The 784 “cancels” in the multiply and the 128 survives. You've just
+                sized the first hidden layer of an image classifier.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== ACTIVATIONS ===================== -->
+          <h2><span class="h-num">3</span>Activation functions: the shape of the switch</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>The activation is the switch each neuron passes its weighted vote through. Different switches
+          have different personalities — some are soft and gentle, some are hard on/off, some let strong
+          signals through untouched. The choice matters because it decides two things: what range the
+          output can take, and — crucially for learning — how the <strong>gradient</strong> (the slope that
+          tells training which way to nudge the weights, from <a href="10-backprop.html">backprop</a>)
+          behaves. A switch whose slope goes flat is a switch through which learning cannot flow.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Think of a dimmer versus a light switch. A <strong>dimmer</strong> (like sigmoid or tanh)
+            eases smoothly from off to fully on, but near the two ends it barely responds — twist it a lot
+            and almost nothing changes. A plain <strong>light switch</strong> is hard on/off. And a
+            <strong>ReLU</strong> is like a diode: it blocks anything negative completely, but passes
+            positive signal straight through at full strength, no dimming. Each feels different to “tune,”
+            and that tuning feel <em>is</em> the gradient.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>The <strong>sigmoid</strong> squashes any number into the range (0, 1) — handy when you want an
+          output you can read as a probability:</p>
+          $$ \sigma(z) = \frac{1}{1 + e^{-z}} \qquad \text{range } (0, 1) $$
+          <p class="gloss"><b>In words:</b> huge positive <b>z</b> gives an output near 1, huge negative
+          <b>z</b> gives near 0, and <span style="white-space:nowrap">$z = 0$</span> gives exactly 0.5. The
+          catch: at both far ends the curve flattens out, so its slope (gradient) shrinks to nearly zero —
+          this is called <strong>saturation</strong>, and it starves learning.</p>
+
+          <p>The <strong>tanh</strong> is a rescaled sigmoid centred on zero, with range (−1, 1):</p>
+          $$ \tanh(z) = \frac{e^{z} - e^{-z}}{e^{z} + e^{-z}} \qquad \text{range } (-1, 1) $$
+          <p class="gloss"><b>In words:</b> same S-shape as sigmoid but symmetric around zero, so its
+          outputs are centred (a negative input gives a negative output). That centering makes it a bit
+          nicer to train than sigmoid — but it still saturates and flattens at the two ends.</p>
+
+          <p>The <strong>ReLU</strong> (“rectified linear unit”) is almost embarrassingly simple: keep the
+          input if it's positive, otherwise output zero.</p>
+          $$ \text{ReLU}(z) = \max(0, z) \qquad \text{range } [0, \infty) $$
+          <p class="gloss"><b>In words:</b> for any positive <b>z</b> the output is just <b>z</b> and the
+          slope is exactly 1 — the gradient passes through undamped, so learning never stalls on the
+          positive side. For negative <b>z</b> the output is 0 and the slope is 0 (the neuron is “off”).
+          No expensive <span style="white-space:nowrap">$e^{x}$</span>, no saturation for positive inputs —
+          that combination is why ReLU became the default hidden-layer activation.</p>
+
+          <p>ReLU has one flaw: a neuron stuck in the negative zone has zero gradient and may never wake up
+          — a <strong>dead neuron</strong>. <strong>Leaky ReLU</strong> fixes this by letting a small trickle
+          through on the negative side instead of hard zero:</p>
+          $$ \text{LeakyReLU}(z) = \max(\alpha z,\; z), \qquad \alpha \approx 0.01
+             \qquad \text{range } (-\infty, \infty) $$
+          <p class="gloss"><b>In words:</b> positive inputs behave exactly like ReLU (slope 1); negative
+          inputs get a gentle slope <b>α</b> (say 0.01) instead of 0, so the neuron always keeps a faint
+          gradient and can recover instead of dying. <b>α</b> (alpha) is just the small leak factor.</p>
+
+          <p>Finally, worth knowing by name: <strong>GELU</strong> (“Gaussian Error Linear Unit”) is a
+          smooth, curved cousin of ReLU that bends gently through zero instead of kinking sharply. It is the
+          default activation inside modern transformer models (the architecture behind today's large language
+          models). You don't need its formula yet — just recognise the name when it appears later.</p>
+
+          <div class="scroll-x">
+          <table>
+            <thead>
+              <tr><th>Activation</th><th>Formula</th><th>Output range</th><th>Gradient behaviour</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Sigmoid</td><td>$\dfrac{1}{1+e^{-z}}$</td><td>(0, 1)</td><td>Saturates both ends → tiny gradients, slow learning</td></tr>
+              <tr><td>Tanh</td><td>$\dfrac{e^{z}-e^{-z}}{e^{z}+e^{-z}}$</td><td>(−1, 1)</td><td>Zero-centred but still saturates both ends</td></tr>
+              <tr><td>ReLU</td><td>$\max(0, z)$</td><td>[0, ∞)</td><td>Slope 1 for <span>$z\gt 0$</span>, 0 for <span>$z\lt 0$</span>; cheap, no positive saturation</td></tr>
+              <tr><td>Leaky ReLU</td><td>$\max(\alpha z, z)$</td><td>(−∞, ∞)</td><td>Like ReLU but small slope <span>$\alpha$</span> on the negative side → no dead neurons</td></tr>
+              <tr><td>GELU</td><td>smooth ReLU-like curve</td><td>≈ (−0.17, ∞)</td><td>Smooth everywhere; default in transformers</td></tr>
+            </tbody>
+          </table>
+          </div>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">every switch on the same inputs</p>
+          <pre><code class="language-python">import torch
+
+z = torch.tensor([-2.0, -0.5, 0.0, 0.5, 2.0])
+
+print(torch.sigmoid(z))                    # (0,1):  [0.12, 0.38, 0.50, 0.62, 0.88]
+print(torch.tanh(z))                       # (-1,1): [-0.96, -0.46, 0.00, 0.46, 0.96]
+print(torch.relu(z))                       # [0,inf):[0.00, 0.00, 0.00, 0.50, 2.00]
+print(torch.nn.functional.leaky_relu(z))   # negatives leak: [-0.02, -0.005, 0, 0.5, 2]</code></pre>
+
+          <div class="callout pitfall">
+            <div class="callout__label"><span class="ic">▲</span> Watch out</div>
+            <p>Don't reach for sigmoid or tanh in deep hidden layers by default. Because they flatten at the
+            ends, stacking many of them makes gradients shrink layer after layer until the early layers
+            barely learn — the <strong>vanishing gradient</strong> problem. Sigmoid still has a proper home:
+            the <em>final</em> layer of a binary classifier, where you genuinely want a 0-to-1 probability.
+            For the hidden layers in between, start with ReLU.</p>
+          </div>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">A neuron uses ReLU and its pre-activation is <code>z = −3.0</code>. What is its output, and what is the gradient flowing back through it during training?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Since <span style="white-space:nowrap">$z = -3.0 \lt 0$</span>,
+                <span style="white-space:nowrap">$\text{ReLU}(z) = \max(0, -3) = 0$</span> — the neuron is
+                silent. And ReLU's slope for negative inputs is <strong>0</strong>, so no gradient flows
+                back through this neuron on this example: it learns nothing from it. If the neuron sits in
+                the negative zone for every example, it's a <em>dead neuron</em> that never recovers — the
+                exact problem Leaky ReLU's small negative slope is designed to prevent.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== THE PROOF ===================== -->
+          <h2><span class="h-num">4</span>Why nonlinearity is not optional</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>Here is the claim, and it is worth proving because it justifies the entire existence of
+          activation functions: <strong>if you stack layers with no activation between them, the whole stack
+          is exactly equal to a single layer.</strong> A hundred plain matrix multiplies in a row have no
+          more power than one. The switch is the only thing that makes depth mean anything.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Lay straight rulers end to end, as many as you like. Every ruler is straight, so the whole
+            chain is still one straight line — you never bend it into a curve, no matter how many rulers you
+            add. A linear layer is a straight ruler. To draw a curve you need a bend somewhere, and the
+            activation is the only place a bend can enter. No bend, no curve; no nonlinearity, no real
+            depth.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>Take two layers with <strong>no</strong> activation. The first maps
+          <span style="white-space:nowrap">$\mathbf{x}$</span> to
+          <span style="white-space:nowrap">$\mathbf{h}$</span>, the second maps
+          <span style="white-space:nowrap">$\mathbf{h}$</span> to
+          <span style="white-space:nowrap">$\mathbf{y}$</span>:</p>
+          $$ \mathbf{h} = \mathbf{W}_1\mathbf{x} + \mathbf{b}_1, \qquad
+             \mathbf{y} = \mathbf{W}_2\mathbf{h} + \mathbf{b}_2 $$
+          <p>Now substitute the first equation into the second and simplify, one honest step at a time:</p>
+          $$ \begin{aligned}
+             \mathbf{y} &= \mathbf{W}_2\mathbf{h} + \mathbf{b}_2 \\[2pt]
+                        &= \mathbf{W}_2\big(\mathbf{W}_1\mathbf{x} + \mathbf{b}_1\big) + \mathbf{b}_2
+                        &&\text{(plug in } \mathbf{h}\text{)} \\[2pt]
+                        &= \mathbf{W}_2\mathbf{W}_1\mathbf{x} + \mathbf{W}_2\mathbf{b}_1 + \mathbf{b}_2
+                        &&\text{(multiply through)} \\[2pt]
+                        &= \underbrace{\big(\mathbf{W}_2\mathbf{W}_1\big)}_{\mathbf{W}'}\mathbf{x}
+                           + \underbrace{\big(\mathbf{W}_2\mathbf{b}_1 + \mathbf{b}_2\big)}_{\mathbf{b}'}
+                        &&\text{(group the constants)} \\[2pt]
+                        &= \mathbf{W}'\mathbf{x} + \mathbf{b}'
+             \end{aligned} $$
+          <p class="gloss"><b>In words:</b> the two weight matrices multiply together into one new matrix
+          <span style="white-space:nowrap">$\mathbf{W}' = \mathbf{W}_2\mathbf{W}_1$</span>, and the two biases
+          fold into one new bias <span style="white-space:nowrap">$\mathbf{b}' = \mathbf{W}_2\mathbf{b}_1 + \mathbf{b}_2$</span>.
+          The result, <span style="white-space:nowrap">$\mathbf{y} = \mathbf{W}'\mathbf{x} + \mathbf{b}'$</span>,
+          is a <em>single</em> linear layer. The two-layer network and this one-layer network compute the
+          identical function.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> The punchline</div>
+            <p>Nothing in that derivation used the number two. Chain 100 activation-free layers and the same
+            collapse happens 99 times over: the product
+            <span style="white-space:nowrap">$\mathbf{W}_{100}\cdots\mathbf{W}_2\mathbf{W}_1$</span> is just
+            <em>some</em> matrix <span style="white-space:nowrap">$\mathbf{W}'$</span>, and all the biases
+            fold into one <span style="white-space:nowrap">$\mathbf{b}'$</span>. A 100-layer linear network
+            is <strong>exactly</strong> as expressive as one layer — it can only ever draw straight lines
+            (technically, flat planes). All those extra parameters buy you nothing. The activation is what
+            breaks the collapse: because <span style="white-space:nowrap">$\text{activation}(\mathbf{W}_2\,\text{activation}(\mathbf{W}_1\mathbf{x}))$</span>
+            can't be flattened into one matrix, each real layer adds genuine new power.</p>
+          </div>
+
+          <p>So what <em>can</em> a network do once you put the nonlinearity back? Far more than you might
+          guess. The <strong>universal approximation theorem</strong> states that a network with just one
+          hidden layer — as long as it has a nonlinear activation and enough neurons — can approximate
+          <em>any</em> continuous function to any accuracy you want. “Approximate” means get as close as you
+          like everywhere; “continuous function” means any smooth input-to-output rule without sudden jumps.
+          In plain terms: the bend the activation provides, repeated across enough neurons, can be assembled
+          into any curve at all. That theorem is why neural networks are worth building — and it is silent,
+          worthless, the moment you delete the activation.</p>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">watch two linear layers collapse into one</p>
+          <pre><code class="language-python">import torch
+
+W1 = torch.randn(4, 3); b1 = torch.randn(4)
+W2 = torch.randn(2, 4); b2 = torch.randn(2)
+x  = torch.randn(3)
+
+# two "layers" with NO activation between them
+y_two = W2 @ (W1 @ x + b1) + b2
+
+# the single equivalent layer, built from the proof
+W_eq = W2 @ W1                 # (2x4)(4x3) -> (2x3)
+b_eq = W2 @ b1 + b2            # folded bias
+y_one = W_eq @ x + b_eq
+
+print(torch.allclose(y_two, y_one))   # True  -> same function, one layer</code></pre>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">A colleague builds a 10-layer network but forgets to add any activation functions. During training the loss drops a little then plateaus, and the model does no better than plain linear regression. Why?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Without activations, all ten layers collapse into a single linear map
+                <span style="white-space:nowrap">$\mathbf{W}'\mathbf{x} + \mathbf{b}'$</span> by the proof
+                above. The model literally <em>is</em> a linear model, so it can never beat one — the nine
+                extra layers add parameters but zero expressive power. It plateaus wherever a straight-line
+                fit plateaus. The fix is one line per layer: wrap each hidden layer's output in a
+                nonlinearity like ReLU, and the collapse can no longer happen.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== FULL LAYER CODE ===================== -->
+          <h2><span class="h-num">5</span>A real layer in PyTorch</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>You now have every piece: weights, bias, matrix multiply, activation. PyTorch bundles the
+          weighted sum and bias into <code>nn.Linear</code> and keeps the activation separate, so you compose
+          them yourself. Let's run a batch through one hidden layer with ReLU and watch the shapes flow — the
+          shapes are the proof that everything above is wired correctly.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>It's a two-stage assembly line. Station one (<code>Linear</code>) takes each incoming part,
+            weighs and combines it, and hands on a rough result. Station two (<code>ReLU</code>) is quality
+            control: anything below the bar is set to zero, the rest passes through unchanged. Same two
+            stations run on every item on the belt (every example in the batch), in lockstep.</p>
+          </div>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">a hidden layer's forward pass, with shapes</p>
+          <pre><code class="language-python">import torch
+import torch.nn as nn
+
+batch_size, in_features, out_features = 32, 784, 128
+
+layer = nn.Linear(in_features, out_features)   # holds W (128x784) and b (128,)
+relu  = nn.ReLU()
+
+x = torch.randn(batch_size, in_features)       # a batch: 32 examples of 784 numbers
+print("input :", x.shape)                      # torch.Size([32, 784])
+
+z = layer(x)                                   # weighted sum + bias:  x @ W.T + b
+print("linear:", z.shape)                      # torch.Size([32, 128])
+
+h = relu(z)                                    # apply the switch element-wise
+print("relu  :", h.shape)                      # torch.Size([32, 128])
+
+# proof the activation actually clipped the negatives:
+print("min after relu:", h.min().item())       # 0.0  -> nothing negative survives</code></pre>
+
+          <p class="gloss"><b>In words:</b> the batch goes in as <span style="white-space:nowrap">$(32, 784)$</span>,
+          <code>Linear</code> turns each 784-number example into 128 numbers giving
+          <span style="white-space:nowrap">$(32, 128)$</span>, and <code>ReLU</code> keeps that shape while
+          zeroing every negative entry. Each row is one example's journey through the layer; the batch
+          dimension (32) just rides along untouched.</p>
+
+          <div class="callout pitfall">
+            <div class="callout__label"><span class="ic">▲</span> Watch out</div>
+            <p>The <code>in_features</code> you pass to <code>nn.Linear</code> must equal the last dimension
+            of your input, and the next layer's <code>in_features</code> must equal this layer's
+            <code>out_features</code>. Mismatch and PyTorch throws a shape error the instant you call the
+            layer. When a network won't run, print the shape after every layer — the break is always where
+            two numbers that should match, don't.</p>
+          </div>
+
+          <hr />
+
+          <h2><span class="h-num">6</span>What to carry forward</h2>
+          <ul>
+            <li>A <strong>neuron</strong> is <span style="white-space:nowrap">$\text{activation}(\mathbf{w}^\top\mathbf{x} + b)$</span> — a weighted vote (weights say how much each input matters) plus a bias (baseline lean), pushed through a nonlinear switch.</li>
+            <li>A <strong>layer</strong> runs many neurons at once and is just one matrix multiply: <span style="white-space:nowrap">$\mathbf{h} = \text{activation}(\mathbf{W}\mathbf{x} + \mathbf{b})$</span>, mapping <b>n</b> inputs to <b>m</b> outputs.</li>
+            <li><strong>Activations</strong> differ by output range and gradient behaviour. <strong>ReLU</strong> (<span style="white-space:nowrap">$\max(0,z)$</span>) is the default hidden-layer switch: cheap and non-saturating for positive inputs. Sigmoid/tanh saturate; Leaky ReLU avoids dead neurons; GELU is the transformer default.</li>
+            <li><strong>The proof:</strong> stacked linear layers with no activation collapse to one layer — <span style="white-space:nowrap">$\mathbf{W}'\mathbf{x} + \mathbf{b}'$</span>. Nonlinearity is what makes depth real, and with it an MLP can approximate any continuous function.</li>
+          </ul>
+          <p>We have a network that can compute a forward pass. But its weights are random, so its answers
+          are nonsense. Next we learn how to <em>fix</em> those weights — how the gradient flows back through
+          every neuron and every activation to teach the whole stack at once. That's
+          <a href="10-backprop.html">backpropagation</a>, and it's where the network finally starts to learn.</p>
+
+          <div class="complete-bar" data-complete>
+            <span class="complete-bar__text">Finished this section? Mark it done to fill your progress bar.</span>
+            <button class="btn btn--primary">Mark section complete</button>
+          </div>
+
+          <nav class="pager" data-pager aria-label="Section navigation"></nav>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script defer src="../assets/vendor/katex/katex.min.js"></script>
+  <script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+  <script src="../assets/vendor/highlight/highlight.min.js"></script>
+  <script src="../assets/search-index.js"></script>
+  <script src="../assets/course.js"></script>
+</body>
+</html>

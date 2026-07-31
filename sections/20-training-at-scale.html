@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <script>try{var t=localStorage.getItem("z2h-ml-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Training at Scale · ML Without the Magic</title>
+  <meta name="description" content="Batch norm vs layer norm, dropout, mixed precision, gradient accumulation, and an honest overview of distributed training — the practical machinery behind training large models." />
+  <link rel="stylesheet" href="../assets/vendor/fonts/fonts.css" />
+  <link rel="stylesheet" href="../assets/course.css" />
+  <link rel="stylesheet" href="../assets/vendor/katex/katex.min.css" />
+</head>
+<body data-slug="20-training-at-scale">
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="nav-scrim"></div>
+  <div class="layout">
+    <aside class="sidebar" aria-label="Course navigation">
+      <div class="brand">
+        <div class="brand__kicker">Machine Learning</div>
+        <h1 class="brand__title"><a href="../index.html">Without the Magic</a></h1>
+      </div>
+      <div class="progress">
+        <div class="progress__track"><div class="progress__fill" data-progress-fill></div></div>
+        <div class="progress__label" data-progress-label></div>
+      </div>
+      <nav class="nav" data-nav aria-label="Sections"></nav>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <button class="iconbtn menubtn" data-menu aria-label="Open navigation">☰</button>
+        <div class="topbar__spacer"></div>
+        <span class="topbar__meta">Part 5 · Deep Learning Architectures</span>
+        <button class="iconbtn" data-theme-toggle aria-label="Toggle theme">☾</button>
+      </div>
+
+      <main id="main" class="reading">
+        <header class="lesson-head">
+          <p class="lesson-eyebrow">Part 5 · Deep Learning Architectures <span class="dot"></span> Section 20</p>
+          <h1 class="lesson-title">Training at Scale</h1>
+          <p class="lesson-standfirst">The gap between a model that trains on paper and one that trains on real hardware, in real time, on real data — normalization, dropout, half-precision numbers, and splitting work across machines.</p>
+          <div class="lesson-meta">
+            <span><b>28 min</b> read</span>
+            <span><b>You'll learn:</b> batch norm vs layer norm · dropout · mixed precision · gradient accumulation · distributed training</span>
+          </div>
+        </header>
+
+        <div class="prose">
+          <p class="lead">Everything so far has assumed you can just call <code>loss.backward()</code> and
+          <code>optimizer.step()</code> and be done. At real scale, a handful of practical techniques stand
+          between that idea and a model that actually trains stably, fits in memory, and finishes before
+          the deadline. None of it is exotic; all of it is necessary.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> The one idea to hold onto</div>
+            <p>Every technique in this section solves one of two problems: keeping the numbers flowing
+            through the network <strong>well-behaved</strong> (normalization, dropout, mixed precision), or
+            making the most of <strong>limited hardware</strong> (gradient accumulation, distributed
+            training). Know which problem you're solving and the right tool is obvious.</p>
+          </div>
+
+          <!-- ===================== NORMALIZATION ===================== -->
+          <h2><span class="h-num">1</span>Normalization: the general recipe</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>As data flows through a deep network, the scale of the numbers at each layer can drift —
+          growing too large, shrinking too small, or shifting off-center — which makes training unstable.
+          <strong>Normalization</strong> is a layer that resets the numbers back to a well-behaved range
+          (centered around zero, with a controlled spread) at each step, then lets the network relearn
+          whatever scale and offset it actually needs.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>A sound engineer normalizes every microphone's volume to the same baseline level before a
+            concert, so no one instrument drowns out the others just because it happened to start too loud
+            or too quiet. Then, deliberately, they turn some instruments up and others down to get the mix
+            they actually want. Reset to a common baseline, then re-adjust on purpose — that's normalization.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>The recipe is always the same two steps: first normalize, then let the network scale and shift
+          the result by its own learned amount.</p>
+          $$
+          \begin{aligned}
+          z &= \frac{x - \mu}{\sqrt{\sigma^2 + \epsilon}} \\
+          y &= \gamma\, z + \beta
+          \end{aligned}
+          $$
+          <p class="gloss"><b>In words:</b> <b>μ</b> (mu) is the mean and <b>σ²</b> (sigma-squared) is the
+          variance (how spread out the values are) — subtracting the mean and dividing by the spread gives
+          <b>z</b>, a version of <b>x</b> centered at 0 with spread 1. <b>ε</b> (epsilon) is a tiny constant
+          added purely so we never divide by zero when the variance happens to be 0. Then <b>γ</b> (gamma)
+          and <b>β</b> (beta) are <em>learned</em> numbers that rescale and re-shift the normalized value —
+          they let the network undo the normalization partially or fully if that turns out to be what's
+          best, rather than being stuck with "always centered at 0."</p>
+
+          <div class="callout definition">
+            <div class="callout__label">Definition</div>
+            <p>The only real design choice in any normalization layer is <em>which numbers you average
+            together</em> to compute <b>μ</b> and <b>σ²</b>. Batch norm and layer norm are the same formula
+            above, applied over two different groups of numbers.</p>
+          </div>
+
+          <!-- ===================== BATCHNORM VS LAYERNORM ===================== -->
+          <h2><span class="h-num">2</span>Batch norm vs layer norm: which numbers get averaged</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p><strong>Batch normalization</strong> computes <b>μ</b> and <b>σ²</b> for each feature
+          separately, averaging <em>across all examples in the mini-batch</em>. <strong>Layer
+          normalization</strong> computes <b>μ</b> and <b>σ²</b> for each example separately, averaging
+          <em>across all features of that one example</em>. Same formula, one crucial difference: which
+          direction you slice the data to gather statistics from.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p><strong>Batch norm</strong> is grading on a curve, per subject: your score on the math test
+            gets adjusted based on how the <em>whole class</em> did on that test — it depends on your
+            classmates. <strong>Layer norm</strong> is normalizing one student against their own report
+            card: comparing your math score to your own scores in history, art, and gym — it only ever
+            depends on you, never on anyone else in the room.</p>
+          </div>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <pre><code class="language-python">import torch, torch.nn as nn
+
+x = torch.randn(32, 4)   # 32 examples in the batch, 4 features each
+
+bn = nn.BatchNorm1d(num_features=4)
+y_bn = bn(x)              # mean/var for each of the 4 features, computed across all 32 examples
+
+ln = nn.LayerNorm(normalized_shape=4)
+y_ln = ln(x)              # mean/var for each example, computed across its own 4 features</code></pre>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> Why transformers use layer norm</div>
+            <p>Layer norm's statistics never depend on other examples in the batch, which buys three things
+            transformers (<a href="18-transformers.html">Section 18</a>) need: it works fine with a
+            <strong>batch size of 1</strong> (batch norm degenerates there, since a single example gives a
+            variance of essentially zero); it doesn't care that different sequences in a batch have
+            <strong>different lengths</strong>, since it never mixes examples together; and it behaves
+            <strong>identically at training and test time</strong>, with no separate "running statistics"
+            bookkeeping that batch norm requires to make evaluation match training.</p>
+          </div>
+
+          <div class="callout pitfall">
+            <div class="callout__label"><span class="ic">▲</span> Watch out</div>
+            <p>Batch norm needs to behave the same on a single test example as it did on a full training
+            batch, so it tracks a <em>running average</em> of <b>μ</b> and <b>σ²</b> during training and
+            switches to using that running average at evaluation time — which is exactly what
+            <code>model.eval()</code> tells it to do (see <a href="15-debugging.html">Section 15</a>). Layer
+            norm has no such distinction: it computes real statistics from the actual input every single
+            time, train or eval, so there is nothing extra to get wrong.</p>
+          </div>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">Why does batch normalization behave badly (or fail outright) with a batch size of 1?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Batch norm computes each feature's mean and variance <em>across the examples in the
+                batch</em>. With only one example, the "mean" of a single number is just that number, and
+                the variance is exactly 0 — the statistics carry no real information about spread, and
+                dividing by <code>sqrt(0 + ε)</code> makes the normalized value dominated entirely by the
+                tiny constant <b>ε</b>, not by anything meaningful in the data. Layer norm is unaffected,
+                because it always has many features within the one example to average over, regardless of
+                how many examples are in the batch.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== DROPOUT ===================== -->
+          <h2><span class="h-num">3</span>Dropout: forcing redundancy</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p><strong>Dropout</strong> randomly zeroes out a fraction of a layer's units on every forward
+          pass during training. The network can no longer lean too heavily on any one unit, because that
+          unit might vanish on the very next step — so it's forced to spread the useful signal across many
+          units instead, which reduces overfitting.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>A sports team that rotates who starts each game, even its best player, ends up with a squad
+            where several players can competently fill any role. If the team only ever depended on one
+            star, losing that player to injury would be catastrophic. Dropout is that rotation policy,
+            applied to a neural network's units instead of a roster.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>During training, each unit is independently zeroed with probability <code>p</code>, and the
+          survivors are scaled up by <code>1/(1-p)</code> so the expected total signal stays the same:</p>
+          $$ \text{dropout}(x_i) = \begin{cases} 0 & \text{with probability } p \\ \dfrac{x_i}{1-p} & \text{with probability } 1-p \end{cases} $$
+          <p class="gloss"><b>In words:</b> flip a biased coin for every unit. Heads (chance <b>p</b>): that
+          unit outputs 0 this step. Tails: the unit's value is divided by <b>1 − p</b> to make up for the
+          units that got zeroed, so the layer's total output stays roughly the same size on average whether
+          or not dropout is active. This rescaling is called <em>inverted dropout</em>, and it's what lets
+          dropout be a no-op at test time with zero extra work.</p>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <pre><code class="language-python">drop = nn.Dropout(p=0.5)
+
+model.train()
+y = drop(x)     # roughly half the entries become 0; survivors are doubled (1/(1-0.5))
+
+model.eval()
+y = drop(x)     # identity -- dropout does nothing at eval time, x passes through unchanged</code></pre>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">You forgot to call model.eval() before running validation. Predictions come out worse than expected and change slightly every time you re-run the same input. Why, specifically?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>In training mode, dropout is still active: each forward pass zeroes a different random
+                subset of units, so the same input produces a different, noisier output every call — and
+                you're effectively evaluating with a random, incomplete slice of the network rather than the
+                full model. Calling <code>model.eval()</code> turns dropout into the identity function, so
+                every unit contributes every time, giving stable, deterministic, and stronger predictions.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== MIXED PRECISION ===================== -->
+          <h2><span class="h-num">4</span>Mixed precision: same math, half the bits</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>Every number in a network is normally stored as a 32-bit float (<code>fp32</code>). Modern GPUs
+          can run much faster, and store roughly twice as much in memory, using a 16-bit format instead —
+          either <strong>fp16</strong> or <strong>bf16</strong> (two different ways of packing a number into
+          16 bits). <strong>Mixed precision</strong> training runs most of the network's math in 16-bit
+          numbers while keeping a few sensitive spots — like the master copy of the weights — in 32-bit, to
+          get the speed without losing correctness.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>A tailor doesn't measure every cut to the nearest micrometer — a millimeter of precision is
+            plenty for cloth, and using a coarser tool is faster and cheaper. But for one critical piece,
+            like fitting a watch gear, they switch back to the precise tool. Mixed precision is using the
+            coarser, faster measurement everywhere it's safe, and the precise one only where it truly
+            matters.</p>
+          </div>
+
+          <p class="beat beat--math">Now the math: why loss scaling exists</p>
+          <p><code>fp16</code> can represent numbers only within a much narrower range than <code>fp32</code>
+          before rounding them to zero. Many gradients during training are legitimately tiny — say,
+          <code>1e-8</code> — and a value that small can <strong>underflow</strong> in <code>fp16</code>
+          (round down to exactly 0.0), silently deleting a real gradient. <strong>Loss scaling</strong>
+          fixes this with one multiplication and one division:</p>
+          $$ \text{scaled\_loss} = s \cdot L, \qquad \nabla_{\text{used}} = \frac{1}{s}\,\nabla(\text{scaled\_loss}) $$
+          <p class="gloss"><b>In words:</b> multiply the loss <b>L</b> by a large scale factor <b>s</b>
+          (e.g. 1024 or higher) before calling <code>backward()</code>. By the chain rule, every gradient
+          computed from that scaled loss is also multiplied by <b>s</b>, which pushes tiny gradients up out
+          of the underflow zone and into a range <code>fp16</code> can represent. Right before the optimizer
+          uses them, divide back by the same <b>s</b> so the actual weight update is correct. <code>bf16</code>
+          has the same exponent range as <code>fp32</code> (it just drops precision, not range), so it
+          rarely needs this trick at all.</p>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <pre><code class="language-python">scaler = torch.cuda.amp.GradScaler()
+
+for xb, yb in loader:
+    optimizer.zero_grad()
+    with torch.cuda.amp.autocast(dtype=torch.float16):
+        out = model(xb)
+        loss = criterion(out, yb)
+
+    scaler.scale(loss).backward()   # scale the loss up before backward
+    scaler.step(optimizer)          # unscales gradients, then steps (skips the step if any are inf/NaN)
+    scaler.update()                 # adjusts the scale factor for the next iteration</code></pre>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">A gradient of 3e-8 is a real, non-zero value in fp32 but becomes exactly 0.0 in fp16. What does loss scaling do about it, mechanically?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Loss scaling multiplies the loss by a large constant <b>s</b> before <code>backward()</code>
+                runs, so by the chain rule every downstream gradient — including this one — is also
+                multiplied by <b>s</b>. A gradient of <code>3e-8 × 1024 ≈ 3e-5</code> is comfortably inside
+                <code>fp16</code>'s representable range and no longer rounds to zero. After
+                <code>backward()</code>, the scaled gradients are divided by <b>s</b> again before the
+                optimizer applies them, so the final weight update is mathematically the same as if you'd
+                never scaled anything — you only used the scaling to survive the trip through 16-bit
+                storage.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== GRADIENT ACCUMULATION ===================== -->
+          <h2><span class="h-num">5</span>Gradient accumulation: a bigger batch on smaller memory</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>Sometimes the batch size you want doesn't fit in GPU memory. <strong>Gradient
+          accumulation</strong> fakes a large batch by processing several small "micro-batches" one at a
+          time, adding up their gradients without resetting them, and only calling
+          <code>optimizer.step()</code> once every few micro-batches — as if all of them had been one big
+          batch all along.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>You want to deposit 400 dollars but your wallet only holds 100 at a time. You make four trips to
+            the ATM, but you don't deposit each 100 separately into different sub-accounts — you add them
+            up and it's exactly as if you'd deposited 400 once. Gradient accumulation is four small trips
+            that add up to the one big deposit you actually wanted.</p>
+          </div>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <pre><code class="language-python">accumulation_steps = 4        # 4 micro-batches of 32 == an effective batch of 128
+optimizer.zero_grad()
+
+for i, (xb, yb) in enumerate(loader):
+    out = model(xb)
+    loss = criterion(out, yb) / accumulation_steps   # average, not sum, across micro-batches
+    loss.backward()                                   # gradients ACCUMULATE in .grad (no zero_grad yet)
+
+    if (i + 1) % accumulation_steps == 0:
+        optimizer.step()
+        optimizer.zero_grad()</code></pre>
+
+          <div class="callout pitfall">
+            <div class="callout__label"><span class="ic">▲</span> Watch out</div>
+            <p>Dividing the loss by <code>accumulation_steps</code> is not optional. Skip it and four
+            accumulated micro-batch gradients add up to roughly 4× the gradient a true batch of 128 would
+            have produced — which behaves like secretly training with a 4× larger learning rate, and can
+            destabilize training in a way that looks like an unrelated bug.</p>
+          </div>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">You accumulate gradients over 4 micro-batches of size 32 but forget to divide the loss by 4. How does this actually change what the optimizer does, compared to a true batch of 128?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>A true batch of 128 with a mean-reduced loss produces one gradient that's the average
+                over 128 examples. Without dividing, summing 4 un-averaged micro-batch losses (each already
+                averaged over its own 32) produces a gradient that's roughly 4x too large before the
+                optimizer step. The optimizer then applies an update as if the learning rate were 4x higher
+                than configured — which can cause instability or divergence that has nothing to do with the
+                model itself, only with this missing division.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== DISTRIBUTED TRAINING ===================== -->
+          <h2><span class="h-num">6</span>Distributed training: an honest overview</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>When a model or dataset is too large for one machine, the work is split across several. There
+          is no single "distributed training" technique — there are a few different things you can split,
+          and real systems often combine them. None of it is magic: it all costs communication between
+          machines, and that communication is usually the actual bottleneck, not the computation.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>A restaurant kitchen with one overloaded chef can add more chefs. You could give each chef an
+            identical copy of the full menu and have them each cook different tables' orders (data
+            parallelism). Or you could have one chef only do sauces and hand plates to a chef who only does
+            grilling, in a chain (pipeline parallelism). Either way, the moment plates need to move between
+            chefs is the moment things can slow down — coordination has a cost.</p>
+          </div>
+
+          <p class="beat beat--math">Data parallelism, the workhorse</p>
+          <p>The most common setup by far is <strong>data parallelism</strong>: every device (GPU) holds a
+          full, identical copy of the model. Each device processes a different slice of the data and
+          computes its own gradients independently. Then, before anyone updates their weights, all devices
+          combine their gradients with an <strong>all-reduce</strong> — a collective operation where every
+          device ends up with the same combined (typically averaged) gradient — so every replica applies an
+          identical update and stays in sync.</p>
+
+          <ul>
+            <li><strong>Model / tensor parallelism</strong> — the model itself is too big to fit on one
+            device, so individual layers, or even individual matrices within a layer, are split across
+            devices, and a single forward pass requires those devices to exchange intermediate results.</li>
+            <li><strong>Pipeline parallelism</strong> — different layers of the model live on different
+            devices, and data flows through them like a factory assembly line, with each device handing its
+            output to the next.</li>
+          </ul>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> The honest bottleneck</div>
+            <p>Adding devices doesn't automatically make training proportionally faster. Every one of these
+            strategies requires devices to send data to each other — gradients in data parallelism,
+            activations in tensor and pipeline parallelism — over a network that is almost always slower
+            than the computation itself. Past a certain scale, training speed is limited by how fast
+            machines can talk to each other, not by how fast any one of them can compute. This is why
+            hardware interconnect (the physical links between devices) matters as much as raw compute in
+            large-scale training.</p>
+          </div>
+
+          <hr />
+
+          <h2><span class="h-num">7</span>What to carry forward</h2>
+          <ul>
+            <li>Every normalization layer is <strong>normalize, then scale-and-shift</strong>:
+            <span style="white-space:nowrap">$y = \gamma(x-\mu)/\sqrt{\sigma^2+\epsilon} + \beta$</span>. The
+            only difference between variants is which numbers <b>μ</b> and <b>σ²</b> are computed over.</li>
+            <li><strong>Batch norm</strong> normalizes each feature across the batch (depends on other
+            examples); <strong>layer norm</strong> normalizes each example across its own features
+            (independent of the batch) — which is why transformers use layer norm.</li>
+            <li><strong>Dropout</strong> randomly zeroes units during training to prevent over-reliance on
+            any one of them, and is switched off entirely by <code>model.eval()</code>.</li>
+            <li><strong>Mixed precision</strong> trades numeric range for speed and memory; <strong>loss
+            scaling</strong> keeps tiny <code>fp16</code> gradients from rounding to zero.</li>
+            <li><strong>Gradient accumulation</strong> simulates a large batch on limited memory by summing
+            (averaged) micro-batch gradients before one optimizer step.</li>
+            <li><strong>Distributed training</strong> splits either the data (data parallelism) or the model
+            itself (model/tensor/pipeline parallelism) across devices — and communication between devices,
+            not raw compute, is usually the real limiting factor.</li>
+          </ul>
+
+          <p>Next we switch from building to reading — how to pull a real algorithm out of a research
+          paper in <a href="21-reading-papers.html">Section 21</a>, the last skill before the capstone.</p>
+
+          <div class="complete-bar" data-complete>
+            <span class="complete-bar__text">Finished this section? Mark it done to fill your progress bar.</span>
+            <button class="btn btn--primary">Mark section complete</button>
+          </div>
+
+          <nav class="pager" data-pager aria-label="Section navigation"></nav>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script defer src="../assets/vendor/katex/katex.min.js"></script>
+  <script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+  <script src="../assets/vendor/highlight/highlight.min.js"></script>
+  <script src="../assets/search-index.js"></script>
+  <script src="../assets/course.js"></script>
+</body>
+</html>

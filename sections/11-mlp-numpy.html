@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <script>try{var t=localStorage.getItem("z2h-ml-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Build an MLP in NumPy · ML Without the Magic</title>
+  <meta name="description" content="No PyTorch yet — just NumPy and the backprop math from Section 10, assembled into a 2-layer network that actually learns to solve XOR, a problem no linear model can." />
+  <link rel="stylesheet" href="../assets/vendor/fonts/fonts.css" />
+  <link rel="stylesheet" href="../assets/course.css" />
+  <link rel="stylesheet" href="../assets/vendor/katex/katex.min.css" />
+</head>
+<body data-slug="11-mlp-numpy">
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="nav-scrim"></div>
+  <div class="layout">
+    <aside class="sidebar" aria-label="Course navigation">
+      <div class="brand">
+        <div class="brand__kicker">Machine Learning</div>
+        <h1 class="brand__title"><a href="../index.html">Without the Magic</a></h1>
+      </div>
+      <div class="progress">
+        <div class="progress__track"><div class="progress__fill" data-progress-fill></div></div>
+        <div class="progress__label" data-progress-label></div>
+      </div>
+      <nav class="nav" data-nav aria-label="Sections"></nav>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <button class="iconbtn menubtn" data-menu aria-label="Open navigation">☰</button>
+        <div class="topbar__spacer"></div>
+        <span class="topbar__meta">Part 3 · Neural Nets from Scratch</span>
+        <button class="iconbtn" data-theme-toggle aria-label="Toggle theme">☾</button>
+      </div>
+
+      <main id="main" class="reading">
+        <header class="lesson-head">
+          <p class="lesson-eyebrow">Part 3 · Neural Nets from Scratch <span class="dot"></span> Section 11</p>
+          <h1 class="lesson-title">Build an MLP in NumPy</h1>
+          <p class="lesson-standfirst">No PyTorch yet — just NumPy and the backprop math from Section 10, assembled into a network that actually learns.</p>
+          <div class="lesson-meta">
+            <span><b>30 min</b> read</span>
+            <span><b>You'll learn:</b> forward pass · backward pass · the training loop · watching a real network learn</span>
+          </div>
+        </header>
+
+        <div class="prose">
+          <p class="lead">So far every idea has lived on its own page: a neuron here, a gradient there,
+          a loss function somewhere else. In this section we <strong>put all the pieces in one file</strong>
+          and press run. No framework, no magic — just NumPy arrays and arithmetic you can read line by
+          line. By the end you'll have a small network that teaches itself to solve a problem no straight
+          line can, and you'll understand every single number that flows through it.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> The one idea to hold onto</div>
+            <p>A neural network is not a mysterious black box. It is four steps in a loop: <strong>guess,
+            measure how wrong the guess is, work out which direction reduces the wrongness, take a small
+            step that way</strong>. Repeat a few thousand times and the guesses become good. Today we
+            write those four steps in plain NumPy and watch them work.</p>
+          </div>
+
+          <!-- ===================== THE PLAN ===================== -->
+          <h2><span class="h-num">1</span>The plan: beat a problem a line cannot</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>Back in <a href="09-neurons.html">Section 9</a> we saw that a single layer — a matrix
+          multiply plus a shift — can only draw a <strong>straight boundary</strong> between classes.
+          That is fine for data you can separate with a ruler, but the world is rarely that tidy. The
+          classic example is <strong>XOR</strong> (short for "exclusive or"): a rule that says "output 1
+          when the two inputs <em>disagree</em>, and 0 when they agree."</p>
+
+          <div class="scroll-x">
+          <table>
+            <thead>
+              <tr><th>input <code>x₁</code></th><th>input <code>x₂</code></th><th>label (XOR)</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>0</td><td>0</td><td>0 &nbsp;<span style="opacity:.6">(agree)</span></td></tr>
+              <tr><td>0</td><td>1</td><td>1 &nbsp;<span style="opacity:.6">(disagree)</span></td></tr>
+              <tr><td>1</td><td>0</td><td>1 &nbsp;<span style="opacity:.6">(disagree)</span></td></tr>
+              <tr><td>1</td><td>1</td><td>0 &nbsp;<span style="opacity:.6">(agree)</span></td></tr>
+            </tbody>
+          </table>
+          </div>
+
+          <p>Try to draw one straight line that puts the two <code>1</code>s on one side and the two
+          <code>0</code>s on the other. You can't — the <code>1</code>s sit on opposite corners of a
+          square, and so do the <code>0</code>s. No single line separates them. This is the smallest
+          possible problem that defeats a linear model, which makes it the perfect first opponent for a
+          real network.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>A light switch at the top of a staircase and another at the bottom. The light is on only
+            when the two switches are in <em>different</em> positions; flip either one and the light
+            flips too. "On when they disagree" is exactly XOR. You know instantly how it behaves, yet
+            there is no way to describe it with a single "the more of this, the more of that" rule — you
+            need a rule that <em>bends</em>. A network bends.</p>
+          </div>
+
+          <p>Our plan for the whole section: build a <strong>2-layer MLP</strong> (multi-layer perceptron
+          — just a fancy name for a small stack of these matrix-plus-nonlinearity layers) in pure NumPy,
+          and train it until it classifies all four XOR points correctly. Every gradient we use was
+          derived in <a href="10-backprop.html">Section 10</a>; here we finally turn that math into code
+          that runs.</p>
+
+          <div class="callout definition">
+            <div class="callout__label">Definition</div>
+            <p>An <dfn>MLP</dfn> (multi-layer perceptron) is a network built from <em>layers</em>, where
+            each layer does a matrix multiply plus a bias shift, and a <strong>nonlinearity</strong> (a
+            bending function like ReLU) sits between the layers. The nonlinearity is what lets the whole
+            thing curve its decision boundary instead of drawing one flat line.</p>
+          </div>
+
+          <!-- ===================== THE LOOP AS CONCEPT ===================== -->
+          <h2><span class="h-num">2</span>The training loop, before any code</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p>Every network in this course, from this toy up to the largest language model, learns with
+          the same four-step loop. Hold these four words in your head and the code below will feel
+          obvious:</p>
+          <ul>
+            <li><strong>Predict</strong> — push the inputs through the network to get a guess.</li>
+            <li><strong>Measure</strong> — compare the guess to the true answer with a <em>loss</em>
+            (a single number saying how wrong we are).</li>
+            <li><strong>Adjust</strong> — find, for every weight, which way to nudge it to make the loss
+            smaller. That "which way" is the <em>gradient</em>.</li>
+            <li><strong>Repeat</strong> — take a small step in that direction and go again.</li>
+          </ul>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Learning to shoot a basketball free throw. You <strong>shoot</strong> (predict). You
+            <strong>see the miss</strong> — short and to the left (measure the error). Your body works out
+            the <strong>correction</strong> — a bit more arc, aim slightly right (the gradient: which
+            adjustment reduces the miss). You take one shot with that small change and <strong>shoot
+            again</strong>. No single throw is perfect, but after a hundred the ball drops through
+            cleanly. A network trains the exact same way, just with numbers instead of muscles.</p>
+          </div>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> One pass = one <em>epoch</em></div>
+            <p>Running that four-step loop once over the whole dataset is called one <dfn>epoch</dfn>.
+            We'll run a few thousand epochs. Each one makes the weights a tiny bit better, and the loss
+            printed on screen ticks downward — that falling number is the network learning, live.</p>
+          </div>
+
+          <!-- ===================== BUILD: DATASET ===================== -->
+          <h2><span class="h-num">3</span>Building it, one block at a time</h2>
+          <p>We'll assemble the network in small labelled pieces so every line has a reason. At the very
+          end (<a href="#full-script">the full script below</a>) the same pieces are collected into one script you can
+          paste and run.</p>
+
+          <h3>(a) The dataset</h3>
+          <p>First the data. XOR has just four points, so we can type them out by hand. <code>X</code>
+          holds the four inputs (one per row); <code>y</code> holds their correct labels.</p>
+
+          <p class="codecap">the four XOR points and their labels</p>
+          <pre><code class="language-python">import numpy as np
+
+# each row is one example: [x1, x2]
+X = np.array([[0.0, 0.0],
+              [0.0, 1.0],
+              [1.0, 0.0],
+              [1.0, 1.0]])
+
+# the correct answer for each row (XOR: 1 when inputs differ)
+y = np.array([0, 1, 1, 0])
+
+N, D = X.shape        # N = 4 examples, D = 2 features each
+C = 2                 # number of classes: "0" and "1"</code></pre>
+          <p>We treat this as a <strong>classification</strong> problem with two classes ("output is 0"
+          and "output is 1") rather than predicting a raw number. That choice is what lets us use softmax
+          and cross-entropy in a moment, exactly as a real classifier does.</p>
+
+          <p>Cross-entropy compares two <em>probability lists</em>, so the label <code>1</code> needs to
+          become a probability list too: "100% class 1, 0% class 0." That format is called
+          <strong>one-hot</strong> — a list that is all zeros except for a single 1 in the correct slot.</p>
+
+          <p class="codecap">turn each label into a one-hot row</p>
+          <pre><code class="language-python"># Y[i] is all zeros except a 1 in the correct class column
+Y = np.zeros((N, C))
+Y[np.arange(N), y] = 1.0
+#   y = [0, 1, 1, 0]  ->  Y = [[1,0],
+#                               [0,1],
+#                               [0,1],
+#                               [1,0]]</code></pre>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>One-hot is a multiple-choice answer sheet where you fill in exactly one bubble. The label
+            "the answer is B" becomes the row <code>[0, 1, 0, 0]</code> — a 1 under B, blanks everywhere
+            else. Storing the answer this way lets us score it against the network's "how sure am I about
+            each option?" output, option by option.</p>
+          </div>
+
+          <h3>(b) Initialize the weights</h3>
+          <p>The network has two layers, so it has two weight matrices and two bias vectors. Layer 1 turns
+          the 2 input features into <code>H</code> hidden numbers; layer 2 turns those <code>H</code>
+          numbers into 2 class scores. We fill the weights with <strong>small random</strong> values and
+          set the biases to zero.</p>
+
+          <p class="codecap">two layers: (2 → H) then (H → 2)</p>
+          <pre><code class="language-python">rng = np.random.default_rng(42)   # fixed seed so results repeat
+H = 8                             # neurons in the hidden layer
+
+# He initialization: spread scaled to the number of inputs (keeps signals sane)
+W1 = rng.normal(0, np.sqrt(2.0 / D), size=(D, H))   # (2, 8)
+b1 = np.zeros(H)                                     # (8,)
+W2 = rng.normal(0, np.sqrt(2.0 / H), size=(H, C))   # (8, 2)
+b2 = np.zeros(C)                                     # (2,)</code></pre>
+
+          <p>Why <em>random</em> and not just zeros? If every weight in a layer starts identical, every
+          neuron in that layer computes the exact same thing, receives the exact same gradient, and
+          updates identically forever — they never split apart to learn different features. This is the
+          <strong>symmetry-breaking</strong> problem, and a little randomness is the cure. We dig into why
+          the specific <em>scale</em> matters (too big or too small both break training) in
+          <a href="12-training-dynamics.html">Section 12</a>.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Seat eight brand-new interns and give every one the identical starting notes and identical
+            feedback. They'll all reach the identical conclusion — you've effectively hired one intern,
+            eight times over. Give each a slightly different starting point and they explore different
+            ideas, and the team as a whole covers far more ground. Random init is how the eight hidden
+            neurons avoid becoming eight copies of the same neuron.</p>
+          </div>
+
+          <h3>(c) The forward pass</h3>
+          <p>The <strong>forward pass</strong> is the "predict" step: push <code>X</code> through both
+          layers to get class scores. Between the layers sits <strong>ReLU</strong> (from
+          <a href="09-neurons.html">Section 9</a>) — the bending function that keeps positive numbers and
+          replaces negatives with 0. That bend is the whole reason the network can beat XOR.</p>
+
+          <p class="beat beat--math">Now the math</p>
+          $$ \begin{aligned}
+             \mathbf{z}_1 &= \mathbf{X}\mathbf{W}_1 + \mathbf{b}_1 \\
+             \mathbf{a}_1 &= \operatorname{ReLU}(\mathbf{z}_1) = \max(0,\ \mathbf{z}_1) \\
+             \mathbf{z}_2 &= \mathbf{a}_1\mathbf{W}_2 + \mathbf{b}_2 \\
+             \mathbf{p}   &= \operatorname{softmax}(\mathbf{z}_2)
+             \end{aligned} $$
+          <p class="gloss"><b>In words:</b> multiply the inputs by the first weight matrix and add the
+          bias to get <b>z₁</b> (the "pre-activation"). Bend it with ReLU to get the hidden values
+          <b>a₁</b>. Multiply those by the second weight matrix and add the second bias to get the raw
+          scores <b>z₂</b> (called <dfn>logits</dfn> — unnormalized, can be any size, positive or
+          negative). Finally squash the logits into probabilities <b>p</b> with softmax.</p>
+
+          <p><strong>Softmax</strong> turns a row of raw scores into a row of probabilities: it makes
+          every number positive by exponentiating it, then divides by the total so the row sums to 1.</p>
+          $$ \operatorname{softmax}(\mathbf{z})_j = \frac{e^{z_j}}{\sum_{k} e^{z_k}} $$
+          <p class="gloss"><b>In words:</b> for each score, raise <b>e</b> to that score (this makes it
+          positive and blows up big scores more than small ones), then divide by the sum of all of them
+          so the results are fractions that add to 100%. The biggest score gets the biggest probability.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Softmax is how you'd convert a panel of judges' raw enthusiasm into betting odds. Judge
+            scores of 8, 6, and 2 aren't probabilities — they don't add to 100%. Softmax exponentiates
+            and normalizes them into something like 82% / 15% / 3%: a clean set of odds where the loudest
+            score gets the lion's share but nobody is left at exactly zero.</p>
+          </div>
+
+          <p class="beat beat--code">The same thing in NumPy</p>
+          <pre><code class="language-python">def relu(z):
+    return np.maximum(0.0, z)
+
+def softmax(z):
+    # subtract each row's max before exp: same result, no overflow on big logits
+    z = z - z.max(axis=1, keepdims=True)
+    e = np.exp(z)
+    return e / e.sum(axis=1, keepdims=True)
+
+def forward(X, W1, b1, W2, b2):
+    z1 = X @ W1 + b1          # (N,2)@(2,8) -> (N,8)
+    a1 = relu(z1)             # (N,8)
+    z2 = a1 @ W2 + b2         # (N,8)@(8,2) -> (N,2)
+    probs = softmax(z2)       # (N,2), each row sums to 1
+    return z1, a1, z2, probs  # keep z1 & a1 — the backward pass needs them</code></pre>
+          <p>Notice the shapes threaded through the comments. <code>X @ W1</code> is
+          <code>(N,2)·(2,8) → (N,8)</code>; then <code>a1 @ W2</code> is <code>(N,8)·(8,2) → (N,2)</code>.
+          The inner numbers match at every step (the shape rule from
+          <a href="01-linear-algebra.html">Section 1</a>), and the final output is one probability pair
+          per example. We return <code>z1</code> and <code>a1</code> as well because — as you'll see next
+          — the backward pass reuses these exact values instead of recomputing them.</p>
+
+          <h3>(d) The loss: cross-entropy</h3>
+          <p>The loss is the "measure" step: one number saying how wrong the predictions are.
+          <strong>Cross-entropy</strong> (from <a href="04-information-theory.html">Section 4</a>) looks
+          only at the probability the network assigned to the <em>correct</em> class and penalizes it for
+          being anything less than 1.</p>
+
+          <p class="beat beat--math">Now the math</p>
+          $$ L = -\frac{1}{N}\sum_{i=1}^{N} \log\big(p_{i,\,y_i}\big) $$
+          <p class="gloss"><b>In words:</b> for each example <b>i</b>, look up the probability the model
+          gave to the <em>true</em> class <b>yᵢ</b>, take its log, negate it, and average over all
+          examples. If the model is confident and right (<b>p ≈ 1</b>), <b>log(1) = 0</b> — no penalty.
+          If it is confident and wrong (<b>p ≈ 0</b>), <b>−log(0)</b> shoots toward infinity — a huge
+          penalty. Cross-entropy rewards being both correct <em>and</em> sure.</p>
+
+          <p class="beat beat--code">The same thing in NumPy</p>
+          <pre><code class="language-python">def cross_entropy(probs, y):
+    # pick out prob of the correct class for each row, then -log, then average
+    correct = probs[np.arange(len(y)), y]   # shape (N,)
+    return -np.mean(np.log(correct + 1e-12))  # +1e-12 guards log(0)</code></pre>
+          <p>The tiny <code>1e-12</code> is a floor that stops <code>log(0)</code> from becoming
+          <code>-inf</code> if a probability ever rounds to exactly zero. It changes the number
+          negligibly but keeps the run from blowing up.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Cross-entropy grades like a strict exam that scores your <em>confidence</em>, not just your
+            answer. Tick the right box and say "I'm certain" → full marks. Tick the right box but hedge
+            "maybe" → partial marks. Confidently tick the <em>wrong</em> box → a savage penalty. It
+            teaches the network not only to be right, but to know when it's right.</p>
+          </div>
+
+          <h3>(e) The backward pass</h3>
+          <p>Now the heart of it: the <strong>backward pass</strong> computes the gradient of the loss
+          with respect to every weight — the "which way should each number move?" step. Every line below
+          is one application of the chain rule from <a href="10-backprop.html">Section 10</a>; we walk
+          backward through the same operations the forward pass ran.</p>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>The chain starts with a small miracle. When softmax feeds straight into cross-entropy, their
+          two derivatives combine and almost everything cancels, leaving one clean line:</p>
+          $$ \frac{\partial L}{\partial \mathbf{z}_2}
+             = \frac{1}{N}\big(\mathbf{p} - \mathbf{Y}\big) $$
+          <p class="gloss"><b>In words:</b> the gradient at the logits is simply <em>predicted
+          probabilities minus the one-hot truth</em>, averaged over the batch. If the network said 0.7
+          for a class that should have been 1, that slot's gradient is <b>0.7 − 1 = −0.3</b>: "push this
+          logit up." Where it's right, prediction minus truth is near zero: "leave it alone." This is the
+          single most reused fact in all of deep-learning code.</p>
+
+          <p>From <code>dz2</code> we push the gradient back through each earlier operation. Each step
+          pairs with a forward step and uses the rules from Section 10 — a matrix multiply's gradient
+          re-uses the <em>other</em> factor, transposed; a bias's gradient is the sum over the batch; and
+          ReLU passes the gradient through only where its input was positive:</p>
+          $$ \begin{aligned}
+             \frac{\partial L}{\partial \mathbf{W}_2} &= \mathbf{a}_1^{\!\top}\, \mathbf{dz}_2
+               & \frac{\partial L}{\partial \mathbf{b}_2} &= \textstyle\sum_i (\mathbf{dz}_2)_i \\[4pt]
+             \frac{\partial L}{\partial \mathbf{a}_1} &= \mathbf{dz}_2\, \mathbf{W}_2^{\!\top}
+               & \mathbf{dz}_1 &= \mathbf{da}_1 \odot \mathbf{1}[\mathbf{z}_1 \gt 0] \\[4pt]
+             \frac{\partial L}{\partial \mathbf{W}_1} &= \mathbf{X}^{\!\top}\, \mathbf{dz}_1
+               & \frac{\partial L}{\partial \mathbf{b}_1} &= \textstyle\sum_i (\mathbf{dz}_1)_i
+             \end{aligned} $$
+          <p class="gloss"><b>In words, line by line:</b> the gradient for <b>W₂</b> is the layer's input
+          <b>a₁</b> (transposed) times the incoming gradient — the multiply rule from Section 10. The
+          gradient for the bias <b>b₂</b> is just the incoming gradient summed down the batch. To pass
+          gradient back into the hidden layer we multiply by <b>W₂</b> transposed, giving <b>da₁</b>.
+          ReLU only let positive values through on the way forward, so on the way back it only lets
+          gradient through where <b>z₁ &gt; 0</b> — that's the <b>⊙ 1[z₁ &gt; 0]</b> mask (⊙ means
+          multiply element by element). Then <b>W₁</b> and <b>b₁</b> follow the very same two rules as the
+          second layer.</p>
+
+          <p class="beat beat--code">The same thing in NumPy</p>
+          <pre><code class="language-python">def backward(X, y, z1, a1, probs, W2):
+    N = len(y)
+    Y = np.zeros_like(probs)
+    Y[np.arange(N), y] = 1.0
+
+    dz2 = (probs - Y) / N          # (N,2)  softmax+CE shortcut
+    dW2 = a1.T @ dz2               # (8,N)@(N,2) -> (8,2)  matches W2
+    db2 = dz2.sum(axis=0)          # (2,)               matches b2
+
+    da1 = dz2 @ W2.T               # (N,2)@(2,8) -> (N,8)
+    dz1 = da1 * (z1 > 0)           # (N,8)  ReLU gate: 0 where z1 <= 0
+    dW1 = X.T @ dz1                # (2,N)@(N,8) -> (2,8)  matches W1
+    db1 = dz1.sum(axis=0)          # (8,)               matches b1
+
+    return dW1, db1, dW2, db2</code></pre>
+          <p>Read the shape comments as a checklist: every gradient comes out the same shape as the thing
+          it updates (<code>dW2</code> is <code>(8,2)</code> just like <code>W2</code>, and so on). When
+          your own backward pass has a bug, this is the first thing to check — a gradient whose shape
+          doesn't match its weight means a transpose is in the wrong place.</p>
+
+          <div class="callout pitfall">
+            <div class="callout__label"><span class="ic">▲</span> Watch out</div>
+            <p>The ReLU gate uses <code>z1</code> — the value <em>before</em> the bend — not <code>a1</code>.
+            It happens that <code>(z1 &gt; 0)</code> and <code>(a1 &gt; 0)</code> give the same mask for
+            plain ReLU, so either works here, but the rule you must remember is "gradient flows only where
+            the neuron was active." Also don't forget the <code>/ N</code> in <code>dz2</code>: it must
+            match the <code>1/N</code> average in the loss, or your gradients are <code>N</code> times too
+            large and the steps overshoot.</p>
+          </div>
+
+          <h3>(f) The update: stochastic gradient descent</h3>
+          <p>The "adjust" step. We now know, for every weight, the direction that <em>increases</em> the
+          loss (that's what the gradient points toward). So we step the opposite way — subtract a small
+          fraction of the gradient. That fraction is the <strong>learning rate</strong>.</p>
+
+          <p class="beat beat--math">Now the math</p>
+          $$ \mathbf{W} \leftarrow \mathbf{W} - \alpha\,\frac{\partial L}{\partial \mathbf{W}} $$
+          <p class="gloss"><b>In words:</b> replace each weight with itself minus (learning rate <b>α</b>,
+          "alpha") times its gradient. The gradient says "uphill is this way"; the minus sign turns us
+          downhill, toward smaller loss; <b>α</b> controls how big a step we take. Too small and learning
+          crawls; too big and we leap past the bottom and bounce around. This one update, repeated, is
+          <dfn>gradient descent</dfn>.</p>
+
+          <p class="beat beat--code">The same thing in NumPy</p>
+          <pre><code class="language-python">def sgd_step(params, grads, lr):
+    for p, g in zip(params, grads):
+        p -= lr * g           # in-place: nudge each weight downhill</code></pre>
+          <p>Because our whole dataset is only four points, each epoch uses all of them at once. When you
+          instead use a small <em>random</em> handful per step — which real datasets force you to do —
+          the "random" makes it <strong>stochastic</strong> gradient descent (SGD). Same update rule,
+          just fed a noisy sample of the data each time.</p>
+
+          <h3>(g) The epoch loop</h3>
+          <p>Now we thread the four steps together and run them a few thousand times. This is the loop
+          we sketched earlier, finally in code:</p>
+
+          <p class="codecap">predict → measure → adjust → repeat</p>
+          <pre><code class="language-python">lr = 0.5
+for epoch in range(2001):
+    # 1. PREDICT
+    z1, a1, z2, probs = forward(X, W1, b1, W2, b2)
+
+    # 2. MEASURE
+    loss = cross_entropy(probs, y)
+
+    # 3. ADJUST — gradients, then step downhill
+    dW1, db1, dW2, db2 = backward(X, y, z1, a1, probs, W2)
+    sgd_step([W1, b1, W2, b2], [dW1, db1, dW2, db2], lr)
+
+    # 4. watch it learn
+    if epoch % 400 == 0:
+        print(f"epoch {epoch:4d}  loss {loss:.4f}")</code></pre>
+
+          <p>Running it prints the loss falling toward zero — the network getting less wrong every few
+          hundred epochs:</p>
+          <pre><code class="language-python">epoch    0  loss 0.8471
+epoch  400  loss 0.0059
+epoch  800  loss 0.0022
+epoch 1200  loss 0.0012
+epoch 1600  loss 0.0008
+epoch 2000  loss 0.0006</code></pre>
+
+          <p>And the payoff — checking the final predictions against the truth:</p>
+          <pre><code class="language-python">pred = forward(X, W1, b1, W2, b2)[-1].argmax(axis=1)
+print(pred)                    # [0 1 1 0]
+print("accuracy:", (pred == y).mean())   # accuracy: 1.0</code></pre>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> The payoff</div>
+            <p><code>[0 1 1 0]</code> — all four XOR points correct, 100% accuracy. A single linear layer
+            <em>cannot</em> do this, no matter how long you train it, because no straight line separates
+            the classes. The hidden layer with its ReLU bend can, and it learned to do so entirely on its
+            own, just by rolling the four-step loop a couple thousand times. That is the whole idea of
+            deep learning, demonstrated in code you can read top to bottom.</p>
+          </div>
+
+          <div class="check">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">If you delete the ReLU line — so <code>a1 = z1</code> with no bend between the two layers — will the network still solve XOR? Why or why not?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>No. Without the bend, layer 2 applied to layer 1 is just
+                <code>(X·W1 + b1)·W2 + b2</code>, which multiplies out to <code>X·(W1·W2) + const</code> —
+                a single matrix <code>W1·W2</code> times <code>X</code>, plus a shift. Two stacked linear
+                layers collapse into <strong>one</strong> linear layer, and we already know one linear
+                layer can't separate XOR. The nonlinearity is not decoration; it is the <em>only</em>
+                reason depth buys you anything. Remove it and you're back to drawing a single straight
+                line.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== FULL SCRIPT ===================== -->
+          <h2 id="full-script"><span class="h-num">4</span>The complete script</h2>
+          <p>Here is everything above collected into one file. It has no dependencies beyond NumPy —
+          paste it into a <code>.py</code> file and run it, and you'll watch the loss fall and see the
+          network hit 100% on XOR. Every line is one you've already met.</p>
+
+          <p class="codecap">mlp_xor.py — a 2-layer network, from scratch</p>
+          <pre><code class="language-python">import numpy as np
+
+# ---- 1. data ------------------------------------------------------------
+X = np.array([[0.0, 0.0],
+              [0.0, 1.0],
+              [1.0, 0.0],
+              [1.0, 1.0]])
+y = np.array([0, 1, 1, 0])          # XOR: 1 when the inputs differ
+N, D = X.shape                      # 4 examples, 2 features
+C = 2                               # two classes: "0" and "1"
+
+# ---- 2. weights (small random; biases zero) -----------------------------
+rng = np.random.default_rng(42)
+H = 8                               # hidden neurons
+W1 = rng.normal(0, np.sqrt(2.0 / D), size=(D, H))   # (2, 8)
+b1 = np.zeros(H)                                     # (8,)
+W2 = rng.normal(0, np.sqrt(2.0 / H), size=(H, C))   # (8, 2)
+b2 = np.zeros(C)                                     # (2,)
+
+# ---- 3. building blocks -------------------------------------------------
+def relu(z):
+    return np.maximum(0.0, z)
+
+def softmax(z):
+    z = z - z.max(axis=1, keepdims=True)            # stability, same result
+    e = np.exp(z)
+    return e / e.sum(axis=1, keepdims=True)
+
+def forward(X, W1, b1, W2, b2):
+    z1 = X @ W1 + b1                # (N, 8)
+    a1 = relu(z1)                   # (N, 8)
+    z2 = a1 @ W2 + b2               # (N, 2)  logits
+    probs = softmax(z2)             # (N, 2)  each row sums to 1
+    return z1, a1, z2, probs
+
+def cross_entropy(probs, y):
+    correct = probs[np.arange(len(y)), y]
+    return -np.mean(np.log(correct + 1e-12))
+
+def backward(X, y, z1, a1, probs, W2):
+    N = len(y)
+    Y = np.zeros_like(probs)
+    Y[np.arange(N), y] = 1.0
+    dz2 = (probs - Y) / N           # (N, 2)  softmax + cross-entropy shortcut
+    dW2 = a1.T @ dz2                # (8, 2)
+    db2 = dz2.sum(axis=0)           # (2,)
+    da1 = dz2 @ W2.T                # (N, 8)
+    dz1 = da1 * (z1 > 0)            # (N, 8)  ReLU gate
+    dW1 = X.T @ dz1                 # (2, 8)
+    db1 = dz1.sum(axis=0)           # (8,)
+    return dW1, db1, dW2, db2
+
+# ---- 4. train -----------------------------------------------------------
+lr = 0.5
+for epoch in range(2001):
+    z1, a1, z2, probs = forward(X, W1, b1, W2, b2)   # predict
+    loss = cross_entropy(probs, y)                   # measure
+    dW1, db1, dW2, db2 = backward(X, y, z1, a1, probs, W2)   # adjust
+    for p, g in zip([W1, b1, W2, b2], [dW1, db1, dW2, db2]):
+        p -= lr * g                                  # step downhill
+    if epoch % 400 == 0:
+        print(f"epoch {epoch:4d}  loss {loss:.4f}")
+
+# ---- 5. results ---------------------------------------------------------
+pred = forward(X, W1, b1, W2, b2)[-1].argmax(axis=1)
+print("predictions:", pred, " truth:", y)
+print("accuracy:   ", (pred == y).mean())</code></pre>
+
+          <div class="callout pitfall">
+            <div class="callout__label"><span class="ic">▲</span> Watch out</div>
+            <p>The <code>rng = np.random.default_rng(42)</code> seed makes this run reproducible — you'll
+            get the exact loss numbers shown above. Change the seed and the random starting weights change,
+            so the loss curve will look a little different, but it should still reach 100% within a couple
+            thousand epochs. If a particular seed <em>stalls</em>, that's a real preview of
+            <a href="12-training-dynamics.html">Section 12</a>: initialization and learning rate genuinely
+            decide whether training succeeds.</p>
+          </div>
+
+          <hr />
+
+          <h2><span class="h-num">5</span>What to carry forward</h2>
+          <ul>
+            <li>A network learns with one loop, four steps: <strong>predict → measure → adjust →
+            repeat</strong>. Everything else is detail.</li>
+            <li>The <strong>forward pass</strong> is matrix multiplies with a nonlinearity between them;
+            the <strong>ReLU bend</strong> is the only reason two layers beat one — remove it and the
+            layers collapse into a single line.</li>
+            <li><strong>Softmax</strong> turns raw scores (logits) into probabilities;
+            <strong>cross-entropy</strong> scores those probabilities against the one-hot truth.</li>
+            <li>The <strong>backward pass</strong> is Section 10's chain rule, one line per operation. The
+            softmax+cross-entropy gradient is just <span style="white-space:nowrap">$\mathbf{p}-\mathbf{Y}$</span>,
+            and every gradient comes out the same shape as the weight it updates.</li>
+            <li>Weights start <strong>small and random</strong> (never all zeros — that never breaks
+            symmetry), and <strong>SGD</strong> nudges them downhill by the learning rate each step.</li>
+          </ul>
+          <p>You just wrote, by hand, everything a deep-learning framework does under the hood. Next, in
+          Section 12, we make training itself reliable — initialization, optimizers, and learning-rate
+          schedules — and then in Part 4 we hand exactly these steps to <strong>PyTorch</strong>, which
+          computes the backward pass for us automatically, so we never have to derive those gradient lines
+          again. But now, when it does, you'll know precisely what it's doing.</p>
+
+          <div class="complete-bar" data-complete>
+            <span class="complete-bar__text">Finished this section? Mark it done to fill your progress bar.</span>
+            <button class="btn btn--primary">Mark section complete</button>
+          </div>
+
+          <nav class="pager" data-pager aria-label="Section navigation"></nav>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script defer src="../assets/vendor/katex/katex.min.js"></script>
+  <script defer src="../assets/vendor/katex/auto-render.min.js"></script>
+  <script src="../assets/vendor/highlight/highlight.min.js"></script>
+  <script src="../assets/search-index.js"></script>
+  <script src="../assets/course.js"></script>
+</body>
+</html>
