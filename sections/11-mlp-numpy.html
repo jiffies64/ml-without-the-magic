@@ -38,7 +38,7 @@
         <header class="lesson-head">
           <p class="lesson-eyebrow">Part 3 · Neural Nets from Scratch <span class="dot"></span> Section 11</p>
           <h1 class="lesson-title">Build an MLP in NumPy</h1>
-          <p class="lesson-standfirst">No PyTorch yet — just NumPy and the backprop math from Section 10, assembled into a network that actually learns.</p>
+          <p class="lesson-standfirst">No PyTorch yet. We use only NumPy and the backprop math from Section 10, and build a network that learns.</p>
           <div class="lesson-meta">
             <span><b>30 min</b> read</span>
           </div>
@@ -54,34 +54,35 @@
         </header>
 
         <div class="prose">
-          <p class="lead">So far every idea has lived on its own page: a neuron here, a gradient there,
-          a loss function somewhere else. In this section we <strong>put all the pieces in one file</strong>
-          and press run. No framework, no magic — just NumPy arrays and arithmetic you can read line by
-          line. By the end you'll have a small network that teaches itself to solve a problem no straight
-          line can, and you'll understand every single number that flows through it.</p>
+          <p class="lead">So far each idea has had its own page: a neuron here, a gradient there, a loss
+          function somewhere else. In this section we <strong>put all the pieces in one file</strong> and
+          run it. There is no framework, only NumPy arrays and arithmetic you can read line by line. By the
+          end you will have a small network that learns to solve a problem no straight line can solve. And
+          you will understand every number that flows through it.</p>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> The one idea to hold onto</div>
-            <p>A neural network is not a mysterious black box. It is four steps in a loop: <strong>guess,
-            measure how wrong the guess is, work out which direction reduces the wrongness, take a small
-            step that way</strong>. Repeat a few thousand times and the guesses become good. Today we
+            <p>A neural network is not a mysterious black box. It learns with four steps in a loop:
+            <strong>predict, measure, find the direction, step</strong>. Predict an answer. Measure how
+            wrong it is. Find the direction for each weight that reduces the error. Take a small step in
+            that direction. Repeat a few thousand times and the predictions become good. In this section we
             write those four steps in plain NumPy and watch them work.</p>
           </div>
 
           <!-- ===================== THE PLAN ===================== -->
-          <h2><span class="h-num">1</span>The plan: beat a problem a line cannot</h2>
+          <h2><span class="h-num">1</span>The plan: solve a problem a line cannot</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>Back in <a href="09-neurons.html">Section 9</a> we saw that a single layer — a matrix
-          multiply plus a shift — can only draw a <strong>straight boundary</strong> between classes.
-          That is fine for data you can separate with a ruler, but the world is rarely that tidy. The
-          classic example is <strong>XOR</strong> (short for "exclusive or"): a rule that says "output 1
-          when the two inputs <em>disagree</em>, and 0 when they agree."</p>
+          <p>In <a href="09-neurons.html">Section 9</a> we saw that a single linear layer can only draw a
+          <strong>straight boundary</strong> between classes. That is fine for data you can separate with a
+          ruler, but real data is rarely that simple. The classic example is <strong>XOR</strong> (short
+          for “exclusive or”). The rule is: output 1 when the two inputs <em>disagree</em>, and 0 when they
+          agree.</p>
 
           <div class="scroll-x">
           <table>
             <thead>
-              <tr><th>input <code>x₁</code></th><th>input <code>x₂</code></th><th>label (XOR)</th></tr>
+              <tr><th>input $x_1$</th><th>input $x_2$</th><th>label (XOR)</th></tr>
             </thead>
             <tbody>
               <tr><td>0</td><td>0</td><td>0 &nbsp;<span style="opacity:.6">(agree)</span></td></tr>
@@ -92,77 +93,293 @@
           </table>
           </div>
 
-          <p>Try to draw one straight line that puts the two <code>1</code>s on one side and the two
-          <code>0</code>s on the other. You can't — the <code>1</code>s sit on opposite corners of a
-          square, and so do the <code>0</code>s. No single line separates them. This is the smallest
-          possible problem that defeats a linear model, which makes it the perfect first opponent for a
-          real network.</p>
+          <p>Try to draw one straight line with the two 1s on one side and the two 0s on the other. You
+          cannot. The 1s sit on opposite corners of a square, and so do the 0s. No single line separates
+          them. This is the smallest problem that a linear model cannot solve, so it is a good first test
+          for a real network.</p>
+
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 360 215" style="max-width:520px;margin:0 auto" role="img" aria-labelledby="fig-11-1-t">
+              <title id="fig-11-1-t">Left: the four XOR points with two straight lines that each misclassify a point. Right: the decision regions of the trained network, which bend around the points.</title>
+              <defs><clipPath id="cp111"><rect x="195" y="30" width="150" height="150"/></clipPath><clipPath id="cp110"><rect x="15" y="30" width="150" height="150"/></clipPath></defs>
+              <rect class="f-p" x="15" y="30" width="150" height="150"/>
+              <text x="90.0" y="20" text-anchor="middle" class="b">any straight line fails</text>
+              <line class="ln thin s-r dash" clip-path="url(#cp110)" x1="15.0" y1="80.0" x2="165.0" y2="120.0"/>
+              <line class="ln thin s-r dash" clip-path="url(#cp110)" x1="60.0" y1="180.0" x2="115.0" y2="30.0"/>
+              <rect class="f-a" x="34.0" y="149.0" width="12" height="12"/>
+              <circle class="f-v" cx="40.0" cy="55.0" r="7"/>
+              <circle class="f-v" cx="140.0" cy="155.0" r="7"/>
+              <rect class="f-a" x="134.0" y="49.0" width="12" height="12"/>
+              <rect class="ax" x="15" y="30" width="150" height="150"/>
+              <text x="40.0" y="194" text-anchor="middle" class="sm">0</text><text x="140.0" y="194" text-anchor="middle" class="sm">1</text>
+              <text x="90.0" y="194" text-anchor="middle" class="sm m" style="font-size:12px">x₁</text>
+              <text x="11" y="159.0" text-anchor="end" class="sm">0</text><text x="11" y="59.0" text-anchor="end" class="sm">1</text>
+              <rect class="f-p" x="195" y="30" width="150" height="150"/>
+              <text x="270.0" y="20" text-anchor="middle" class="b">the trained network</text>
+              <rect class="f-vs" x="266.2" y="178.8" width="79.0" height="1.55"/>
+              <rect class="f-vs" x="266.2" y="177.5" width="79.0" height="1.55"/>
+              <rect class="f-vs" x="266.2" y="176.2" width="79.0" height="1.55"/>
+              <rect class="f-vs" x="266.2" y="175.0" width="79.0" height="1.55"/>
+              <rect class="f-vs" x="266.2" y="173.8" width="79.0" height="1.55"/>
+              <rect class="f-vs" x="266.2" y="172.5" width="79.0" height="1.55"/>
+              <rect class="f-vs" x="266.2" y="171.3" width="79.0" height="1.55"/>
+              <rect class="f-vs" x="266.2" y="170.0" width="79.0" height="1.55"/>
+              <rect class="f-vs" x="266.2" y="168.8" width="79.0" height="1.55"/>
+              <rect class="f-vs" x="266.2" y="167.5" width="79.0" height="1.55"/>
+              <rect class="f-vs" x="266.2" y="166.2" width="79.0" height="1.55"/>
+              <rect class="f-vs" x="266.2" y="165.0" width="79.0" height="1.55"/>
+              <rect class="f-vs" x="266.2" y="163.8" width="79.0" height="1.55"/>
+              <rect class="f-vs" x="266.2" y="162.5" width="79.0" height="1.55"/>
+              <rect class="f-vs" x="267.5" y="161.2" width="77.8" height="1.55"/>
+              <rect class="f-vs" x="267.5" y="160.0" width="77.8" height="1.55"/>
+              <rect class="f-vs" x="267.5" y="158.8" width="77.8" height="1.55"/>
+              <rect class="f-vs" x="267.5" y="157.5" width="77.8" height="1.55"/>
+              <rect class="f-vs" x="267.5" y="156.2" width="77.8" height="1.55"/>
+              <rect class="f-vs" x="267.5" y="155.0" width="77.8" height="1.55"/>
+              <rect class="f-vs" x="267.5" y="153.8" width="77.8" height="1.55"/>
+              <rect class="f-vs" x="267.5" y="152.5" width="77.8" height="1.55"/>
+              <rect class="f-vs" x="267.5" y="151.2" width="77.8" height="1.55"/>
+              <rect class="f-vs" x="267.5" y="150.0" width="77.8" height="1.55"/>
+              <rect class="f-vs" x="268.8" y="148.8" width="76.6" height="1.55"/>
+              <rect class="f-vs" x="268.8" y="147.5" width="76.6" height="1.55"/>
+              <rect class="f-vs" x="268.8" y="146.2" width="76.6" height="1.55"/>
+              <rect class="f-vs" x="268.8" y="145.0" width="76.6" height="1.55"/>
+              <rect class="f-vs" x="268.8" y="143.8" width="76.6" height="1.55"/>
+              <rect class="f-vs" x="268.8" y="142.5" width="76.6" height="1.55"/>
+              <rect class="f-vs" x="268.8" y="141.2" width="76.6" height="1.55"/>
+              <rect class="f-vs" x="268.8" y="140.0" width="76.6" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="138.8" width="1.6" height="1.55"/>
+              <rect class="f-vs" x="268.8" y="138.8" width="76.6" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="137.5" width="2.8" height="1.55"/>
+              <rect class="f-vs" x="270.0" y="137.5" width="75.3" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="136.2" width="4.1" height="1.55"/>
+              <rect class="f-vs" x="270.0" y="136.2" width="75.3" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="135.0" width="5.3" height="1.55"/>
+              <rect class="f-vs" x="270.0" y="135.0" width="75.3" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="133.8" width="6.5" height="1.55"/>
+              <rect class="f-vs" x="270.0" y="133.8" width="75.3" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="132.5" width="6.5" height="1.55"/>
+              <rect class="f-vs" x="270.0" y="132.5" width="75.3" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="131.2" width="7.8" height="1.55"/>
+              <rect class="f-vs" x="270.0" y="131.2" width="75.3" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="130.0" width="9.1" height="1.55"/>
+              <rect class="f-vs" x="270.0" y="130.0" width="75.3" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="128.8" width="10.3" height="1.55"/>
+              <rect class="f-vs" x="270.0" y="128.8" width="75.3" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="127.5" width="11.6" height="1.55"/>
+              <rect class="f-vs" x="270.0" y="127.5" width="75.3" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="126.3" width="12.8" height="1.55"/>
+              <rect class="f-vs" x="270.0" y="126.3" width="75.3" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="125.0" width="14.1" height="1.55"/>
+              <rect class="f-vs" x="271.2" y="125.0" width="74.0" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="123.8" width="15.3" height="1.55"/>
+              <rect class="f-vs" x="271.2" y="123.8" width="74.0" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="122.5" width="16.6" height="1.55"/>
+              <rect class="f-vs" x="271.2" y="122.5" width="74.0" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="121.2" width="17.8" height="1.55"/>
+              <rect class="f-vs" x="271.2" y="121.2" width="74.0" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="120.0" width="19.1" height="1.55"/>
+              <rect class="f-vs" x="271.2" y="120.0" width="74.0" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="118.8" width="20.3" height="1.55"/>
+              <rect class="f-vs" x="271.2" y="118.8" width="74.0" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="117.5" width="20.3" height="1.55"/>
+              <rect class="f-vs" x="271.2" y="117.5" width="74.0" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="116.3" width="21.6" height="1.55"/>
+              <rect class="f-vs" x="271.2" y="116.3" width="74.0" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="115.0" width="22.8" height="1.55"/>
+              <rect class="f-vs" x="271.2" y="115.0" width="74.0" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="113.7" width="24.1" height="1.55"/>
+              <rect class="f-vs" x="271.2" y="113.7" width="74.0" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="112.5" width="25.3" height="1.55"/>
+              <rect class="f-vs" x="272.5" y="112.5" width="72.8" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="111.2" width="27.8" height="1.55"/>
+              <rect class="f-vs" x="272.5" y="111.2" width="72.8" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="110.0" width="32.8" height="1.55"/>
+              <rect class="f-vs" x="281.2" y="110.0" width="64.1" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="108.8" width="37.8" height="1.55"/>
+              <rect class="f-vs" x="293.8" y="108.8" width="51.6" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="107.5" width="44.0" height="1.55"/>
+              <rect class="f-vs" x="307.5" y="107.5" width="37.8" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="106.2" width="51.6" height="1.55"/>
+              <rect class="f-vs" x="320.0" y="106.2" width="25.3" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="105.0" width="57.8" height="1.55"/>
+              <rect class="f-vs" x="332.5" y="105.0" width="12.8" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="103.8" width="65.3" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="102.5" width="69.0" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="101.2" width="69.0" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="100.0" width="69.0" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="98.8" width="69.0" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="97.5" width="69.0" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="96.2" width="69.0" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="95.0" width="69.0" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="93.8" width="69.0" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="92.5" width="70.3" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="91.2" width="70.3" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="90.0" width="70.3" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="88.8" width="70.3" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="87.5" width="70.3" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="86.2" width="70.3" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="85.0" width="70.3" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="83.8" width="70.3" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="82.5" width="70.3" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="81.2" width="71.5" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="80.0" width="71.5" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="78.8" width="71.5" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="77.5" width="71.5" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="76.2" width="71.5" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="75.0" width="71.5" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="73.8" width="71.5" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="72.5" width="71.5" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="71.2" width="71.5" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="70.0" width="71.5" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="68.8" width="72.8" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="67.5" width="72.8" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="66.2" width="72.8" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="65.0" width="72.8" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="63.7" width="72.8" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="62.5" width="72.8" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="61.2" width="72.8" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="60.0" width="72.8" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="58.7" width="72.8" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="57.5" width="74.0" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="56.2" width="74.0" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="55.0" width="74.0" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="53.7" width="74.0" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="52.5" width="74.0" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="51.2" width="74.0" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="50.0" width="74.0" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="48.8" width="74.0" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="47.5" width="74.0" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="46.2" width="74.0" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="45.0" width="75.3" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="43.7" width="75.3" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="42.5" width="75.3" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="41.2" width="75.3" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="40.0" width="75.3" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="38.7" width="75.3" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="37.5" width="75.3" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="36.2" width="75.3" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="35.0" width="75.3" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="33.7" width="76.6" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="32.5" width="76.6" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="31.2" width="76.6" height="1.55"/>
+              <rect class="f-vs" x="195.0" y="30.0" width="76.6" height="1.55"/>
+              <path class="ln thin s-v" clip-path="url(#cp111)" d="M265.7,180.0L265.8,178.8 M265.8,178.8L265.8,177.5 M265.8,177.5L265.8,176.2 M265.8,176.2L265.9,175.0 M265.9,175.0L265.9,173.8 M265.9,173.8L265.9,172.5 M265.9,172.5L266.0,171.3 M266.0,171.3L266.1,170.0 M266.1,170.0L266.2,168.9 M266.3,168.8L266.2,168.9 M266.3,168.8L266.4,167.5 M266.4,167.5L266.5,166.2 M266.5,166.2L266.6,165.0 M266.6,165.0L266.8,163.8 M266.8,163.8L266.9,162.5 M266.9,162.5L267.0,161.2 M267.0,161.2L267.2,160.0 M267.2,160.0L267.3,158.8 M267.3,158.8L267.4,157.5 M267.4,157.5L267.5,156.7 M267.5,156.2L267.5,156.7 M267.5,156.2L267.7,155.0 M267.7,155.0L267.8,153.8 M267.8,153.8L267.9,152.5 M267.9,152.5L268.1,151.2 M268.1,151.2L268.2,150.0 M268.2,150.0L268.3,148.8 M268.3,148.8L268.4,147.5 M268.4,147.5L268.6,146.2 M268.6,146.2L268.7,145.0 M268.7,145.0L268.8,144.5 M268.8,143.8L268.8,144.5 M268.8,143.8L269.0,142.5 M269.0,142.5L269.1,141.2 M195.2,140.0L195.0,140.2 M269.1,141.2L269.2,140.0 M195.2,140.0L196.2,138.9 M196.4,138.8L196.2,138.9 M269.2,140.0L269.3,138.8 M196.4,138.8L197.5,137.6 M197.6,137.5L197.5,137.6 M269.3,138.8L269.5,137.5 M197.6,137.5L198.8,136.3 M198.8,136.2L198.8,136.3 M269.5,137.5L269.6,136.2 M198.8,136.2L200.0,135.0 M200.0,135.0L200.0,135.0 M269.6,136.2L269.7,135.0 M200.0,135.0L201.2,133.8 M269.7,135.0L269.9,133.8 M201.2,133.8L201.2,133.7 M202.4,132.5L201.2,133.7 M269.9,133.8L270.0,132.5 M202.4,132.5L202.5,132.4 M203.6,131.2L202.5,132.4 M270.0,132.5L270.0,132.3 M270.1,131.2L270.0,132.3 M203.6,131.2L203.8,131.0 M204.7,130.0L203.8,131.0 M270.1,131.2L270.2,130.0 M204.7,130.0L205.0,129.7 M205.8,128.8L205.0,129.7 M270.2,130.0L270.4,128.8 M205.8,128.8L206.2,128.3 M207.0,127.5L206.2,128.3 M270.4,128.8L270.5,127.5 M207.0,127.5L207.5,126.9 M208.1,126.3L207.5,126.9 M270.5,127.5L270.6,126.3 M208.1,126.3L208.8,125.6 M209.3,125.0L208.8,125.6 M270.6,126.3L270.8,125.0 M209.3,125.0L210.0,124.2 M210.4,123.8L210.0,124.2 M270.8,125.0L270.9,123.8 M210.4,123.8L211.2,122.8 M211.6,122.5L211.2,122.8 M270.9,123.8L271.0,122.5 M211.6,122.5L212.5,121.5 M212.7,121.2L212.5,121.5 M271.0,122.5L271.1,121.2 M212.7,121.2L213.8,120.1 M213.8,120.0L213.8,120.1 M271.1,121.2L271.2,120.1 M271.3,120.0L271.2,120.1 M213.8,120.0L215.0,118.8 M271.3,120.0L271.4,118.8 M215.0,118.8L215.0,118.7 M216.1,117.5L215.0,118.7 M271.4,118.8L271.5,117.5 M216.1,117.5L216.2,117.4 M217.3,116.2L216.2,117.4 M271.5,117.5L271.6,116.2 M217.3,116.2L217.5,116.0 M218.4,115.0L217.5,116.0 M271.6,116.2L271.8,115.0 M218.4,115.0L218.8,114.6 M219.6,113.7L218.8,114.6 M271.8,115.0L271.9,113.7 M219.6,113.7L220.0,113.3 M220.8,112.5L220.0,113.3 M271.9,113.7L272.0,112.5 M220.8,112.5L221.2,112.1 M222.5,111.8L221.2,112.1 M223.8,111.4L222.5,111.8 M224.5,111.2L223.8,111.4 M272.0,112.5L272.5,111.7 M273.8,111.4L272.5,111.7 M275.0,111.3L273.8,111.4 M275.3,111.2L275.0,111.3 M224.5,111.2L225.0,111.1 M226.2,110.8L225.0,111.1 M227.5,110.5L226.2,110.8 M228.8,110.1L227.5,110.5 M229.3,110.0L228.8,110.1 M275.3,111.2L276.2,111.2 M277.5,111.0L276.2,111.2 M278.8,110.9L277.5,111.0 M280.0,110.8L278.8,110.9 M281.2,110.7L280.0,110.8 M282.5,110.5L281.2,110.7 M283.8,110.4L282.5,110.5 M285.0,110.3L283.8,110.4 M286.2,110.2L285.0,110.3 M287.5,110.0L286.2,110.2 M288.0,110.0L287.5,110.0 M229.3,110.0L230.0,109.8 M231.2,109.5L230.0,109.8 M232.5,109.3L231.2,109.5 M233.8,109.1L232.5,109.3 M235.0,108.8L233.8,109.1 M235.5,108.8L235.0,108.8 M288.0,110.0L288.8,109.9 M290.0,109.8L288.8,109.9 M291.2,109.7L290.0,109.8 M292.5,109.6L291.2,109.7 M293.8,109.4L292.5,109.6 M295.0,109.3L293.8,109.4 M296.2,109.2L295.0,109.3 M297.5,109.1L296.2,109.2 M298.8,108.9L297.5,109.1 M300.0,108.8L298.8,108.9 M300.6,108.8L300.0,108.8 M235.5,108.8L236.2,108.6 M237.5,108.4L236.2,108.6 M238.8,108.2L237.5,108.4 M240.0,107.9L238.8,108.2 M241.2,107.7L240.0,107.9 M242.3,107.5L241.2,107.7 M300.6,108.8L301.2,108.7 M302.5,108.6L301.2,108.7 M303.8,108.4L302.5,108.6 M305.0,108.3L303.8,108.4 M306.2,108.2L305.0,108.3 M307.5,108.1L306.2,108.2 M308.8,107.9L307.5,108.1 M310.0,107.8L308.8,107.9 M311.2,107.7L310.0,107.8 M312.5,107.6L311.2,107.7 M313.3,107.5L312.5,107.6 M242.3,107.5L242.5,107.5 M243.8,107.2L242.5,107.5 M245.0,107.0L243.8,107.2 M246.2,106.8L245.0,107.0 M247.5,106.6L246.2,106.8 M248.8,106.3L247.5,106.6 M249.2,106.2L248.8,106.3 M313.3,107.5L313.8,107.5 M315.0,107.3L313.8,107.5 M316.2,107.2L315.0,107.3 M317.5,107.1L316.2,107.2 M318.8,107.0L317.5,107.1 M320.0,106.8L318.8,107.0 M321.2,106.7L320.0,106.8 M322.5,106.6L321.2,106.7 M323.8,106.5L322.5,106.6 M325.0,106.3L323.8,106.5 M325.9,106.2L325.0,106.3 M249.2,106.2L250.0,106.1 M251.2,105.9L250.0,106.1 M252.5,105.6L251.2,105.9 M253.8,105.4L252.5,105.6 M255.0,105.2L253.8,105.4 M256.0,105.0L255.0,105.2 M325.9,106.2L326.2,106.2 M327.5,106.1L326.2,106.2 M328.8,106.0L327.5,106.1 M330.0,105.8L328.8,106.0 M331.2,105.7L330.0,105.8 M332.5,105.6L331.2,105.7 M333.8,105.5L332.5,105.6 M335.0,105.4L333.8,105.5 M336.2,105.2L335.0,105.4 M337.5,105.1L336.2,105.2 M338.6,105.0L337.5,105.1 M256.0,105.0L256.2,105.0 M257.5,104.7L256.2,105.0 M258.8,104.5L257.5,104.7 M260.0,104.3L258.8,104.5 M261.2,104.0L260.0,104.3 M262.5,103.8L261.2,104.0 M262.7,103.8L262.5,103.8 M338.6,105.0L338.8,105.0 M340.0,104.9L338.8,105.0 M341.2,104.7L340.0,104.9 M342.5,104.6L341.2,104.7 M343.8,104.5L342.5,104.6 M345.0,104.4L343.8,104.5 M262.7,103.8L263.5,102.5 M263.5,102.5L263.7,101.2 M263.7,101.2L263.8,100.3 M263.8,100.0L263.8,100.3 M263.8,100.0L263.9,98.8 M263.9,98.8L264.0,97.5 M264.0,97.5L264.2,96.2 M264.2,96.2L264.3,95.0 M264.3,95.0L264.4,93.8 M264.4,93.8L264.6,92.5 M264.6,92.5L264.7,91.2 M264.7,91.2L264.8,90.0 M264.8,90.0L265.0,88.8 M265.0,88.8L265.0,88.3 M265.1,87.5L265.0,88.3 M265.1,87.5L265.2,86.2 M265.2,86.2L265.3,85.0 M265.3,85.0L265.5,83.8 M265.5,83.8L265.6,82.5 M265.6,82.5L265.7,81.2 M265.7,81.2L265.9,80.0 M265.9,80.0L266.0,78.8 M266.0,78.8L266.1,77.5 M266.1,77.5L266.2,76.4 M266.3,76.2L266.2,76.4 M266.3,76.2L266.4,75.0 M266.4,75.0L266.5,73.8 M266.5,73.8L266.7,72.5 M266.7,72.5L266.8,71.2 M266.8,71.2L266.9,70.0 M266.9,70.0L267.0,68.8 M267.0,68.8L267.2,67.5 M267.2,67.5L267.3,66.2 M267.3,66.2L267.4,65.0 M267.4,65.0L267.5,64.4 M267.6,63.7L267.5,64.4 M267.6,63.7L267.7,62.5 M267.7,62.5L267.8,61.2 M267.8,61.2L268.0,60.0 M268.0,60.0L268.1,58.7 M268.1,58.7L268.2,57.5 M268.2,57.5L268.3,56.2 M268.3,56.2L268.5,55.0 M268.5,55.0L268.6,53.7 M268.6,53.7L268.7,52.5 M268.7,52.5L268.8,52.4 M268.9,51.2L268.8,52.4 M268.9,51.2L269.0,50.0 M269.0,50.0L269.1,48.8 M269.1,48.8L269.3,47.5 M269.3,47.5L269.4,46.2 M269.4,46.2L269.5,45.0 M269.5,45.0L269.7,43.7 M269.7,43.7L269.8,42.5 M269.8,42.5L269.9,41.2 M269.9,41.2L270.0,40.4 M270.0,40.0L270.0,40.4 M270.0,40.0L270.2,38.7 M270.2,38.7L270.3,37.5 M270.3,37.5L270.4,36.2 M270.4,36.2L270.6,35.0 M270.6,35.0L270.7,33.7 M270.7,33.7L270.8,32.5 M270.8,32.5L271.0,31.2 M271.0,31.2L271.1,30.0"/>
+              <rect class="f-a" x="214.0" y="149.0" width="12" height="12"/>
+              <circle class="f-v" cx="220.0" cy="55.0" r="7"/>
+              <circle class="f-v" cx="320.0" cy="155.0" r="7"/>
+              <rect class="f-a" x="314.0" y="49.0" width="12" height="12"/>
+              <rect class="ax" x="195" y="30" width="150" height="150"/>
+              <text x="220.0" y="194" text-anchor="middle" class="sm">0</text><text x="320.0" y="194" text-anchor="middle" class="sm">1</text>
+              <text x="270.0" y="194" text-anchor="middle" class="sm m" style="font-size:12px">x₁</text>
+              <text x="191" y="159.0" text-anchor="end" class="sm">0</text><text x="191" y="59.0" text-anchor="end" class="sm">1</text>
+              <circle class="f-v" cx="30" cy="207" r="5"/><text x="40" y="211" class="sm">label 1 (inputs differ)</text>
+              <rect class="f-a" x="190" y="202" width="10" height="10"/><text x="206" y="211" class="sm">label 0 (inputs agree)</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 11.1</b> Left: every straight line puts at least one point on the wrong
+            side. The two dashed lines are examples. Right: the regions learned by the network we train in
+            this section (seed 42). The shaded area is where the network predicts label 1. Its boundary is
+            made of straight pieces joined at bends. Each bend comes from a ReLU switching on or off.</figcaption>
+          </figure>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>A light switch at the top of a staircase and another at the bottom. The light is on only
-            when the two switches are in <em>different</em> positions; flip either one and the light
-            flips too. "On when they disagree" is exactly XOR. You know instantly how it behaves, yet
-            there is no way to describe it with a single "the more of this, the more of that" rule — you
-            need a rule that <em>bends</em>. A network bends.</p>
+            <p>Think of a staircase light with one switch at the top and one at the bottom. The light is on
+            only when the two switches are in <em>different</em> positions. Flip either switch and the light
+            changes. “On when they disagree” is XOR. Flipping switch A has the opposite effect depending on
+            where switch B is. So no rule of the form “more A means more light” can describe it. You need a
+            rule that <em>bends</em>, and a network can bend.</p>
           </div>
 
-          <p>Our plan for the whole section: build a <strong>2-layer MLP</strong> (multi-layer perceptron
-          — just a fancy name for a small stack of these matrix-plus-nonlinearity layers) in pure NumPy,
-          and train it until it classifies all four XOR points correctly. Every gradient we use was
-          derived in <a href="10-backprop.html">Section 10</a>; here we finally turn that math into code
-          that runs.</p>
+          <p>The plan for this section: build a <strong>2-layer MLP</strong> in pure NumPy and train it
+          until it classifies all four XOR points correctly. Every gradient we use comes from
+          <a href="10-backprop.html">Section 10</a>. Here we turn that math into code that runs.</p>
 
           <div class="callout definition">
             <div class="callout__label">Definition</div>
-            <p>An <dfn>MLP</dfn> (multi-layer perceptron) is a network built from <em>layers</em>, where
-            each layer does a matrix multiply plus a bias shift, and a <strong>nonlinearity</strong> (a
-            bending function like ReLU) sits between the layers. The nonlinearity is what lets the whole
-            thing curve its decision boundary instead of drawing one flat line.</p>
+            <p>An <dfn>MLP</dfn> (multi-layer perceptron) is a network built from layers. Each layer does a
+            matrix multiply and adds a bias. A <strong>nonlinearity</strong> (a bending function such as
+            ReLU) sits between the layers. The nonlinearity lets the decision boundary bend instead of being
+            one straight line.</p>
+          </div>
+
+          <div class="check-wrap">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">Suppose you add a third input $x_3 = x_1 \cdot x_2$ to each XOR point. Can a single linear layer now separate the classes?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Yes. The label equals $x_1 + x_2 - 2x_3$: this gives 0, 1, 1, 0 for the four points. So a
+                linear model with threshold 0.5 on this sum is correct. The new feature did the “bending” for
+                us. A hidden layer does the same thing, but it <em>learns</em> useful features from the data
+                instead of needing you to invent them.</p>
+              </div>
+            </details>
           </div>
 
           <!-- ===================== THE LOOP AS CONCEPT ===================== -->
           <h2><span class="h-num">2</span>The training loop, before any code</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>Every network in this course, from this toy up to the largest language model, learns with
-          the same four-step loop. Hold these four words in your head and the code below will feel
-          obvious:</p>
-          <ul>
-            <li><strong>Predict</strong> — push the inputs through the network to get a guess.</li>
-            <li><strong>Measure</strong> — compare the guess to the true answer with a <em>loss</em>
-            (a single number saying how wrong we are).</li>
-            <li><strong>Adjust</strong> — find, for every weight, which way to nudge it to make the loss
-            smaller. That "which way" is the <em>gradient</em>.</li>
-            <li><strong>Repeat</strong> — take a small step in that direction and go again.</li>
-          </ul>
+          <p>Every network in this course, from this small one to large language models, learns with the
+          same four-step loop. Remember these four steps and the code below will be easy to follow:</p>
+          <ol>
+            <li><strong>Predict</strong>: pass the inputs through the network to get an answer (the
+            <em>forward pass</em>).</li>
+            <li><strong>Measure</strong>: compare the answer with the true answer using a <em>loss</em>
+            (one number that says how wrong we are).</li>
+            <li><strong>Find the direction</strong>: for every weight, find which way to change it to make
+            the loss smaller. This direction comes from the <em>gradient</em>, computed by the <em>backward
+            pass</em>.</li>
+            <li><strong>Step</strong>: change every weight a little in that direction. Then go back to
+            step 1.</li>
+          </ol>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>Learning to shoot a basketball free throw. You <strong>shoot</strong> (predict). You
-            <strong>see the miss</strong> — short and to the left (measure the error). Your body works out
-            the <strong>correction</strong> — a bit more arc, aim slightly right (the gradient: which
-            adjustment reduces the miss). You take one shot with that small change and <strong>shoot
-            again</strong>. No single throw is perfect, but after a hundred the ball drops through
-            cleanly. A network trains the exact same way, just with numbers instead of muscles.</p>
+            <p>Think of learning a basketball free throw. You <strong>shoot</strong> (predict). You
+            <strong>see the miss</strong>: short and to the left (measure). You work out the
+            <strong>correction</strong>: a bit more arc, aim a little to the right (find the direction). You
+            shoot again with that small change (step). No single throw is perfect, but after a hundred
+            throws the ball goes in. A network trains in the same way, with numbers instead of muscles.</p>
           </div>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> One pass = one <em>epoch</em></div>
-            <p>Running that four-step loop once over the whole dataset is called one <dfn>epoch</dfn>.
-            We'll run a few thousand epochs. Each one makes the weights a tiny bit better, and the loss
-            printed on screen ticks downward — that falling number is the network learning, live.</p>
+            <p>Running the loop once over the whole dataset is called one <dfn>epoch</dfn>. We will run a
+            few thousand epochs. Each one makes the weights a little better, and the printed loss goes down.
+            That falling number is the network learning.</p>
           </div>
 
-          <!-- ===================== BUILD: DATASET ===================== -->
+          <div class="check-wrap">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">You run a training loop and the printed loss is exactly the same number at every epoch. The update line is <code>for p, g in zip(params, grads): p = p - lr * g</code>. What is wrong?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Step 4 never happens. <code>p = p - lr * g</code> creates a <em>new</em> array and gives it
+                the local name <code>p</code>. The original weight array is not changed. So every epoch
+                predicts with the same weights and prints the same loss (0.8471 for our network). The fix is
+                the in-place form <code>p -= lr * g</code>, which changes the array itself.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== BUILD ===================== -->
           <h2><span class="h-num">3</span>Building it, one block at a time</h2>
-          <p>We'll assemble the network in small labelled pieces so every line has a reason. At the very
-          end (<a href="#full-script">the full script below</a>) the same pieces are collected into one script you can
-          paste and run.</p>
+          <p>We build the network in small labeled pieces, so every line has a reason. At the end
+          (<a href="#full-script">the full script</a>), the same pieces are collected into one script you
+          can copy and run.</p>
 
           <h3>(a) The dataset</h3>
-          <p>First the data. XOR has just four points, so we can type them out by hand. <code>X</code>
-          holds the four inputs (one per row); <code>y</code> holds their correct labels.</p>
+          <p>First the data. XOR has only four points, so we can type them by hand. <code>X</code> holds
+          the four inputs (one per row), and <code>y</code> holds their correct labels.</p>
 
           <p class="codecap">the four XOR points and their labels</p>
           <pre><code class="language-python">import numpy as np
@@ -178,13 +395,13 @@ y = np.array([0, 1, 1, 0])
 
 N, D = X.shape        # N = 4 examples, D = 2 features each
 C = 2                 # number of classes: "0" and "1"</code></pre>
-          <p>We treat this as a <strong>classification</strong> problem with two classes ("output is 0"
-          and "output is 1") rather than predicting a raw number. That choice is what lets us use softmax
-          and cross-entropy in a moment, exactly as a real classifier does.</p>
+          <p>We treat this as a <strong>classification</strong> problem with two classes (“output is 0” and
+          “output is 1”) instead of predicting a raw number. This choice lets us use softmax and
+          cross-entropy, as a real classifier does.</p>
 
-          <p>Cross-entropy compares two <em>probability lists</em>, so the label <code>1</code> needs to
-          become a probability list too: "100% class 1, 0% class 0." That format is called
-          <strong>one-hot</strong> — a list that is all zeros except for a single 1 in the correct slot.</p>
+          <p>Cross-entropy compares two <em>probability lists</em>. So the label 1 must also become a
+          probability list: “0% class 0, 100% class 1.” This format is called <strong>one-hot</strong>: a
+          list of zeros with a single 1 in the correct position.</p>
 
           <p class="codecap">turn each label into a one-hot row</p>
           <pre><code class="language-python"># Y[i] is all zeros except a 1 in the correct class column
@@ -198,78 +415,160 @@ Y[np.arange(N), y] = 1.0
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
             <p>One-hot is a multiple-choice answer sheet where you fill in exactly one bubble. The label
-            "the answer is B" becomes the row <code>[0, 1, 0, 0]</code> — a 1 under B, blanks everywhere
-            else. Storing the answer this way lets us score it against the network's "how sure am I about
-            each option?" output, option by option.</p>
+            “the answer is B” becomes the row [0, 1, 0, 0]: a 1 under B and 0 everywhere else. In this
+            form we can compare the answer, option by option, with the network's output, which says how sure
+            it is about each option.</p>
           </div>
 
           <h3>(b) Initialize the weights</h3>
           <p>The network has two layers, so it has two weight matrices and two bias vectors. Layer 1 turns
-          the 2 input features into <code>H</code> hidden numbers; layer 2 turns those <code>H</code>
-          numbers into 2 class scores. We fill the weights with <strong>small random</strong> values and
-          set the biases to zero.</p>
+          the 2 input features into $H$ hidden numbers. Layer 2 turns those $H$ numbers into 2 class
+          scores. We fill the weights with <strong>small random</strong> values and set the biases to
+          zero.</p>
+
+          <div class="callout pitfall">
+            <div class="callout__label"><span class="ic">▲</span> Watch out: weight shape in this lesson</div>
+            <p>In this NumPy lesson, a weight matrix has shape <strong>(in, out)</strong>, and a layer
+            computes <code>X @ W + b</code>. For example, <code>W1</code> is (2, 8). In
+            <a href="09-neurons.html">Section 9</a>, <a href="10-backprop.html">Section 10</a> and
+            PyTorch's <code>nn.Linear</code> (<a href="14-nn-module.html">Section 14</a>), $\mathbf{W}$ has
+            shape <strong>(out, in)</strong> and the layer computes $\mathbf{X}\mathbf{W}^\top + \mathbf{b}$.
+            The two forms compute the same thing; our $\mathbf{W}$ here is their $\mathbf{W}^\top$. We use
+            (in, out) because the code is shorter without the transposes.</p>
+          </div>
 
           <p class="codecap">two layers: (2 → H) then (H → 2)</p>
           <pre><code class="language-python">rng = np.random.default_rng(42)   # fixed seed so results repeat
 H = 8                             # neurons in the hidden layer
 
-# He initialization: spread scaled to the number of inputs (keeps signals sane)
+# He initialization: random spread scaled by the number of inputs
 W1 = rng.normal(0, np.sqrt(2.0 / D), size=(D, H))   # (2, 8)
 b1 = np.zeros(H)                                     # (8,)
 W2 = rng.normal(0, np.sqrt(2.0 / H), size=(H, C))   # (8, 2)
 b2 = np.zeros(C)                                     # (2,)</code></pre>
 
-          <p>Why <em>random</em> and not just zeros? If every weight in a layer starts identical, every
-          neuron in that layer computes the exact same thing, receives the exact same gradient, and
-          updates identically forever — they never split apart to learn different features. This is the
-          <strong>symmetry-breaking</strong> problem, and a little randomness is the cure. We dig into why
-          the specific <em>scale</em> matters (too big or too small both break training) in
-          <a href="12-training-dynamics.html">Section 12</a>.</p>
+          <p>Why <em>random</em> and not zeros? If every weight in a layer starts with the same value, every
+          neuron in that layer computes the same thing. Each one then receives the same gradient and changes
+          in the same way, forever. The neurons never become different, so they cannot learn different
+          features. This is the <strong>symmetry</strong> problem, and a little randomness breaks it. The
+          scale of the random values also matters (too big or too small both break training). He
+          initialization chooses a scale that keeps the values in each layer at a similar size.
+          <a href="12-training-dynamics.html">Section 12</a> explains why.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>Seat eight brand-new interns and give every one the identical starting notes and identical
-            feedback. They'll all reach the identical conclusion — you've effectively hired one intern,
-            eight times over. Give each a slightly different starting point and they explore different
-            ideas, and the team as a whole covers far more ground. Random init is how the eight hidden
-            neurons avoid becoming eight copies of the same neuron.</p>
+            <p>Give eight new interns the same starting notes and the same feedback. They will all reach the
+            same conclusion. In effect you have hired one intern eight times. Give each one a slightly
+            different starting point, and they explore different ideas. Random initialization is how the
+            eight hidden neurons avoid becoming eight copies of the same neuron.</p>
           </div>
 
           <h3>(c) The forward pass</h3>
-          <p>The <strong>forward pass</strong> is the "predict" step: push <code>X</code> through both
+          <p>The <strong>forward pass</strong> is the “predict” step: pass <code>X</code> through both
           layers to get class scores. Between the layers sits <strong>ReLU</strong> (from
-          <a href="09-neurons.html">Section 9</a>) — the bending function that keeps positive numbers and
-          replaces negatives with 0. That bend is the whole reason the network can beat XOR.</p>
+          <a href="09-neurons.html">Section 9</a>), which keeps positive numbers and replaces negative
+          numbers with 0. That bend is what lets the network solve XOR.</p>
 
           <p class="beat beat--math">Now the math</p>
+          <p>We process all $N$ examples at once, so each quantity is a matrix with one row per example. We
+          write these batch matrices with capital letters:</p>
           $$ \begin{aligned}
-             \mathbf{z}_1 &= \mathbf{X}\mathbf{W}_1 + \mathbf{b}_1 \\
-             \mathbf{a}_1 &= \operatorname{ReLU}(\mathbf{z}_1) = \max(0,\ \mathbf{z}_1) \\
-             \mathbf{z}_2 &= \mathbf{a}_1\mathbf{W}_2 + \mathbf{b}_2 \\
-             \mathbf{p}   &= \operatorname{softmax}(\mathbf{z}_2)
+             \mathbf{Z}_1 &= \mathbf{X}\mathbf{W}_1 + \mathbf{b}_1 \\
+             \mathbf{A}_1 &= \operatorname{ReLU}(\mathbf{Z}_1) = \max(0,\ \mathbf{Z}_1) \\
+             \mathbf{Z}_2 &= \mathbf{A}_1\mathbf{W}_2 + \mathbf{b}_2 \\
+             \mathbf{P}   &= \operatorname{softmax}(\mathbf{Z}_2)
              \end{aligned} $$
-          <p class="gloss"><b>In words:</b> multiply the inputs by the first weight matrix and add the
-          bias to get <b>z₁</b> (the "pre-activation"). Bend it with ReLU to get the hidden values
-          <b>a₁</b>. Multiply those by the second weight matrix and add the second bias to get the raw
-          scores <b>z₂</b> (called <dfn>logits</dfn> — unnormalized, can be any size, positive or
-          negative). Finally squash the logits into probabilities <b>p</b> with softmax.</p>
+          <p class="gloss"><b>In words:</b> multiply the inputs by the first weight matrix and add the bias
+          to get $\mathbf{Z}_1$ (the pre-activations, code name <code>z1</code>). Bend them with ReLU to get
+          the hidden values $\mathbf{A}_1$ (<code>a1</code>). Multiply those by the second weight matrix and
+          add the second bias to get the raw scores $\mathbf{Z}_2$ (<code>z2</code>). These scores are
+          called <dfn>logits</dfn>: they are not normalized and can be any size, positive or negative.
+          Finally, softmax turns each row of logits into probabilities $\mathbf{P}$ (<code>probs</code>).
+          The bias vector is added to every row; NumPy does this automatically (broadcasting,
+          <a href="13-tensors-autograd.html">Section 13</a>).</p>
 
-          <p><strong>Softmax</strong> turns a row of raw scores into a row of probabilities: it makes
-          every number positive by exponentiating it, then divides by the total so the row sums to 1.</p>
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 360 260" style="max-width:520px;margin:0 auto" role="img" aria-labelledby="fig-11-2-t">
+              <title id="fig-11-2-t">The 2-8-2 network: 2 inputs, 8 hidden ReLU neurons, 2 softmax outputs, with the shape of every array for a batch of 4 examples.</title>
+              <line class="ln thin s-f" x1="40" y1="95" x2="180" y2="30" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="40" y1="95" x2="180" y2="54" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="40" y1="95" x2="180" y2="78" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="40" y1="95" x2="180" y2="102" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="40" y1="95" x2="180" y2="126" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="40" y1="95" x2="180" y2="150" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="40" y1="95" x2="180" y2="174" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="40" y1="95" x2="180" y2="198" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="40" y1="145" x2="180" y2="30" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="40" y1="145" x2="180" y2="54" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="40" y1="145" x2="180" y2="78" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="40" y1="145" x2="180" y2="102" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="40" y1="145" x2="180" y2="126" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="40" y1="145" x2="180" y2="150" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="40" y1="145" x2="180" y2="174" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="40" y1="145" x2="180" y2="198" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="180" y1="30" x2="320" y2="95" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="180" y1="30" x2="320" y2="145" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="180" y1="54" x2="320" y2="95" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="180" y1="54" x2="320" y2="145" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="180" y1="78" x2="320" y2="95" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="180" y1="78" x2="320" y2="145" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="180" y1="102" x2="320" y2="95" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="180" y1="102" x2="320" y2="145" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="180" y1="126" x2="320" y2="95" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="180" y1="126" x2="320" y2="145" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="180" y1="150" x2="320" y2="95" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="180" y1="150" x2="320" y2="145" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="180" y1="174" x2="320" y2="95" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="180" y1="174" x2="320" y2="145" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="180" y1="198" x2="320" y2="95" style="stroke-width:1"/>
+              <line class="ln thin s-f" x1="180" y1="198" x2="320" y2="145" style="stroke-width:1"/>
+              <circle class="f-k" cx="40" cy="95" r="11"/><circle class="ln thin s-i" cx="40" cy="95" r="11"/>
+              <circle class="f-k" cx="40" cy="145" r="11"/><circle class="ln thin s-i" cx="40" cy="145" r="11"/>
+              <circle class="f-vs" cx="180" cy="30" r="9"/><circle class="ln thin s-v" cx="180" cy="30" r="9"/>
+              <circle class="f-vs" cx="180" cy="54" r="9"/><circle class="ln thin s-v" cx="180" cy="54" r="9"/>
+              <circle class="f-vs" cx="180" cy="78" r="9"/><circle class="ln thin s-v" cx="180" cy="78" r="9"/>
+              <circle class="f-vs" cx="180" cy="102" r="9"/><circle class="ln thin s-v" cx="180" cy="102" r="9"/>
+              <circle class="f-vs" cx="180" cy="126" r="9"/><circle class="ln thin s-v" cx="180" cy="126" r="9"/>
+              <circle class="f-vs" cx="180" cy="150" r="9"/><circle class="ln thin s-v" cx="180" cy="150" r="9"/>
+              <circle class="f-vs" cx="180" cy="174" r="9"/><circle class="ln thin s-v" cx="180" cy="174" r="9"/>
+              <circle class="f-vs" cx="180" cy="198" r="9"/><circle class="ln thin s-v" cx="180" cy="198" r="9"/>
+              <circle class="f-as" cx="320" cy="95" r="11"/><circle class="ln thin s-a" cx="320" cy="95" r="11"/>
+              <circle class="f-as" cx="320" cy="145" r="11"/><circle class="ln thin s-a" cx="320" cy="145" r="11"/>
+              <text x="110.0" y="20" text-anchor="middle" class="b">W1 (2, 8)</text>
+              <text x="110.0" y="34" text-anchor="middle" class="sm">b1 (8,)</text>
+              <text x="260.0" y="20" text-anchor="middle" class="b">W2 (8, 2)</text>
+              <text x="260.0" y="34" text-anchor="middle" class="sm">b2 (2,)</text>
+              <text x="40" y="222" text-anchor="middle" class="b">X</text>
+              <text x="40" y="238" text-anchor="middle" class="tv b">(4, 2)</text>
+              <text x="40" y="254" text-anchor="middle" class="sm">inputs</text>
+              <text x="180" y="222" text-anchor="middle" class="b">z1, a1</text>
+              <text x="180" y="238" text-anchor="middle" class="tv b">(4, 8)</text>
+              <text x="180" y="254" text-anchor="middle" class="sm">ReLU</text>
+              <text x="320" y="222" text-anchor="middle" class="b">z2, probs</text>
+              <text x="320" y="238" text-anchor="middle" class="tv b">(4, 2)</text>
+              <text x="320" y="254" text-anchor="middle" class="sm">softmax</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 11.2</b> Our 2 → 8 → 2 network. Every line is one weight: $2 \times 8 = 16$
+            in <code>W1</code> and $8 \times 2 = 16$ in <code>W2</code>. Below each layer is the shape of its
+            array for the batch of 4 examples. The first number is always the batch size.</figcaption>
+          </figure>
+
+          <p><strong>Softmax</strong> turns a row of raw scores into a row of probabilities. It makes every
+          number positive with the exponential function. Then it divides by the total, so the row sums to
+          1.</p>
           $$ \operatorname{softmax}(\mathbf{z})_j = \frac{e^{z_j}}{\sum_{k} e^{z_k}} $$
-          <p class="gloss"><b>In words:</b> for each score, raise <b>e</b> to that score (this makes it
-          positive and blows up big scores more than small ones), then divide by the sum of all of them
-          so the results are fractions that add to 100%. The biggest score gets the biggest probability.</p>
+          <p class="gloss"><b>In words:</b> for each score $z_j$, compute $e^{z_j}$. This makes it positive
+          and increases large scores much more than small ones. Then divide by the sum of all of them, so the
+          results are fractions that add up to 1. The largest score gets the largest probability.</p>
 
-          <div class="callout parallel">
-            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>Softmax is how you'd convert a panel of judges' raw enthusiasm into betting odds. Judge
-            scores of 8, 6, and 2 aren't probabilities — they don't add to 100%. Softmax exponentiates
-            and normalizes them into something like 82% / 15% / 3%: a clean set of odds where the loudest
-            score gets the lion's share but nobody is left at exactly zero.</p>
-          </div>
+          <p>An example: scores of 8, 6 and 2 become about 88%, 12% and 0.2%. The gap between 8 and 6 is
+          only 2, but $e^2 \approx 7.4$, so the first probability is about 7.4 times the second. Softmax
+          exaggerates differences between scores. No probability is ever exactly zero.</p>
 
           <p class="beat beat--code">The same thing in NumPy</p>
+          <p class="codecap">ReLU, a numerically safe softmax, and the forward pass</p>
           <pre><code class="language-python">def relu(z):
     return np.maximum(0.0, z)
 
@@ -284,206 +583,351 @@ def forward(X, W1, b1, W2, b2):
     a1 = relu(z1)             # (N,8)
     z2 = a1 @ W2 + b2         # (N,8)@(8,2) -> (N,2)
     probs = softmax(z2)       # (N,2), each row sums to 1
-    return z1, a1, z2, probs  # keep z1 & a1 — the backward pass needs them</code></pre>
-          <p>Notice the shapes threaded through the comments. <code>X @ W1</code> is
-          <code>(N,2)·(2,8) → (N,8)</code>; then <code>a1 @ W2</code> is <code>(N,8)·(8,2) → (N,2)</code>.
-          The inner numbers match at every step (the shape rule from
-          <a href="01-linear-algebra.html">Section 1</a>), and the final output is one probability pair
-          per example. We return <code>z1</code> and <code>a1</code> as well because — as you'll see next
-          — the backward pass reuses these exact values instead of recomputing them.</p>
+    return z1, a1, z2, probs  # keep z1 and a1: the backward pass needs them</code></pre>
+          <p>Follow the shapes in the comments. <code>X @ W1</code> is (N, 2) times (2, 8), which gives
+          (N, 8). Then <code>a1 @ W2</code> is (N, 8) times (8, 2), which gives (N, 2). The inner numbers
+          match at every step (the shape rule from <a href="01-linear-algebra.html">Section 1</a>). The
+          output is one pair of probabilities per example. We also return <code>z1</code> and
+          <code>a1</code>, because the backward pass reuses these values instead of computing them
+          again.</p>
+
+          <div class="check-wrap">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">Why does subtracting each row's maximum before <code>np.exp</code> not change the softmax result?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Subtracting a constant $c$ from every score multiplies every $e^{z_j}$ by the same factor
+                $e^{-c}$: $e^{z_j - c} = e^{z_j} e^{-c}$. The factor appears in the numerator and in the sum
+                in the denominator, so it cancels. The result is the same, but the largest exponent is now
+                $e^0 = 1$, so nothing overflows. Without the shift, a logit of 1000 would give
+                <code>inf</code>.</p>
+              </div>
+            </details>
+          </div>
 
           <h3>(d) The loss: cross-entropy</h3>
-          <p>The loss is the "measure" step: one number saying how wrong the predictions are.
+          <p>The loss is the “measure” step: one number that says how wrong the predictions are.
           <strong>Cross-entropy</strong> (from <a href="04-information-theory.html">Section 4</a>) looks
-          only at the probability the network assigned to the <em>correct</em> class and penalizes it for
-          being anything less than 1.</p>
+          only at the probability the network gave to the <em>correct</em> class. It penalizes that
+          probability for being less than 1.</p>
 
           <p class="beat beat--math">Now the math</p>
           $$ L = -\frac{1}{N}\sum_{i=1}^{N} \log\big(p_{i,\,y_i}\big) $$
-          <p class="gloss"><b>In words:</b> for each example <b>i</b>, look up the probability the model
-          gave to the <em>true</em> class <b>yᵢ</b>, take its log, negate it, and average over all
-          examples. If the model is confident and right (<b>p ≈ 1</b>), <b>log(1) = 0</b> — no penalty.
-          If it is confident and wrong (<b>p ≈ 0</b>), <b>−log(0)</b> shoots toward infinity — a huge
-          penalty. Cross-entropy rewards being both correct <em>and</em> sure.</p>
+          <p class="gloss"><b>In words:</b> for each example $i$, find the probability that the model gave
+          to the <em>true</em> class $y_i$. Take its log, change the sign, and average over all examples.
+          If the model is confident and right ($p \approx 1$), then $\log 1 = 0$: no penalty. If it is
+          confident and wrong ($p \approx 0$), then $-\log p$ becomes very large: a large penalty.
+          Cross-entropy rewards being correct <em>and</em> sure.</p>
 
           <p class="beat beat--code">The same thing in NumPy</p>
+          <p class="codecap">average cross-entropy over the batch</p>
           <pre><code class="language-python">def cross_entropy(probs, y):
     # pick out prob of the correct class for each row, then -log, then average
     correct = probs[np.arange(len(y)), y]   # shape (N,)
     return -np.mean(np.log(correct + 1e-12))  # +1e-12 guards log(0)</code></pre>
-          <p>The tiny <code>1e-12</code> is a floor that stops <code>log(0)</code> from becoming
-          <code>-inf</code> if a probability ever rounds to exactly zero. It changes the number
-          negligibly but keeps the run from blowing up.</p>
+          <p>The tiny <code>1e-12</code> is a lower limit. It stops <code>log(0)</code> from becoming
+          <code>-inf</code> if a probability is rounded to exactly zero. It changes the loss by a negligible
+          amount, but it keeps the run from failing.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>Cross-entropy grades like a strict exam that scores your <em>confidence</em>, not just your
-            answer. Tick the right box and say "I'm certain" → full marks. Tick the right box but hedge
-            "maybe" → partial marks. Confidently tick the <em>wrong</em> box → a savage penalty. It
-            teaches the network not only to be right, but to know when it's right.</p>
+            <p>Cross-entropy is like an exam that also scores your <em>confidence</em>. Mark the right answer
+            and say “I am certain”: full marks. Mark the right answer but say “maybe”: partial marks. Mark
+            the <em>wrong</em> answer and say “I am certain”: a very large penalty. So the network learns to
+            be right, and also to be sure only when it is right.</p>
           </div>
 
           <h3>(e) The backward pass</h3>
-          <p>Now the heart of it: the <strong>backward pass</strong> computes the gradient of the loss
-          with respect to every weight — the "which way should each number move?" step. Every line below
-          is one application of the chain rule from <a href="10-backprop.html">Section 10</a>; we walk
-          backward through the same operations the forward pass ran.</p>
+          <p>Now the central part. The <strong>backward pass</strong> is the “find the direction” step: it
+          computes the gradient of the loss with respect to every weight. Every line is one use of the
+          local-gradient rule from <a href="10-backprop.html">Section 10</a>. We go backward through the
+          same operations that the forward pass ran.</p>
 
           <p class="beat beat--math">Now the math</p>
-          <p>The chain starts with a small miracle. When softmax feeds straight into cross-entropy, their
-          two derivatives combine and almost everything cancels, leaving one clean line:</p>
-          $$ \frac{\partial L}{\partial \mathbf{z}_2}
-             = \frac{1}{N}\big(\mathbf{p} - \mathbf{Y}\big) $$
-          <p class="gloss"><b>In words:</b> the gradient at the logits is simply <em>predicted
-          probabilities minus the one-hot truth</em>, averaged over the batch. If the network said 0.7
-          for a class that should have been 1, that slot's gradient is <b>0.7 − 1 = −0.3</b>: "push this
-          logit up." Where it's right, prediction minus truth is near zero: "leave it alone." This is the
-          single most reused fact in all of deep-learning code.</p>
+          <p><strong>Notation.</strong> For any array $\mathbf{M}$ in the network, the code name
+          <code>dM</code> means the gradient $\partial L/\partial \mathbf{M}$, with the same shape as
+          $\mathbf{M}$. So <code>dz2</code> is $\partial L/\partial \mathbf{Z}_2$ and <code>dW1</code> is
+          $\partial L/\partial \mathbf{W}_1$. As in Section 10, the gradient at a pre-activation is also
+          called $\delta$.</p>
 
-          <p>From <code>dz2</code> we push the gradient back through each earlier operation. Each step
-          pairs with a forward step and uses the rules from Section 10 — a matrix multiply's gradient
-          re-uses the <em>other</em> factor, transposed; a bias's gradient is the sum over the batch; and
-          ReLU passes the gradient through only where its input was positive:</p>
+          <p><strong>Step 1: the gradient at the logits.</strong> Softmax followed by cross-entropy has a
+          very simple gradient. Let's derive it for one example. Call its logits $\mathbf{z}$, its
+          probabilities $\mathbf{p} = \operatorname{softmax}(\mathbf{z})$, its one-hot label $\mathbf{y}$,
+          and its correct class $c$. Its loss is $-\log p_c$. Write out $\log p_c$ with the softmax
+          formula:</p>
           $$ \begin{aligned}
-             \frac{\partial L}{\partial \mathbf{W}_2} &= \mathbf{a}_1^{\!\top}\, \mathbf{dz}_2
-               & \frac{\partial L}{\partial \mathbf{b}_2} &= \textstyle\sum_i (\mathbf{dz}_2)_i \\[4pt]
-             \frac{\partial L}{\partial \mathbf{a}_1} &= \mathbf{dz}_2\, \mathbf{W}_2^{\!\top}
-               & \mathbf{dz}_1 &= \mathbf{da}_1 \odot \mathbf{1}[\mathbf{z}_1 \gt 0] \\[4pt]
-             \frac{\partial L}{\partial \mathbf{W}_1} &= \mathbf{X}^{\!\top}\, \mathbf{dz}_1
-               & \frac{\partial L}{\partial \mathbf{b}_1} &= \textstyle\sum_i (\mathbf{dz}_1)_i
+             \ell &= -\log p_c = -\log \frac{e^{z_c}}{\sum_k e^{z_k}}
+                  = -z_c + \log \sum_k e^{z_k} \\[4pt]
+             \frac{\partial \ell}{\partial z_j} &= -\,y_j + \frac{e^{z_j}}{\sum_k e^{z_k}}
+                  = p_j - y_j
              \end{aligned} $$
-          <p class="gloss"><b>In words, line by line:</b> the gradient for <b>W₂</b> is the layer's input
-          <b>a₁</b> (transposed) times the incoming gradient — the multiply rule from Section 10. The
-          gradient for the bias <b>b₂</b> is just the incoming gradient summed down the batch. To pass
-          gradient back into the hidden layer we multiply by <b>W₂</b> transposed, giving <b>da₁</b>.
-          ReLU only let positive values through on the way forward, so on the way back it only lets
-          gradient through where <b>z₁ &gt; 0</b> — that's the <b>⊙ 1[z₁ &gt; 0]</b> mask (⊙ means
-          multiply element by element). Then <b>W₁</b> and <b>b₁</b> follow the very same two rules as the
-          second layer.</p>
+          <p class="gloss"><b>In words:</b> the first term, $-z_c$, depends on $z_j$ only when $j = c$. Its
+          derivative is $-1$ for the correct class and $0$ for the others, which is $-y_j$. The second term
+          is the log of a sum. By the chain rule its derivative is $e^{z_j}$ divided by the sum, which is
+          $p_j$. So the gradient is <em>predicted probability minus one-hot truth</em>. We call the loss of
+          one example $\ell$ here; $L$ is the average of $\ell$ over the batch.</p>
+
+          <p>The full loss $L$ averages over $N$ examples, so each row gets a factor $1/N$. In matrix
+          form:</p>
+          $$ \frac{\partial L}{\partial \mathbf{Z}_2} = \frac{1}{N}\big(\mathbf{P} - \mathbf{Y}\big) $$
+          <p class="gloss"><b>In words:</b> if the network said 0.7 for a class whose true value is 1, that
+          entry is $0.7 - 1 = -0.3$ (before the $1/N$). The negative sign means “increase this logit.”
+          Where the prediction is right, prediction minus truth is near zero, and the logit changes very
+          little. You will see this gradient in almost every classifier.</p>
+
+          <p><strong>Step 2: back through the layers.</strong> From <code>dz2</code> we pass the gradient
+          back through each earlier operation. Each step pairs with one forward step and uses the rules from
+          Section 10. First, a weight gradient. With the (in, out) layout, $\mathbf{Z}_2 = \mathbf{A}_1
+          \mathbf{W}_2 + \mathbf{b}_2$ means $Z_{ik} = \sum_j A_{ij} W_{jk} + b_k$ for example $i$. The
+          weight $W_{jk}$ is used by <em>every</em> example, so its gradient is a sum over examples:</p>
+          $$ \frac{\partial L}{\partial W_{jk}} = \sum_{i} A_{ij}\,\frac{\partial L}{\partial Z_{ik}}
+             \quad\Longrightarrow\quad
+             \frac{\partial L}{\partial \mathbf{W}_2} = \mathbf{A}_1^{\top}\,\frac{\partial L}{\partial \mathbf{Z}_2} $$
+          <p class="gloss"><b>In words:</b> for one example, this is Section 10's rule “$\delta$ times the
+          input.” The matrix product $\mathbf{A}_1^\top(\cdot)$ does the sum over the examples $i$. The bias
+          $b_k$ is also added to every example's row, so its gradient is the column sum of
+          $\partial L/\partial \mathbf{Z}_2$.</p>
+
+          <p>The same reasoning gives all six gradients. Here $\mathbb{1}[\mathbf{Z}_1 \gt 0]$ is a mask: 1
+          where the entry of $\mathbf{Z}_1$ is positive, 0 elsewhere. And $\odot$ means “multiply matching
+          entries.”</p>
+          $$ \begin{aligned}
+             \frac{\partial L}{\partial \mathbf{W}_2} &= \mathbf{A}_1^{\top}\, \frac{\partial L}{\partial \mathbf{Z}_2}
+               & \frac{\partial L}{\partial \mathbf{b}_2} &= \textstyle\sum_i \big(\tfrac{\partial L}{\partial \mathbf{Z}_2}\big)_{i} \\[6pt]
+             \frac{\partial L}{\partial \mathbf{A}_1} &= \frac{\partial L}{\partial \mathbf{Z}_2}\, \mathbf{W}_2^{\top}
+               & \frac{\partial L}{\partial \mathbf{Z}_1} &= \frac{\partial L}{\partial \mathbf{A}_1} \odot \mathbb{1}[\mathbf{Z}_1 \gt 0] \\[6pt]
+             \frac{\partial L}{\partial \mathbf{W}_1} &= \mathbf{X}^{\top}\, \frac{\partial L}{\partial \mathbf{Z}_1}
+               & \frac{\partial L}{\partial \mathbf{b}_1} &= \textstyle\sum_i \big(\tfrac{\partial L}{\partial \mathbf{Z}_1}\big)_{i}
+             \end{aligned} $$
+          <p class="gloss"><b>In words, line by line:</b> the gradient for $\mathbf{W}_2$ is the layer's
+          input $\mathbf{A}_1$ (transposed) times the incoming gradient. The gradient for $\mathbf{b}_2$ is
+          the incoming gradient summed over the batch (the rows $i$). To pass the gradient back into the
+          hidden layer, multiply by $\mathbf{W}_2$ transposed; this gives <code>da1</code>. On the way
+          forward, ReLU passed only positive values. So on the way back it passes gradient only where
+          $\mathbf{Z}_1 \gt 0$; the mask does this. Its local gradient is 1 there and 0 elsewhere. Then
+          $\mathbf{W}_1$ and $\mathbf{b}_1$ follow the same two rules as the second layer.</p>
 
           <p class="beat beat--code">The same thing in NumPy</p>
+          <p class="codecap">the backward pass, one line per operation</p>
           <pre><code class="language-python">def backward(X, y, z1, a1, probs, W2):
     N = len(y)
     Y = np.zeros_like(probs)
     Y[np.arange(N), y] = 1.0
 
-    dz2 = (probs - Y) / N          # (N,2)  softmax+CE shortcut
-    dW2 = a1.T @ dz2               # (8,N)@(N,2) -> (8,2)  matches W2
-    db2 = dz2.sum(axis=0)          # (2,)               matches b2
+    dz2 = (probs - Y) / N          # (N,2)  softmax + cross-entropy: (P - Y)/N
+    dW2 = a1.T @ dz2               # (8,N)@(N,2) -> (8,2)  same shape as W2
+    db2 = dz2.sum(axis=0)          # (2,)                  same shape as b2
 
     da1 = dz2 @ W2.T               # (N,2)@(2,8) -> (N,8)
-    dz1 = da1 * (z1 > 0)           # (N,8)  ReLU gate: 0 where z1 <= 0
-    dW1 = X.T @ dz1                # (2,N)@(N,8) -> (2,8)  matches W1
-    db1 = dz1.sum(axis=0)          # (8,)               matches b1
+    dz1 = da1 * (z1 > 0)           # (N,8)  ReLU mask: 0 where z1 <= 0
+    dW1 = X.T @ dz1                # (2,N)@(N,8) -> (2,8)  same shape as W1
+    db1 = dz1.sum(axis=0)          # (8,)                  same shape as b1
 
     return dW1, db1, dW2, db2</code></pre>
-          <p>Read the shape comments as a checklist: every gradient comes out the same shape as the thing
-          it updates (<code>dW2</code> is <code>(8,2)</code> just like <code>W2</code>, and so on). When
-          your own backward pass has a bug, this is the first thing to check — a gradient whose shape
-          doesn't match its weight means a transpose is in the wrong place.</p>
+          <p>Use the shape comments as a checklist. Every gradient has the same shape as the array it
+          updates: <code>dW2</code> is (8, 2), like <code>W2</code>, and so on. When your own backward pass
+          has a bug, check this first. A gradient whose shape does not match its weight means a transpose is
+          in the wrong place.</p>
 
           <div class="callout pitfall">
             <div class="callout__label"><span class="ic">▲</span> Watch out</div>
-            <p>The ReLU gate uses <code>z1</code> — the value <em>before</em> the bend — not <code>a1</code>.
-            It happens that <code>(z1 &gt; 0)</code> and <code>(a1 &gt; 0)</code> give the same mask for
-            plain ReLU, so either works here, but the rule you must remember is "gradient flows only where
-            the neuron was active." Also don't forget the <code>/ N</code> in <code>dz2</code>: it must
-            match the <code>1/N</code> average in the loss, or your gradients are <code>N</code> times too
-            large and the steps overshoot.</p>
-          </div>
-
-          <h3>(f) The update: stochastic gradient descent</h3>
-          <p>The "adjust" step. We now know, for every weight, the direction that <em>increases</em> the
-          loss (that's what the gradient points toward). So we step the opposite way — subtract a small
-          fraction of the gradient. That fraction is the <strong>learning rate</strong>.</p>
-
-          <p class="beat beat--math">Now the math</p>
-          $$ \mathbf{W} \leftarrow \mathbf{W} - \alpha\,\frac{\partial L}{\partial \mathbf{W}} $$
-          <p class="gloss"><b>In words:</b> replace each weight with itself minus (learning rate <b>α</b>,
-          "alpha") times its gradient. The gradient says "uphill is this way"; the minus sign turns us
-          downhill, toward smaller loss; <b>α</b> controls how big a step we take. Too small and learning
-          crawls; too big and we leap past the bottom and bounce around. This one update, repeated, is
-          <dfn>gradient descent</dfn>.</p>
-
-          <p class="beat beat--code">The same thing in NumPy</p>
-          <pre><code class="language-python">def sgd_step(params, grads, lr):
-    for p, g in zip(params, grads):
-        p -= lr * g           # in-place: nudge each weight downhill</code></pre>
-          <p>Because our whole dataset is only four points, each epoch uses all of them at once. When you
-          instead use a small <em>random</em> handful per step — which real datasets force you to do —
-          the "random" makes it <strong>stochastic</strong> gradient descent (SGD). Same update rule,
-          just fed a noisy sample of the data each time.</p>
-
-          <h3>(g) The epoch loop</h3>
-          <p>Now we thread the four steps together and run them a few thousand times. This is the loop
-          we sketched earlier, finally in code:</p>
-
-          <p class="codecap">predict → measure → adjust → repeat</p>
-          <pre><code class="language-python">lr = 0.5
-for epoch in range(2001):
-    # 1. PREDICT
-    z1, a1, z2, probs = forward(X, W1, b1, W2, b2)
-
-    # 2. MEASURE
-    loss = cross_entropy(probs, y)
-
-    # 3. ADJUST — gradients, then step downhill
-    dW1, db1, dW2, db2 = backward(X, y, z1, a1, probs, W2)
-    sgd_step([W1, b1, W2, b2], [dW1, db1, dW2, db2], lr)
-
-    # 4. watch it learn
-    if epoch % 400 == 0:
-        print(f"epoch {epoch:4d}  loss {loss:.4f}")</code></pre>
-
-          <p>Running it prints the loss falling toward zero — the network getting less wrong every few
-          hundred epochs:</p>
-          <pre><code class="language-python">epoch    0  loss 0.8471
-epoch  400  loss 0.0059
-epoch  800  loss 0.0022
-epoch 1200  loss 0.0012
-epoch 1600  loss 0.0008
-epoch 2000  loss 0.0006</code></pre>
-
-          <p>And the payoff — checking the final predictions against the truth:</p>
-          <pre><code class="language-python">pred = forward(X, W1, b1, W2, b2)[-1].argmax(axis=1)
-print(pred)                    # [0 1 1 0]
-print("accuracy:", (pred == y).mean())   # accuracy: 1.0</code></pre>
-
-          <div class="callout keyidea">
-            <div class="callout__label"><span class="ic">◆</span> The payoff</div>
-            <p><code>[0 1 1 0]</code> — all four XOR points correct, 100% accuracy. A single linear layer
-            <em>cannot</em> do this, no matter how long you train it, because no straight line separates
-            the classes. The hidden layer with its ReLU bend can, and it learned to do so entirely on its
-            own, just by rolling the four-step loop a couple thousand times. That is the whole idea of
-            deep learning, demonstrated in code you can read top to bottom.</p>
+            <p>The ReLU mask uses <code>z1</code>, the value <em>before</em> the bend. For plain ReLU,
+            <code>(z1 &gt; 0)</code> and <code>(a1 &gt; 0)</code> give the same mask, so either works here.
+            The rule to remember is “gradient flows only where the neuron was active.” Also keep the
+            <code>/ N</code> in <code>dz2</code>. It must match the $1/N$ average in the loss. Without it,
+            your gradients are $N$ times too large and the steps are too big.</p>
           </div>
 
           <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">If you delete the ReLU line — so <code>a1 = z1</code> with no bend between the two layers — will the network still solve XOR? Why or why not?</span>
+                <span class="check__q">One row of <code>probs</code> is [0.9, 0.1], its label is 0, and the batch has $N = 4$ examples. What is that row of <code>dz2</code>? Which logit will the update push up?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>No. Without the bend, layer 2 applied to layer 1 is just
-                <code>(X·W1 + b1)·W2 + b2</code>, which multiplies out to <code>X·(W1·W2) + const</code> —
-                a single matrix <code>W1·W2</code> times <code>X</code>, plus a shift. Two stacked linear
-                layers collapse into <strong>one</strong> linear layer, and we already know one linear
-                layer can't separate XOR. The nonlinearity is not decoration; it is the <em>only</em>
-                reason depth buys you anything. Remove it and you're back to drawing a single straight
-                line.</p>
+                <p>The one-hot row is [1, 0]. So the row is $([0.9, 0.1] - [1, 0]) / 4 = [-0.025,\ 0.025]$.
+                Gradient descent moves against the gradient, so it pushes logit 0 (the correct class) up and
+                logit 1 down. The numbers are small because the prediction is already mostly right.</p>
+              </div>
+            </details>
+          </div>
+
+          <div class="check-wrap">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">Why does <code>db2</code> sum over <code>axis=0</code>, and what would go wrong with <code>axis=1</code>?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Axis 0 runs over the examples (rows). The same bias <code>b2</code> is added to every
+                example's row, so it affects the loss through all $N$ rows. By the sum rule, its gradient adds
+                up the contributions of all rows. The result has shape (2,), like <code>b2</code>. With
+                <code>axis=1</code> you would sum over the two classes instead and get shape (4,): one number
+                per example. That does not match <code>b2</code>, and it mixes the gradients of different
+                classes.</p>
+              </div>
+            </details>
+          </div>
+
+          <h3>(f) The update: gradient descent</h3>
+          <p>This is the “step” part of the loop. For every weight we now know the direction that
+          <em>increases</em> the loss (the gradient points that way). So we step the opposite way: we
+          subtract a small fraction of the gradient. That fraction is the <strong>learning rate</strong>.</p>
+
+          <p class="beat beat--math">Now the math</p>
+          $$ \mathbf{W} \leftarrow \mathbf{W} - \alpha\,\frac{\partial L}{\partial \mathbf{W}} $$
+          <p class="gloss"><b>In words:</b> replace each weight with itself minus the learning rate $\alpha$
+          (alpha) times its gradient. The gradient points uphill. The minus sign turns us downhill, toward a
+          smaller loss. $\alpha$ sets the step size. If it is too small, learning is very slow. If it is too
+          large, we jump past the minimum and bounce around. This update, repeated, is <dfn>gradient
+          descent</dfn>.</p>
+
+          <p class="beat beat--code">The same thing in NumPy</p>
+          <p class="codecap">one gradient-descent step, in place</p>
+          <pre><code class="language-python">def gd_step(params, grads, lr):
+    for p, g in zip(params, grads):
+        p -= lr * g           # in place: move each weight downhill</code></pre>
+          <p>Our dataset has only four points, so every step uses all of them. This is called
+          <strong>full-batch</strong> gradient descent. Real datasets are too large for that. There, each
+          step uses a small random group of examples (a <em>mini-batch</em>). The randomness gives the name
+          <strong>stochastic</strong> gradient descent (SGD). The update rule is the same; only the data in
+          each step changes.</p>
+
+          <h3>(g) The epoch loop</h3>
+          <p>Now we connect the four steps and run them a few thousand times. This is the loop from
+          Section 2, in code:</p>
+
+          <p class="codecap">predict → measure → find the direction → step, repeated</p>
+          <pre><code class="language-python">lr = 0.5
+for epoch in range(2001):
+    # 1. PREDICT (forward pass)
+    z1, a1, z2, probs = forward(X, W1, b1, W2, b2)
+
+    # 2. MEASURE (loss)
+    loss = cross_entropy(probs, y)
+
+    # 3. FIND THE DIRECTION (backward pass)
+    dW1, db1, dW2, db2 = backward(X, y, z1, a1, probs, W2)
+
+    # 4. STEP (update)
+    gd_step([W1, b1, W2, b2], [dW1, db1, dW2, db2], lr)
+
+    if epoch % 400 == 0:
+        print(f"epoch {epoch:4d}  loss {loss:.4f}")</code></pre>
+
+          <p>With seed 42, the loss falls toward zero:</p>
+          <p class="codecap">output</p>
+          <pre><code class="language-plaintext">epoch    0  loss 0.8471
+epoch  400  loss 0.0059
+epoch  800  loss 0.0022
+epoch 1200  loss 0.0012
+epoch 1600  loss 0.0008
+epoch 2000  loss 0.0006</code></pre>
+
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 360 210" style="max-width:520px;margin:0 auto" role="img" aria-labelledby="fig-11-3-t">
+              <title id="fig-11-3-t">Training loss on a log scale over 2000 epochs: it falls from about 0.85 to about 0.0006.</title>
+              <line class="grid" x1="46" y1="170.0" x2="345" y2="170.0"/>
+              <text x="41" y="174.0" text-anchor="end" class="sm">0.0001</text>
+              <line class="grid" x1="46" y1="131.2" x2="345" y2="131.2"/>
+              <text x="41" y="135.2" text-anchor="end" class="sm">0.001</text>
+              <line class="grid" x1="46" y1="92.5" x2="345" y2="92.5"/>
+              <text x="41" y="96.5" text-anchor="end" class="sm">0.01</text>
+              <line class="grid" x1="46" y1="53.8" x2="345" y2="53.8"/>
+              <text x="41" y="57.8" text-anchor="end" class="sm">0.1</text>
+              <line class="grid" x1="46" y1="15.0" x2="345" y2="15.0"/>
+              <text x="41" y="19.0" text-anchor="end" class="sm">1</text>
+              <text x="46.0" y="186" text-anchor="middle" class="sm">0</text>
+              <text x="105.8" y="186" text-anchor="middle" class="sm">400</text>
+              <text x="165.6" y="186" text-anchor="middle" class="sm">800</text>
+              <text x="225.4" y="186" text-anchor="middle" class="sm">1200</text>
+              <text x="285.2" y="186" text-anchor="middle" class="sm">1600</text>
+              <text x="345.0" y="186" text-anchor="middle" class="sm">2000</text>
+              <line class="ax" x1="46" y1="170" x2="345" y2="170"/><line class="ax" x1="46" y1="15" x2="46" y2="170"/>
+              <polyline class="ln s-v" points="46.0,17.8 46.1,21.4 46.3,22.0 46.4,22.5 46.6,22.9 46.7,23.2 46.9,23.6 47.0,24.0 47.2,24.4 47.3,24.8 47.5,25.0 47.6,25.3 47.8,25.6 47.9,26.0 48.1,26.1 48.2,26.5 48.4,27.0 48.5,27.3 48.7,27.6 48.8,28.0 49.0,28.4 49.1,28.4 49.3,28.8 49.4,29.2 49.6,29.5 49.7,29.9 49.9,29.9 50.0,30.1 50.2,30.6 50.3,30.9 50.5,31.2 50.6,31.7 50.8,31.8 50.9,32.2 51.1,32.7 51.2,33.1 51.4,33.3 51.5,33.9 51.7,34.4 51.8,34.5 52.0,35.1 52.1,35.8 52.3,36.1 52.4,36.4 52.6,37.2 52.7,37.7 52.9,38.2 53.0,38.7 53.2,39.4 53.3,39.8 53.5,40.3 53.6,41.1 53.8,41.5 53.9,41.9 54.1,42.8 54.2,43.1 54.4,43.6 54.5,44.4 54.7,44.7 54.8,45.2 55.0,46.0 55.7,48.3 56.5,50.9 57.2,53.2 58.0,54.9 58.7,57.2 59.5,59.1 60.2,60.9 61.0,62.6 61.7,64.1 62.4,65.6 63.2,67.0 63.9,68.2 64.7,69.4 65.4,70.8 66.2,71.9 66.9,73.0 67.7,73.8 68.4,75.0 69.2,75.9 69.9,76.9 70.7,77.8 71.4,78.5 72.2,79.4 72.9,80.1 73.7,81.0 74.4,81.7 75.2,82.4 75.9,83.1 76.6,83.8 77.4,84.5 78.1,85.1 78.9,85.8 79.6,86.3 80.4,87.0 81.1,87.5 81.9,88.1 82.6,88.6 83.4,89.2 84.1,89.7 84.9,90.2 85.6,90.6 86.4,91.3 87.1,91.8 87.9,92.2 88.6,92.7 89.4,93.1 90.1,93.6 90.8,94.0 91.6,94.5 92.3,94.9 93.1,95.3 93.8,95.6 94.6,96.1 95.3,96.5 96.1,96.9 96.8,97.2 97.6,97.6 98.3,98.0 99.1,98.4 99.8,98.7 100.6,99.1 101.3,99.4 102.1,99.8 102.8,100.1 103.6,100.5 104.3,100.8 105.1,101.1 105.8,101.4 106.5,101.7 107.3,102.0 108.0,102.3 108.8,102.6 109.5,103.0 110.3,103.2 111.0,103.6 111.8,103.8 112.5,104.1 113.3,104.3 114.0,104.6 114.8,104.9 115.5,105.2 116.3,105.4 117.0,105.7 117.8,106.0 118.5,106.3 119.3,106.5 120.0,106.8 120.8,107.0 121.5,107.2 122.2,107.5 123.0,107.7 123.7,108.0 124.5,108.2 125.2,108.4 126.0,108.7 126.7,108.9 127.5,109.1 128.2,109.3 129.0,109.5 129.7,109.8 130.5,110.0 131.2,110.2 132.0,110.4 132.7,110.7 133.5,110.9 134.2,111.0 135.0,111.3 135.7,111.5 136.4,111.7 137.2,111.9 137.9,112.1 138.7,112.3 139.4,112.5 140.2,112.7 140.9,112.8 141.7,113.0 142.4,113.2 143.2,113.4 143.9,113.6 144.7,113.8 145.4,113.9 146.2,114.1 146.9,114.3 147.7,114.5 148.4,114.7 149.2,114.8 149.9,115.0 150.6,115.2 151.4,115.4 152.1,115.5 152.9,115.7 153.6,115.9 154.4,116.0 155.1,116.2 155.9,116.3 156.6,116.5 157.4,116.7 158.1,116.8 158.9,117.0 159.6,117.1 160.4,117.3 161.1,117.4 161.9,117.6 162.6,117.8 163.4,117.9 164.1,118.1 164.9,118.2 165.6,118.4 166.3,118.5 167.1,118.7 167.8,118.8 168.6,118.9 169.3,119.1 170.1,119.2 170.8,119.4 171.6,119.5 172.3,119.7 173.1,119.8 173.8,119.9 174.6,120.1 175.3,120.2 176.1,120.3 176.8,120.5 177.6,120.6 178.3,120.7 179.1,120.8 179.8,121.0 180.6,121.1 181.3,121.2 182.0,121.4 182.8,121.5 183.5,121.6 184.3,121.8 185.0,121.9 185.8,122.0 186.5,122.1 187.3,122.3 188.0,122.4 188.8,122.5 189.5,122.6 190.3,122.7 191.0,122.9 191.8,123.0 192.5,123.1 193.3,123.2 194.0,123.3 194.8,123.4 195.5,123.6 196.2,123.7 197.0,123.8 197.7,123.9 198.5,124.0 199.2,124.1 200.0,124.2 200.7,124.4 201.5,124.5 202.2,124.6 203.0,124.7 203.7,124.8 204.5,124.9 205.2,125.0 206.0,125.1 206.7,125.2 207.5,125.3 208.2,125.4 209.0,125.6 209.7,125.6 210.5,125.8 211.2,125.9 211.9,126.0 212.7,126.1 213.4,126.2 214.2,126.3 214.9,126.4 215.7,126.5 216.4,126.6 217.2,126.7 217.9,126.8 218.7,126.9 219.4,127.0 220.2,127.1 220.9,127.2 221.7,127.2 222.4,127.4 223.2,127.5 223.9,127.6 224.7,127.6 225.4,127.7 226.1,127.8 226.9,127.9 227.6,128.0 228.4,128.1 229.1,128.2 229.9,128.3 230.6,128.4 231.4,128.5 232.1,128.6 232.9,128.7 233.6,128.8 234.4,128.8 235.1,128.9 235.9,129.0 236.6,129.1 237.4,129.2 238.1,129.3 238.9,129.4 239.6,129.5 240.3,129.6 241.1,129.6 241.8,129.7 242.6,129.8 243.3,129.9 244.1,130.0 244.8,130.1 245.6,130.1 246.3,130.2 247.1,130.3 247.8,130.4 248.6,130.5 249.3,130.6 250.1,130.7 250.8,130.7 251.6,130.8 252.3,130.9 253.1,131.0 253.8,131.1 254.6,131.1 255.3,131.2 256.0,131.3 256.8,131.4 257.5,131.5 258.3,131.5 259.0,131.6 259.8,131.7 260.5,131.8 261.3,131.9 262.0,131.9 262.8,132.0 263.5,132.1 264.3,132.2 265.0,132.2 265.8,132.3 266.5,132.4 267.3,132.5 268.0,132.5 268.8,132.6 269.5,132.7 270.2,132.8 271.0,132.8 271.7,132.9 272.5,133.0 273.2,133.1 274.0,133.1 274.7,133.2 275.5,133.3 276.2,133.3 277.0,133.4 277.7,133.5 278.5,133.6 279.2,133.6 280.0,133.7 280.7,133.8 281.5,133.8 282.2,133.9 283.0,134.0 283.7,134.1 284.5,134.1 285.2,134.2 285.9,134.3 286.7,134.3 287.4,134.4 288.2,134.5 288.9,134.5 289.7,134.6 290.4,134.7 291.2,134.7 291.9,134.8 292.7,134.9 293.4,135.0 294.2,135.0 294.9,135.1 295.7,135.2 296.4,135.3 297.2,135.4 297.9,135.4 298.7,135.5 299.4,135.6 300.1,135.7 300.9,135.7 301.6,135.8 302.4,135.9 303.1,136.0 303.9,136.1 304.6,136.1 305.4,136.2 306.1,136.3 306.9,136.4 307.6,136.4 308.4,136.5 309.1,136.6 309.9,136.6 310.6,136.7 311.4,136.8 312.1,136.9 312.9,136.9 313.6,137.0 314.4,137.1 315.1,137.1 315.8,137.2 316.6,137.3 317.3,137.4 318.1,137.4 318.8,137.5 319.6,137.6 320.3,137.6 321.1,137.7 321.8,137.8 322.6,137.9 323.3,137.9 324.1,138.0 324.8,138.1 325.6,138.1 326.3,138.2 327.1,138.3 327.8,138.3 328.6,138.4 329.3,138.5 330.1,138.5 330.8,138.6 331.5,138.7 332.3,138.7 333.0,138.8 333.8,138.9 334.5,138.9 335.3,139.0 336.0,139.1 336.8,139.1 337.5,139.2 338.3,139.2 339.0,139.3 339.8,139.4 340.5,139.4 341.3,139.5 342.0,139.6 342.8,139.6 343.5,139.7 344.3,139.8 345.0,139.8"/>
+              <circle class="f-a" cx="46.0" cy="17.8" r="4"/>
+              <circle class="f-a" cx="105.8" cy="101.4" r="4"/>
+              <circle class="f-a" cx="165.6" cy="118.4" r="4"/>
+              <circle class="f-a" cx="225.4" cy="127.7" r="4"/>
+              <circle class="f-a" cx="285.2" cy="134.2" r="4"/>
+              <circle class="f-a" cx="345.0" cy="139.8" r="4"/>
+              <text x="195.5" y="206" text-anchor="middle" class="sm">epoch</text>
+              <text x="111.8" y="91.4" class="ta b">0.0059</text>
+              <text x="54.0" y="21.8" class="ta b">0.8471</text>
+              <text x="345.0" y="129.8" text-anchor="end" class="ta b">0.0006</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 11.3</b> The loss at every epoch of the run above, on a log scale. The
+            amber dots are the printed values. Most of the drop happens in the first 200 epochs. After that,
+            the loss keeps shrinking slowly as the network becomes more and more sure of answers that are
+            already correct.</figcaption>
+          </figure>
+
+          <p>Now the result: compare the final predictions with the truth.</p>
+          <p class="codecap">final predictions (continues the loop above)</p>
+          <pre><code class="language-python">pred = forward(X, W1, b1, W2, b2)[-1].argmax(axis=1)
+print(pred)                    # [0 1 1 0]
+print("accuracy:", (pred == y).mean())   # accuracy: 1.0</code></pre>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> The result</div>
+            <p>[0 1 1 0]: all four XOR points are correct, 100% accuracy. A single linear layer
+            <em>cannot</em> do this, however long you train it, because no straight line separates the
+            classes. The hidden layer with its ReLU bend can. It learned this by itself, only by running the
+            four-step loop about two thousand times. That is the central idea of deep learning, in code you
+            can read from top to bottom.</p>
+          </div>
+
+          <div class="check-wrap">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">Suppose all weights and biases start at exactly 0. What are <code>dW1</code> and <code>dW2</code> on the first step? What happens during training?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Both are exactly zero. With zero weights, <code>z1</code> and <code>a1</code> are all 0.
+                So <code>dW2 = a1.T @ dz2 = 0</code>. Also <code>da1 = dz2 @ W2.T = 0</code>, because
+                <code>W2</code> is zero, so <code>dW1 = 0</code> too. (The ReLU mask is also 0 everywhere,
+                since no <code>z1</code> is positive.) The logits are 0, so each row of <code>probs</code> is
+                [0.5, 0.5]. XOR has two examples of each class, so even <code>db2</code> sums to 0. Every
+                gradient is zero, and the network never changes. This is the symmetry problem at its most
+                extreme.</p>
+              </div>
+            </details>
+          </div>
+
+          <div class="check-wrap">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">If you delete the ReLU line, so that <code>a1 = z1</code> with no bend between the layers, can the network still solve XOR?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>No. Without the bend, the two layers compute
+                $(\mathbf{X}\mathbf{W}_1 + \mathbf{b}_1)\mathbf{W}_2 + \mathbf{b}_2$. This multiplies out to
+                $\mathbf{X}(\mathbf{W}_1\mathbf{W}_2)$ plus a constant: one matrix times $\mathbf{X}$, plus a
+                shift. This is the collapse from <a href="09-neurons.html">Section 9</a>. The two layers act
+                as one linear layer, and one linear layer cannot separate XOR. The network would stop at an
+                accuracy of at most 75%.</p>
               </div>
             </details>
           </div>
 
           <!-- ===================== FULL SCRIPT ===================== -->
           <h2 id="full-script"><span class="h-num">4</span>The complete script</h2>
-          <p>Here is everything above collected into one file. It has no dependencies beyond NumPy —
-          paste it into a <code>.py</code> file and run it, and you'll watch the loss fall and see the
-          network hit 100% on XOR. Every line is one you've already met.</p>
+          <p>Here is everything above in one file. It needs only NumPy. Copy it into a <code>.py</code>
+          file and run it: you will see the loss fall and the network reach 100% on XOR. You have already
+          seen every line.</p>
 
-          <p class="codecap">mlp_xor.py — a 2-layer network, from scratch</p>
+          <p class="codecap">mlp_xor.py: a 2-layer network, from scratch</p>
           <pre><code class="language-python">import numpy as np
 
 # ---- 1. data ------------------------------------------------------------
@@ -495,7 +939,7 @@ y = np.array([0, 1, 1, 0])          # XOR: 1 when the inputs differ
 N, D = X.shape                      # 4 examples, 2 features
 C = 2                               # two classes: "0" and "1"
 
-# ---- 2. weights (small random; biases zero) -----------------------------
+# ---- 2. weights (small random; biases zero); shapes are (in, out) -------
 rng = np.random.default_rng(42)
 H = 8                               # hidden neurons
 W1 = rng.normal(0, np.sqrt(2.0 / D), size=(D, H))   # (2, 8)
@@ -527,11 +971,11 @@ def backward(X, y, z1, a1, probs, W2):
     N = len(y)
     Y = np.zeros_like(probs)
     Y[np.arange(N), y] = 1.0
-    dz2 = (probs - Y) / N           # (N, 2)  softmax + cross-entropy shortcut
+    dz2 = (probs - Y) / N           # (N, 2)  softmax + cross-entropy
     dW2 = a1.T @ dz2                # (8, 2)
     db2 = dz2.sum(axis=0)           # (2,)
     da1 = dz2 @ W2.T                # (N, 8)
-    dz1 = da1 * (z1 > 0)            # (N, 8)  ReLU gate
+    dz1 = da1 * (z1 > 0)            # (N, 8)  ReLU mask
     dW1 = X.T @ dz1                 # (2, 8)
     db1 = dz1.sum(axis=0)           # (8,)
     return dW1, db1, dW2, db2
@@ -539,11 +983,11 @@ def backward(X, y, z1, a1, probs, W2):
 # ---- 4. train -----------------------------------------------------------
 lr = 0.5
 for epoch in range(2001):
-    z1, a1, z2, probs = forward(X, W1, b1, W2, b2)   # predict
-    loss = cross_entropy(probs, y)                   # measure
-    dW1, db1, dW2, db2 = backward(X, y, z1, a1, probs, W2)   # adjust
+    z1, a1, z2, probs = forward(X, W1, b1, W2, b2)           # 1. predict
+    loss = cross_entropy(probs, y)                           # 2. measure
+    dW1, db1, dW2, db2 = backward(X, y, z1, a1, probs, W2)   # 3. find the direction
     for p, g in zip([W1, b1, W2, b2], [dW1, db1, dW2, db2]):
-        p -= lr * g                                  # step downhill
+        p -= lr * g                                          # 4. step
     if epoch % 400 == 0:
         print(f"epoch {epoch:4d}  loss {loss:.4f}")
 
@@ -552,38 +996,72 @@ pred = forward(X, W1, b1, W2, b2)[-1].argmax(axis=1)
 print("predictions:", pred, " truth:", y)
 print("accuracy:   ", (pred == y).mean())</code></pre>
 
+          <p class="codecap">output</p>
+          <pre><code class="language-plaintext">epoch    0  loss 0.8471
+epoch  400  loss 0.0059
+epoch  800  loss 0.0022
+epoch 1200  loss 0.0012
+epoch 1600  loss 0.0008
+epoch 2000  loss 0.0006
+predictions: [0 1 1 0]  truth: [0 1 1 0]
+accuracy:    1.0</code></pre>
+
           <div class="callout pitfall">
             <div class="callout__label"><span class="ic">▲</span> Watch out</div>
-            <p>The <code>rng = np.random.default_rng(42)</code> seed makes this run reproducible — you'll
-            get the exact loss numbers shown above. Change the seed and the random starting weights change,
-            so the loss curve will look a little different, but it should still reach 100% within a couple
-            thousand epochs. If a particular seed <em>stalls</em>, that's a real preview of
-            <a href="12-training-dynamics.html">Section 12</a>: initialization and learning rate genuinely
-            decide whether training succeeds.</p>
+            <p>The seed in <code>np.random.default_rng(42)</code> makes the run reproducible: you get the
+            loss values shown above. With a different seed, the starting weights change and so does the loss
+            curve. Most seeds still reach 100%: in our test, 39 of the seeds 0 to 39 did. Seed 10 did not. It
+            stalls at a loss of about 0.4775 and gets one point wrong. The reason: three hidden neurons have
+            <code>z1 &lt;= 0</code> on all four inputs from the start, and a fourth reaches that state
+            during training. These are dead ReLUs (<a href="09-neurons.html">Section 9</a>): their gradient
+            is zero, so they never recover. The other four neurons are active only for the input (1, 0). If a
+            run stalls, try another seed, or use Leaky ReLU (with seed 10 and $a = 0.01$, it classifies all
+            four points after 2000 epochs). <a href="12-training-dynamics.html">Section 12</a> shows how
+            initialization and learning rate decide whether training succeeds.</p>
+          </div>
+
+          <div class="check-wrap">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">In the stalled seed-10 run, four hidden neurons are dead and the other four are active only for the input (1, 0). Why must the network give the same answer for (0, 0), (0, 1) and (1, 1)? Why can't gradient descent fix this?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>For those three inputs, every hidden neuron has <code>z1 &lt;= 0</code>, so
+                <code>a1</code> is all zeros. Then <code>z2 = b2</code> for all three, and they get the same
+                probabilities (about [0.67, 0.33] here). But (0, 1) has label 1 and the others have label 0,
+                so one of them must be wrong. Gradient flows through a neuron only on inputs where it is
+                active. The dead neurons get no gradient at all. The live ones get gradient only from
+                (1, 0), which is already correct, so nothing pushes them to become active on (0, 1).</p>
+              </div>
+            </details>
           </div>
 
           <hr />
 
           <h2><span class="h-num">5</span>What to carry forward</h2>
           <ul>
-            <li>A network learns with one loop, four steps: <strong>predict → measure → adjust →
-            repeat</strong>. Everything else is detail.</li>
-            <li>The <strong>forward pass</strong> is matrix multiplies with a nonlinearity between them;
-            the <strong>ReLU bend</strong> is the only reason two layers beat one — remove it and the
-            layers collapse into a single line.</li>
-            <li><strong>Softmax</strong> turns raw scores (logits) into probabilities;
-            <strong>cross-entropy</strong> scores those probabilities against the one-hot truth.</li>
-            <li>The <strong>backward pass</strong> is Section 10's chain rule, one line per operation. The
-            softmax+cross-entropy gradient is just $\mathbf{p}-\mathbf{Y}$,
-            and every gradient comes out the same shape as the weight it updates.</li>
-            <li>Weights start <strong>small and random</strong> (never all zeros — that never breaks
-            symmetry), and <strong>SGD</strong> nudges them downhill by the learning rate each step.</li>
+            <li>A network learns with one loop of four steps: <strong>predict → measure → find the direction
+            → step</strong>, repeated.</li>
+            <li>The <strong>forward pass</strong> is matrix multiplies with a nonlinearity between them. The
+            ReLU bend is the reason two layers can do more than one. Remove it and the layers collapse into a
+            single linear layer.</li>
+            <li><strong>Softmax</strong> turns raw scores (logits) into probabilities.
+            <strong>Cross-entropy</strong> scores those probabilities against the one-hot truth.</li>
+            <li>The <strong>backward pass</strong> is Section 10's chain rule, one line per operation.
+            Softmax plus cross-entropy has the gradient $(\mathbf{P}-\mathbf{Y})/N$ at the logits. Every
+            gradient has the same shape as the array it updates.</li>
+            <li>In this lesson, weights have shape (in, out) and a layer computes <code>X @ W + b</code>;
+            PyTorch stores the transpose.</li>
+            <li>Weights start <strong>small and random</strong>. All zeros would never break the symmetry.
+            Gradient descent then moves them downhill by the learning rate at each step.</li>
           </ul>
-          <p>You just wrote, by hand, everything a deep-learning framework does under the hood. Next, in
-          Section 12, we make training itself reliable — initialization, optimizers, and learning-rate
-          schedules — and then in Part 4 we hand exactly these steps to <strong>PyTorch</strong>, which
-          computes the backward pass for us automatically, so we never have to derive those gradient lines
-          again. But now, when it does, you'll know precisely what it's doing.</p>
+          <p>You have now written by hand everything a deep-learning framework does for a network like this.
+          In <a href="12-training-dynamics.html">Section 12</a> we make training reliable: initialization,
+          optimizers and learning-rate schedules. Then in Part 4 we give these same steps to
+          <strong>PyTorch</strong>, which computes the backward pass for us automatically. When it does,
+          you will know what it is doing.</p>
 
           <div class="complete-bar" data-complete>
             <span class="complete-bar__text">Finished this section? Mark it done to fill your progress bar.</span>

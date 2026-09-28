@@ -38,7 +38,7 @@
         <header class="lesson-head">
           <p class="lesson-eyebrow">Part 3 · Neural Nets from Scratch <span class="dot"></span> Section 9</p>
           <h1 class="lesson-title">Neurons, Layers, Activations</h1>
-          <p class="lesson-standfirst">A neuron is a weighted vote passed through a switch — and without that switch, depth is a lie.</p>
+          <p class="lesson-standfirst">A neuron is a weighted vote passed through a switch. Without that switch, extra layers add nothing.</p>
           <div class="lesson-meta">
             <span><b>28 min</b> read</span>
           </div>
@@ -54,67 +54,105 @@
         </header>
 
         <div class="prose">
-          <p class="lead">Everything you have built so far — vectors, matrices, dot products — was
-          preparation for this one small object: the <strong>neuron</strong>. A neuron takes a handful
-          of numbers, weighs them, adds them up, and then passes the result through a little switch. Wire
-          a few thousand of these together and you have a neural network. This section builds the neuron,
-          stacks neurons into layers, and then proves the single most important fact about them: the
-          switch is not optional. Remove it and a hundred layers collapse into one.</p>
+          <p class="lead">Everything you have built so far (vectors, matrices, dot products) prepares you
+          for one small object: the <strong>neuron</strong>. A neuron takes a few numbers, weighs them,
+          adds them up, and passes the result through a small switch. Connect a few thousand of these and
+          you have a neural network. In this section we build the neuron and stack neurons into layers.
+          Then we prove a key fact about them: the switch is necessary. Remove it, and a hundred layers
+          collapse into one.</p>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> The one idea to hold onto</div>
-            <p>One neuron is $\text{activation}(\mathbf{w}^\top\mathbf{x} + b)$
-            — a weighted sum passed through a nonlinear switch. A layer runs many neurons at once, which is
-            just a matrix multiply. And the switch — the <strong>activation</strong> — is the only thing
-            that lets stacking layers buy you real power. That's the whole section; everything below is why.</p>
+            <p>One neuron computes $\phi(\mathbf{w}^\top\mathbf{x} + b)$: a weighted sum passed through a
+            nonlinear switch $\phi$. A layer runs many neurons at once, and that is one matrix multiply.
+            The switch (the <strong>activation</strong>) is the only thing that makes extra layers add
+            power. The rest of this section explains why.</p>
           </div>
 
           <!-- ===================== THE NEURON ===================== -->
           <h2><span class="h-num">1</span>The artificial neuron: a weighted vote through a switch</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>A <strong>neuron</strong> makes one small decision. It looks at several input numbers, decides
-          how much each one matters, adds up its weighted opinion, and then squashes that total through a
-          switch that decides how strongly to “fire.” Big weighted total → strong output. Small or
-          negative total → weak or zero output. That's it. The cleverness of a network is not in any one
-          neuron; it's in wiring many simple ones together.</p>
+          <p>A <strong>neuron</strong> makes one small decision. It looks at several input numbers and
+          decides how much each one matters. It adds up this weighted evidence. Then it passes the total
+          through a switch that decides how strongly to “fire.” A big total gives a strong output. A small
+          or negative total gives a weak or zero output. No single neuron is clever. The power of a network
+          comes from connecting many simple neurons.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>Deciding whether to go outside is a weighted vote. The weather matters a lot to you (big
-            weight), whether you have plans matters somewhat (medium weight), your energy level matters a
-            little (small weight). You tally up the weighted evidence — and you only actually get off the
-            couch once that tally crosses some personal threshold. Below the threshold you stay in; above
-            it you go. A neuron is exactly that: weigh the factors, sum them, fire only past a point.</p>
+            <p>Think about how you decide to go for a walk. The weather matters a lot to you (a big weight).
+            Your plans for the day matter somewhat (a medium weight). Your energy level matters a little (a
+            small weight). You add up the weighted evidence. The more the total favors a walk, the more
+            likely you are to go. A neuron does the same thing: it weighs the factors, sums them, and turns
+            the total into an output. The activation decides <em>how</em> the total becomes a decision:
+            gradually (sigmoid) or with a hard floor at zero (ReLU).</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>Write the inputs as a vector $\mathbf{x} \in \mathbb{R}^{n}$
-          (a list of <b>n</b> numbers). Give the neuron a matching list of <strong>weights</strong>
-          $\mathbf{w} \in \mathbb{R}^{n}$ and a single extra number
-          <b>b</b>, the <strong>bias</strong>. The neuron computes:</p>
-          $$ y = \text{activation}\!\left( \mathbf{w}^\top\mathbf{x} + b \right)
-             = \text{activation}\!\left( \sum_{i=1}^{n} w_i x_i + b \right) $$
-          <p class="gloss"><b>In words:</b> the piece $\mathbf{w}^\top\mathbf{x}$
-          is just the <em>dot product</em> from <a href="01-linear-algebra.html">Section 1</a> — multiply
-          each input by its weight and add the results, giving one number (“how much do I care, in total?”).
-          Then add the bias <b>b</b> to shift that number up or down, and finally push the whole thing
-          through the <b>activation</b> — the switch — to get the neuron's output <b>y</b>.</p>
+          <p>Write the inputs as a vector $\mathbf{x} \in \mathbb{R}^{n}$ (a list of $n$ numbers). Give
+          the neuron a matching list of <strong>weights</strong> $\mathbf{w} \in \mathbb{R}^{n}$ and one
+          extra number $b$, the <strong>bias</strong>. Call the activation function $\phi$ (the Greek
+          letter phi). The neuron computes:</p>
+          $$ y = \phi\!\left( \mathbf{w}^\top\mathbf{x} + b \right)
+             = \phi\!\left( \sum_{i=1}^{n} w_i x_i + b \right) $$
+          <p class="gloss"><b>In words:</b> the piece $\mathbf{w}^\top\mathbf{x}$ is the <em>dot
+          product</em> from <a href="01-linear-algebra.html">Section 1</a>. Multiply each input by its
+          weight and add the results. This gives one number (“how much do I care, in total?”). Add the
+          bias $b$ to shift that number up or down. Finally, pass the result through the activation $\phi$
+          to get the neuron's output $y$.</p>
 
           <div class="callout definition">
             <div class="callout__label">Definition</div>
-            <p>A <dfn>weight</dfn> $w_i$ says how much input
-            $x_i$ matters, and in which direction — a large positive
-            weight means “this input pushes the output up,” a negative weight means “this input pushes it
-            down.” The <dfn>bias</dfn> <b>b</b> is a constant offset added to every input; it sets the
-            neuron's default lean, i.e. how big the weighted sum must be before the neuron starts to fire.
-            The <dfn>activation</dfn> is a fixed nonlinear function — the switch — applied to that sum.</p>
+            <p>A <dfn>weight</dfn> $w_i$ says how much input $x_i$ matters, and in which direction. A large
+            positive weight means “this input pushes the output up.” A negative weight means “this input
+            pushes it down.” The <dfn>bias</dfn> $b$ is one constant, added once to the weighted sum. It
+            sets the neuron's default lean: how big the weighted sum must be before the neuron starts to
+            fire. The <dfn>activation</dfn> $\phi$ is a fixed nonlinear function applied to that sum.</p>
           </div>
 
-          <p>The raw number <em>before</em> the activation, $z = \mathbf{w}^\top\mathbf{x} + b$,
-          shows up so often it has a name: the <strong>pre-activation</strong> (some texts call it the
-          <em>logit</em> when it is the final score before a probability). Keep the two apart in your head:
-          <b>z</b> is the weighted vote, <b>y = activation(z)</b> is the vote after the switch.</p>
+          <p>The number <em>before</em> the activation, $z = \mathbf{w}^\top\mathbf{x} + b$, appears so
+          often that it has a name: the <strong>pre-activation</strong>. (Some texts call it the
+          <em>logit</em> when it is the final score before a probability.) Keep the two apart: $z$ is the
+          weighted vote, and $y = \phi(z)$ is the vote after the switch.</p>
+
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 400 200" style="max-width:520px;margin:0 auto" role="img" aria-labelledby="fig-09-1-t">
+              <title id="fig-09-1-t">A neuron: three inputs are multiplied by their weights, summed, shifted by the bias, and passed through ReLU.</title>
+              <defs><marker id="ar91" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path class="f-i" d="M0,0 L8,4 L0,8 z"/></marker></defs>
+              <circle class="f-vs" cx="30" cy="45" r="17"/>
+              <text x="30" y="49" text-anchor="middle" class="b">0.6</text>
+              <line class="ln thin s-i" x1="48" y1="45" x2="170" y2="90.1" marker-end="url(#ar91)"/>
+              <text x="100" y="62" text-anchor="middle" class="ta">×1.5</text>
+              <circle class="f-vs" cx="30" cy="100" r="17"/>
+              <text x="30" y="104" text-anchor="middle" class="b">-1.2</text>
+              <line class="ln thin s-i" x1="48" y1="100" x2="170" y2="100.0" marker-end="url(#ar91)"/>
+              <text x="100" y="94" text-anchor="middle" class="ta">×0.3</text>
+              <circle class="f-vs" cx="30" cy="155" r="17"/>
+              <text x="30" y="159" text-anchor="middle" class="b">2</text>
+              <line class="ln thin s-i" x1="48" y1="155" x2="170" y2="109.9" marker-end="url(#ar91)"/>
+              <text x="100" y="126" text-anchor="middle" class="ta">×-0.8</text>
+              <text x="30" y="192" text-anchor="middle" class="sm">inputs x</text>
+              <text x="100" y="192" text-anchor="middle" class="sm">weights w</text>
+              <circle class="f-k" cx="195" cy="100" r="22"/><circle class="ln thin s-i" cx="195" cy="100" r="22"/>
+              <text x="195" y="106" text-anchor="middle" class="lg b">Σ + b</text>
+              <text x="195" y="140" text-anchor="middle" class="sm">b = 0.1</text>
+              <line class="ln thin s-i" x1="218" y1="100" x2="272" y2="100" marker-end="url(#ar91)"/>
+              <text x="245" y="92" text-anchor="middle" class="tv b">z = -0.96</text>
+              <rect class="f-vs" x="276" y="78" width="54" height="44" rx="8"/>
+              <polyline class="ln thin s-v" points="283,110 303,110 323,86"/>
+              <text x="303" y="140" text-anchor="middle" class="sm">ReLU</text>
+              <line class="ln thin s-i" x1="331" y1="100" x2="362" y2="100" marker-end="url(#ar91)"/>
+              <text x="383" y="105" text-anchor="middle" class="lg b">y = 0</text>
+              <text x="195" y="192" text-anchor="middle" class="sm">weighted sum</text>
+              <text x="360" y="192" text-anchor="middle" class="sm">output</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 9.1</b> The neuron from the code below. Each input is multiplied by its
+            weight. The products are summed and the bias is added, which gives $z = -0.96$. ReLU turns the
+            negative $z$ into 0, so the neuron stays silent.</figcaption>
+          </figure>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
           <p class="codecap">one neuron by hand</p>
@@ -125,25 +163,22 @@ w = torch.tensor([1.5,  0.3, -0.8])    # a weight per input
 b = torch.tensor(0.1)                  # one bias
 
 z = torch.dot(w, x) + b                # pre-activation: the weighted vote
-y = torch.relu(z)                      # push it through the switch (ReLU)
+y = torch.relu(z)                      # pass it through the switch (ReLU)
 
-print(z)     # tensor(-1.05)   0.6*1.5 + (-1.2)*0.3 + 2.0*(-0.8) + 0.1
-print(y)     # tensor(0.)      negative vote -> neuron stays silent</code></pre>
+print(z)     # tensor(-0.9600)   0.6*1.5 + (-1.2)*0.3 + 2.0*(-0.8) + 0.1
+print(y)     # tensor(0.)        negative vote -> neuron stays silent</code></pre>
 
           <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">If every weight in a neuron were <code>0</code>, what would its output be for <em>any</em> input, and what does that tell you about the bias?</span>
+                <span class="check__q">In the code above, which single number would you change, and to what, so that the neuron outputs exactly 0.5?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>With all weights zero, $\mathbf{w}^\top\mathbf{x} = 0$
-                no matter what <b>x</b> is, so the pre-activation is just <b>b</b> and the output is a
-                constant $\text{activation}(b)$ — the neuron ignores
-                its inputs entirely. That's the point of the bias: it's the neuron's output when the
-                weighted evidence is silent, its baseline lean. Weights decide how the inputs move the
-                output; the bias decides where the output sits when the inputs say nothing.</p>
+                <p>The easiest choice is the bias. The weighted sum without bias is $0.9 - 0.36 - 1.6 = -1.06$.
+                For ReLU to output 0.5 you need $z = 0.5$, so $b = 0.5 + 1.06 = 1.56$. This shows the job of
+                the bias: it moves the whole weighted sum up or down, without looking at the inputs. (Changing $w_3$ from $-0.8$ to $-0.07$ also works.)</p>
               </div>
             </details>
           </div>
@@ -152,69 +187,117 @@ print(y)     # tensor(0.)      negative vote -> neuron stays silent</code></pre>
           <h2><span class="h-num">2</span>Layers: many neurons at once is one matrix multiply</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>One neuron gives you one number. Usually you want many — one neuron asking “does this look
+          <p>One neuron gives you one number. Usually you want many. One neuron might ask “does this look
           like a wheel?”, another “does this look like a window?”, another “is there fur?”. A
-          <strong>layer</strong> is simply a row of neurons, all looking at the same input at the same
-          time, each with its own weights and bias, each producing its own number. Their outputs stack
-          into a new vector, which becomes the input to the next layer.</p>
+          <strong>layer</strong> is a row of neurons. They all look at the same input at the same time.
+          Each has its own weights and bias, and each produces its own number. Their outputs stack into a
+          new vector, which becomes the input to the next layer.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>A loan application lands on a desk with a panel of reviewers. One reviewer cares mostly about
-            income, another mostly about credit history, another about existing debt. They all read the
-            <em>same</em> application but weigh it differently, and each writes down a score. The panel's
-            set of scores is richer than any single reviewer's opinion. A layer is that panel: same input
-            to everyone, different weights per member, a vector of scores out.</p>
+            <p>A panel of reviewers reads a loan application. One reviewer cares mostly about income,
+            another about credit history, another about existing debt. They all read the <em>same</em>
+            application, but they weigh it differently, and each writes down a score. The list of scores
+            tells you more than any single opinion. A layer is that panel: the same input for everyone,
+            different weights for each member, and a vector of scores out.</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>Here is the beautiful part. Stacking neurons doesn't need any new machinery — it is exactly the
-          matrix–vector multiply from <a href="01-linear-algebra.html">Section 1</a>. Put each neuron's
-          weight vector as a <em>row</em> of a matrix <b>W</b>, collect the biases into a vector <b>b</b>,
-          and one line does the whole layer:</p>
-          $$ \mathbf{h} = \text{activation}\!\left( \mathbf{W}\mathbf{x} + \mathbf{b} \right) $$
-          <p class="gloss"><b>In words:</b> row <b>i</b> of <b>W</b> is the weights of neuron <b>i</b>, so
-          $\mathbf{W}\mathbf{x}$ computes every neuron's weighted
-          vote in a single multiply (one dot product per row). Add the bias vector, apply the activation to
-          every slot, and out comes <b>h</b> — the layer's output vector, one number per neuron.</p>
+          <p>Stacking neurons needs no new tools. It is the matrix–vector multiply from
+          <a href="01-linear-algebra.html">Section 1</a>. Put each neuron's weight vector as a
+          <em>row</em> of a matrix $\mathbf{W}$. Collect the biases into a vector $\mathbf{b}$. Then one
+          line computes the whole layer:</p>
+          $$ \mathbf{h} = \phi\!\left( \mathbf{W}\mathbf{x} + \mathbf{b} \right) $$
+          <p class="gloss"><b>In words:</b> row $i$ of $\mathbf{W}$ holds the weights of neuron $i$. So
+          $\mathbf{W}\mathbf{x}$ computes every neuron's weighted vote in one multiply (one dot product per
+          row). Add the bias vector and apply $\phi$ to every entry. The result is $\mathbf{h}$, the layer's
+          output vector, with one number per neuron.</p>
 
-          <p>The shapes are the whole story, so let's pin them down. Suppose the input has <b>n</b> features
-          and the layer has <b>m</b> neurons:</p>
+          <p>The shapes tell the whole story, so let's state them. Suppose the input has $n$ features and
+          the layer has $m$ neurons:</p>
           $$ \underbrace{\mathbf{W}}_{m \times n}\;
              \underbrace{\mathbf{x}}_{n \times 1}
              \;+\; \underbrace{\mathbf{b}}_{m \times 1}
-             \;=\; \underbrace{\mathbf{h}}_{m \times 1} $$
-          <p class="gloss"><b>In words:</b> <b>W</b> has one row per neuron (<b>m</b> rows) and one column
-          per input feature (<b>n</b> columns). By the shape rule — inner numbers match, outer numbers
-          survive — an $(m\times n)$ matrix times an
-          $(n\times 1)$ vector gives an
-          $(m\times 1)$ vector. So a layer maps <b>n</b> numbers in
-          to <b>m</b> numbers out; you pick <b>m</b> when you design the network.</p>
+             \;=\; \underbrace{\mathbf{z}}_{m \times 1} $$
+          <p class="gloss"><b>In words:</b> $\mathbf{W}$ has one row per neuron ($m$ rows) and one column
+          per input feature ($n$ columns). By the shape rule (inner numbers match, outer numbers stay), an
+          $(m\times n)$ matrix times an $(n\times 1)$ vector gives an $(m\times 1)$ vector. So a layer maps
+          $n$ numbers in to $m$ numbers out. You choose $m$ when you design the network.</p>
 
-          <p>In practice you rarely push one example through at a time. You send a whole <strong>batch</strong>
-          (a bundle of examples processed together for speed). Stack <b>N</b> input vectors as the rows of a
-          matrix $\mathbf{X}$ of shape
-          $(N \times n)$, and the layer becomes
-          $\mathbf{H} = \text{activation}(\mathbf{X}\mathbf{W}^\top + \mathbf{b})$,
-          producing an $(N \times m)$ output — one row of answers
-          per example. (This row-of-examples convention is why PyTorch's <code>Linear</code> layer stores
-          its weight as $(m \times n)$ and multiplies by
-          $\mathbf{W}^\top$ under the hood.)</p>
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 400 220" style="max-width:540px;margin:0 auto" role="img" aria-labelledby="fig-09-3-t">
+              <title id="fig-09-3-t">A layer with 3 inputs and 4 neurons drawn as a fully connected graph, next to its 4 by 3 weight matrix; neuron 2 and row 2 are highlighted.</title>
+              <line class="ln thin s-f" x1="40" y1="60" x2="150" y2="35"/>
+              <line class="ln thin s-f" x1="40" y1="110" x2="150" y2="35"/>
+              <line class="ln thin s-f" x1="40" y1="160" x2="150" y2="35"/>
+              <line class="ln s-v" x1="40" y1="60" x2="150" y2="85"/>
+              <line class="ln s-v" x1="40" y1="110" x2="150" y2="85"/>
+              <line class="ln s-v" x1="40" y1="160" x2="150" y2="85"/>
+              <line class="ln thin s-f" x1="40" y1="60" x2="150" y2="135"/>
+              <line class="ln thin s-f" x1="40" y1="110" x2="150" y2="135"/>
+              <line class="ln thin s-f" x1="40" y1="160" x2="150" y2="135"/>
+              <line class="ln thin s-f" x1="40" y1="60" x2="150" y2="185"/>
+              <line class="ln thin s-f" x1="40" y1="110" x2="150" y2="185"/>
+              <line class="ln thin s-f" x1="40" y1="160" x2="150" y2="185"/>
+              <circle class="f-k" cx="40" cy="60" r="14"/><circle class="ln thin s-i" cx="40" cy="60" r="14"/><text x="40" y="65" text-anchor="middle" class="m">x<tspan dy="3" font-size="11">1</tspan></text>
+              <circle class="f-k" cx="40" cy="110" r="14"/><circle class="ln thin s-i" cx="40" cy="110" r="14"/><text x="40" y="115" text-anchor="middle" class="m">x<tspan dy="3" font-size="11">2</tspan></text>
+              <circle class="f-k" cx="40" cy="160" r="14"/><circle class="ln thin s-i" cx="40" cy="160" r="14"/><text x="40" y="165" text-anchor="middle" class="m">x<tspan dy="3" font-size="11">3</tspan></text>
+              <circle class="f-vs" cx="150" cy="35" r="14"/><text x="150" y="40" text-anchor="middle" class="m">h<tspan dy="3" font-size="11">1</tspan></text>
+              <circle class="f-vs" cx="150" cy="85" r="14"/><circle class="ln s-v" cx="150" cy="85" r="14"/><text x="150" y="90" text-anchor="middle" class="m">h<tspan dy="3" font-size="11">2</tspan></text>
+              <circle class="f-vs" cx="150" cy="135" r="14"/><text x="150" y="140" text-anchor="middle" class="m">h<tspan dy="3" font-size="11">3</tspan></text>
+              <circle class="f-vs" cx="150" cy="185" r="14"/><text x="150" y="190" text-anchor="middle" class="m">h<tspan dy="3" font-size="11">4</tspan></text>
+              <text x="40" y="212" text-anchor="middle" class="sm">n = 3 inputs</text>
+              <text x="150" y="212" text-anchor="middle" class="sm">m = 4 neurons</text>
+              <text x="303.0" y="21" text-anchor="middle" class="m">W  (4 × 3)</text>
+              <rect class="f-vs" x="240" y="71" width="126" height="36" rx="4"/>
+              <text x="261.0" y="58.0" text-anchor="middle" class="m ">w<tspan dy="3" font-size="10">11</tspan></text>
+              <text x="303.0" y="58.0" text-anchor="middle" class="m ">w<tspan dy="3" font-size="10">12</tspan></text>
+              <text x="345.0" y="58.0" text-anchor="middle" class="m ">w<tspan dy="3" font-size="10">13</tspan></text>
+              <text x="261.0" y="94.0" text-anchor="middle" class="m b tv">w<tspan dy="3" font-size="10">21</tspan></text>
+              <text x="303.0" y="94.0" text-anchor="middle" class="m b tv">w<tspan dy="3" font-size="10">22</tspan></text>
+              <text x="345.0" y="94.0" text-anchor="middle" class="m b tv">w<tspan dy="3" font-size="10">23</tspan></text>
+              <text x="261.0" y="130.0" text-anchor="middle" class="m ">w<tspan dy="3" font-size="10">31</tspan></text>
+              <text x="303.0" y="130.0" text-anchor="middle" class="m ">w<tspan dy="3" font-size="10">32</tspan></text>
+              <text x="345.0" y="130.0" text-anchor="middle" class="m ">w<tspan dy="3" font-size="10">33</tspan></text>
+              <text x="261.0" y="166.0" text-anchor="middle" class="m ">w<tspan dy="3" font-size="10">41</tspan></text>
+              <text x="303.0" y="166.0" text-anchor="middle" class="m ">w<tspan dy="3" font-size="10">42</tspan></text>
+              <text x="345.0" y="166.0" text-anchor="middle" class="m ">w<tspan dy="3" font-size="10">43</tspan></text>
+              <path class="ln thin s-i" d="M244,35 h-6 v144 h6 M362,35 h6 v144 h-6"/>
+              <text x="303.0" y="201" text-anchor="middle" class="sm">row 2 = the weights of neuron 2</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 9.2</b> A layer with 3 inputs and 4 neurons. Every input connects to every
+            neuron (a “fully connected” layer). The three highlighted edges into neuron 2 carry the three
+            weights in row 2 of $\mathbf{W}$. One edge is one matrix entry.</figcaption>
+          </figure>
+
+          <p>In practice you rarely send one example at a time. You send a <strong>batch</strong> (a group
+          of examples processed together for speed). Stack $N$ input vectors as the rows of a matrix
+          $\mathbf{X}$ of shape $(N \times n)$. The layer becomes:</p>
+          $$ \mathbf{H} = \phi(\mathbf{X}\mathbf{W}^\top + \mathbf{b}) $$
+          <p class="gloss"><b>In words:</b> each row of $\mathbf{X}$ is one example. Multiplying by
+          $\mathbf{W}^\top$ gives an $(N \times m)$ matrix, one row of answers per example. The bias
+          $\mathbf{b}$ has shape $(m,)$, so PyTorch adds it to every row. This automatic copying is called
+          <em>broadcasting</em>; <a href="13-tensors-autograd.html">Section 13</a> explains it in
+          detail.</p>
+
+          <p>This row-of-examples convention is why PyTorch's <code>nn.Linear</code> stores its weight with
+          shape $(m \times n)$ and multiplies by $\mathbf{W}^\top$ inside its forward pass.</p>
 
           <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">A layer takes a 784-length image vector and has 128 neurons. What are the shapes of <code>W</code>, <code>b</code>, and the output <code>h</code> for a single image?</span>
+                <span class="check__q">A layer takes a 784-number image vector and has 128 neurons. What are the shapes of $\mathbf{W}$, $\mathbf{b}$ and $\mathbf{h}$? How many parameters does the layer have?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>The layer maps $n = 784$ inputs to
-                $m = 128$ neurons. So <b>W</b> is
-                <strong>(128, 784)</strong> — one row per neuron, one column per input feature — the bias
-                <b>b</b> is <strong>(128,)</strong> — one per neuron — and the output <b>h</b> is
-                <strong>(128,)</strong>. The 784 “cancels” in the multiply and the 128 survives. You've just
-                sized the first hidden layer of an image classifier.</p>
+                <p>The layer maps $n = 784$ inputs to $m = 128$ neurons. So $\mathbf{W}$ is
+                <strong>(128, 784)</strong>: one row per neuron, one column per input feature. The bias
+                $\mathbf{b}$ is <strong>(128,)</strong>, one per neuron. The output $\mathbf{h}$ is
+                <strong>(128,)</strong>. The parameter count is $128 \times 784 + 128 = 100{,}480$. Almost all
+                of them are weights. This is the size of the first hidden layer of a small image classifier.</p>
               </div>
             </details>
           </div>
@@ -223,75 +306,128 @@ print(y)     # tensor(0.)      negative vote -> neuron stays silent</code></pre>
           <h2><span class="h-num">3</span>Activation functions: the shape of the switch</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>The activation is the switch each neuron passes its weighted vote through. Different switches
-          have different personalities — some are soft and gentle, some are hard on/off, some let strong
-          signals through untouched. The choice matters because it decides two things: what range the
-          output can take, and — crucially for learning — how the <strong>gradient</strong> (the slope that
-          tells training which way to nudge the weights, from <a href="10-backprop.html">backprop</a>)
-          behaves. A switch whose slope goes flat is a switch through which learning cannot flow.</p>
+          <p>The activation is the switch that each neuron's weighted vote passes through. Different
+          switches behave differently. Some are soft and gradual. Some block negative values completely.
+          Some let large values through unchanged. The choice decides two things. First, the range of
+          values the output can take. Second, and important for learning, how the <strong>gradient</strong>
+          behaves. (The gradient is the slope that tells training which way to change the weights.
+          <a href="10-backprop.html">Section 10</a> computes it.) Where a switch's slope is flat, learning cannot pass
+          through it.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>Think of a dimmer versus a light switch. A <strong>dimmer</strong> (like sigmoid or tanh)
-            eases smoothly from off to fully on, but near the two ends it barely responds — twist it a lot
-            and almost nothing changes. A plain <strong>light switch</strong> is hard on/off. And a
-            <strong>ReLU</strong> is like a diode: it blocks anything negative completely, but passes
-            positive signal straight through at full strength, no dimming. Each feels different to “tune,”
-            and that tuning feel <em>is</em> the gradient.</p>
+            <p>Think of a light dimmer with a knob. Near the middle, a small turn changes the brightness a
+            lot. Near the two ends the knob still turns, but the light hardly changes. That is sigmoid and
+            tanh: at both ends, turning the input changes the output very little. In math words, the slope
+            is nearly zero. ReLU is a different kind of dimmer. Below zero the light is off, and turning the
+            knob does nothing (slope 0). Above zero, each turn adds the same amount of light (slope 1). How
+            much the light responds to a turn of the knob <em>is</em> the gradient.</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>The <strong>sigmoid</strong> squashes any number into the range (0, 1) — handy when you want an
-          output you can read as a probability:</p>
+          <p>The <strong>sigmoid</strong> $\sigma$ squashes any number into the range (0, 1). This is
+          useful when you want an output you can read as a probability:</p>
           $$ \sigma(z) = \frac{1}{1 + e^{-z}} \qquad \text{range } (0, 1) $$
-          <p class="gloss"><b>In words:</b> huge positive <b>z</b> gives an output near 1, huge negative
-          <b>z</b> gives near 0, and $z = 0$ gives exactly 0.5. The
-          catch: at both far ends the curve flattens out, so its slope (gradient) shrinks to nearly zero —
-          this is called <strong>saturation</strong>, and it starves learning.</p>
+          <p class="gloss"><b>In words:</b> a large positive $z$ gives an output near 1. A large negative
+          $z$ gives an output near 0. And $z = 0$ gives exactly 0.5. The problem: at both ends the curve
+          becomes flat, so its slope (the gradient) shrinks to nearly zero. This is called
+          <strong>saturation</strong>, and it slows learning.</p>
 
-          <p>The <strong>tanh</strong> is a rescaled sigmoid centred on zero, with range (−1, 1):</p>
+          <p>The <strong>tanh</strong> is a rescaled sigmoid, centered on zero, with range (−1, 1):</p>
           $$ \tanh(z) = \frac{e^{z} - e^{-z}}{e^{z} + e^{-z}} \qquad \text{range } (-1, 1) $$
-          <p class="gloss"><b>In words:</b> same S-shape as sigmoid but symmetric around zero, so its
-          outputs are centred (a negative input gives a negative output). That centering makes it a bit
-          nicer to train than sigmoid — but it still saturates and flattens at the two ends.</p>
+          <p class="gloss"><b>In words:</b> the same S-shape as sigmoid, but symmetric around zero. A
+          negative input gives a negative output, so the outputs are centered. This makes tanh a bit
+          easier to train than sigmoid. But it still saturates at both ends.</p>
 
-          <p>The <strong>ReLU</strong> (“rectified linear unit”) is almost embarrassingly simple: keep the
-          input if it's positive, otherwise output zero.</p>
+          <p>The <strong>ReLU</strong> (“rectified linear unit”) is very simple. It keeps the input if it
+          is positive, and outputs zero otherwise.</p>
           $$ \text{ReLU}(z) = \max(0, z) \qquad \text{range } [0, \infty) $$
-          <p class="gloss"><b>In words:</b> for any positive <b>z</b> the output is just <b>z</b> and the
-          slope is exactly 1 — the gradient passes through undamped, so learning never stalls on the
-          positive side. For negative <b>z</b> the output is 0 and the slope is 0 (the neuron is “off”).
-          No expensive $e^{x}$, no saturation for positive inputs —
-          that combination is why ReLU became the default hidden-layer activation.</p>
+          <p class="gloss"><b>In words:</b> for any positive $z$ the output is $z$ and the slope is 1. The
+          gradient passes through at full strength, so learning does not stall on the positive side. For
+          negative $z$ the output is 0 and the slope is 0 (the neuron is “off”). ReLU needs no costly
+          $e^{z}$ and does not saturate for positive inputs. That is why it became the default activation
+          for hidden layers.</p>
 
-          <p>ReLU has one flaw: a neuron stuck in the negative zone has zero gradient and may never wake up
-          — a <strong>dead neuron</strong>. <strong>Leaky ReLU</strong> fixes this by letting a small trickle
-          through on the negative side instead of hard zero:</p>
-          $$ \text{LeakyReLU}(z) = \max(\alpha z,\; z), \qquad \alpha \approx 0.01
+          <p>ReLU has one weak point. A neuron whose $z$ is negative for every input has zero gradient
+          everywhere, so it may never recover. This is a <strong>dead neuron</strong>. <strong>Leaky
+          ReLU</strong> fixes this: on the negative side it lets a small fraction through instead of a
+          hard zero.</p>
+          $$ \text{LeakyReLU}(z) = \max(a z,\; z), \qquad a \approx 0.01
              \qquad \text{range } (-\infty, \infty) $$
-          <p class="gloss"><b>In words:</b> positive inputs behave exactly like ReLU (slope 1); negative
-          inputs get a gentle slope <b>α</b> (say 0.01) instead of 0, so the neuron always keeps a faint
-          gradient and can recover instead of dying. <b>α</b> (alpha) is just the small leak factor.</p>
+          <p class="gloss"><b>In words:</b> positive inputs behave like ReLU (slope 1). Negative inputs get
+          a small slope $a$ (for example 0.01) instead of 0. So the neuron always keeps a small gradient and
+          can recover. The number $a$ is the “leak.”</p>
 
-          <p>Finally, worth knowing by name: <strong>GELU</strong> (“Gaussian Error Linear Unit”) is a
-          smooth, curved cousin of ReLU that bends gently through zero instead of kinking sharply. It is the
-          default activation inside modern transformer models (the architecture behind today's large language
-          models). You don't need its formula yet — just recognise the name when it appears later.</p>
+          <p>Finally, a name you should know: <strong>GELU</strong> (“Gaussian Error Linear Unit”). It is a
+          smooth version of ReLU that bends gently through zero instead of having a sharp corner. It is the
+          default activation inside transformer models (the architecture behind today's large language
+          models). You do not need its formula yet. Just recognize the name when you see it later.</p>
 
           <div class="scroll-x">
           <table>
             <thead>
-              <tr><th>Activation</th><th>Formula</th><th>Output range</th><th>Gradient behaviour</th></tr>
+              <tr><th>Activation</th><th>Formula</th><th>Output range</th><th>Gradient behavior</th></tr>
             </thead>
             <tbody>
-              <tr><td>Sigmoid</td><td>$\dfrac{1}{1+e^{-z}}$</td><td>(0, 1)</td><td>Saturates both ends → tiny gradients, slow learning</td></tr>
-              <tr><td>Tanh</td><td>$\dfrac{e^{z}-e^{-z}}{e^{z}+e^{-z}}$</td><td>(−1, 1)</td><td>Zero-centred but still saturates both ends</td></tr>
+              <tr><td>Sigmoid</td><td>$\dfrac{1}{1+e^{-z}}$</td><td>(0, 1)</td><td>Saturates at both ends → tiny gradients, slow learning</td></tr>
+              <tr><td>Tanh</td><td>$\dfrac{e^{z}-e^{-z}}{e^{z}+e^{-z}}$</td><td>(−1, 1)</td><td>Zero-centered, but still saturates at both ends</td></tr>
               <tr><td>ReLU</td><td>$\max(0, z)$</td><td>[0, ∞)</td><td>Slope 1 for <span>$z\gt 0$</span>, 0 for <span>$z\lt 0$</span>; cheap, no positive saturation</td></tr>
-              <tr><td>Leaky ReLU</td><td>$\max(\alpha z, z)$</td><td>(−∞, ∞)</td><td>Like ReLU but small slope <span>$\alpha$</span> on the negative side → no dead neurons</td></tr>
-              <tr><td>GELU</td><td>smooth ReLU-like curve</td><td>≈ (−0.17, ∞)</td><td>Smooth everywhere; default in transformers</td></tr>
+              <tr><td>Leaky ReLU</td><td>$\max(a z, z)$</td><td>(−∞, ∞)</td><td>Like ReLU, but small slope <span>$a$</span> on the negative side → no dead neurons</td></tr>
+              <tr><td>GELU</td><td>smooth ReLU-like curve</td><td>≈ [−0.17, ∞)</td><td>Smooth everywhere; default in transformers</td></tr>
             </tbody>
           </table>
           </div>
+
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 400 500" style="max-width:560px;margin:0 auto" role="img" aria-labelledby="fig-09-2-t">
+              <title id="fig-09-2-t">Five activation functions drawn as solid curves, each with its slope drawn as a dashed curve.</title>
+              <text x="10" y="20" class="b">sigmoid</text>
+              <line class="ax" x1="10.0" y1="116.5" x2="190.0" y2="116.5"/>
+              <line class="ax" x1="100.0" y1="150.0" x2="100.0" y2="30.0"/>
+              <line class="grid" x1="10.0" y1="88.6" x2="190.0" y2="88.6"/>
+              <text x="8.0" y="92.6" text-anchor="end" class="sm">1</text>
+              <polyline class="ln s-v" points="10.0,115.2 10.7,115.2 11.5,115.1 12.3,115.1 13.0,115.1 13.8,115.0 14.5,115.0 15.2,114.9 16.0,114.9 16.8,114.9 17.5,114.8 18.2,114.8 19.0,114.8 19.8,114.7 20.5,114.7 21.2,114.6 22.0,114.6 22.7,114.5 23.5,114.5 24.2,114.4 25.0,114.4 25.7,114.3 26.5,114.3 27.3,114.2 28.0,114.2 28.8,114.1 29.5,114.1 30.2,114.0 31.0,114.0 31.8,113.9 32.5,113.9 33.2,113.8 34.0,113.7 34.8,113.7 35.5,113.6 36.2,113.5 37.0,113.5 37.8,113.4 38.5,113.3 39.2,113.3 40.0,113.2 40.8,113.1 41.5,113.0 42.2,113.0 43.0,112.9 43.8,112.8 44.5,112.7 45.2,112.6 46.0,112.6 46.8,112.5 47.5,112.4 48.2,112.3 49.0,112.2 49.8,112.1 50.5,112.0 51.2,111.9 52.0,111.8 52.8,111.7 53.5,111.6 54.2,111.5 55.0,111.4 55.8,111.3 56.5,111.2 57.2,111.1 58.0,111.0 58.8,110.9 59.5,110.8 60.2,110.7 61.0,110.5 61.8,110.4 62.5,110.3 63.2,110.2 64.0,110.1 64.8,109.9 65.5,109.8 66.2,109.7 67.0,109.5 67.8,109.4 68.5,109.3 69.2,109.1 70.0,109.0 70.8,108.9 71.5,108.7 72.2,108.6 73.0,108.4 73.8,108.3 74.5,108.2 75.2,108.0 76.0,107.9 76.8,107.7 77.5,107.6 78.2,107.4 79.0,107.3 79.8,107.1 80.5,106.9 81.2,106.8 82.0,106.6 82.7,106.5 83.5,106.3 84.2,106.1 85.0,106.0 85.8,105.8 86.5,105.6 87.2,105.5 88.0,105.3 88.8,105.1 89.5,105.0 90.2,104.8 91.0,104.6 91.8,104.5 92.5,104.3 93.2,104.1 94.0,103.9 94.8,103.8 95.5,103.6 96.2,103.4 97.0,103.3 97.8,103.1 98.5,102.9 99.2,102.7 100.0,102.6 100.8,102.4 101.5,102.2 102.3,102.0 103.0,101.9 103.8,101.7 104.5,101.5 105.2,101.3 106.0,101.2 106.8,101.0 107.5,100.8 108.2,100.7 109.0,100.5 109.8,100.3 110.5,100.1 111.2,100.0 112.0,99.8 112.8,99.6 113.5,99.5 114.3,99.3 115.0,99.1 115.8,99.0 116.5,98.8 117.2,98.7 118.0,98.5 118.8,98.3 119.5,98.2 120.2,98.0 121.0,97.9 121.8,97.7 122.5,97.6 123.2,97.4 124.0,97.3 124.8,97.1 125.5,97.0 126.2,96.8 127.0,96.7 127.8,96.5 128.5,96.4 129.2,96.2 130.0,96.1 130.8,96.0 131.5,95.8 132.2,95.7 133.0,95.6 133.8,95.4 134.5,95.3 135.2,95.2 136.0,95.1 136.8,94.9 137.5,94.8 138.2,94.7 139.0,94.6 139.8,94.5 140.5,94.3 141.2,94.2 142.0,94.1 142.8,94.0 143.5,93.9 144.2,93.8 145.0,93.7 145.8,93.6 146.5,93.5 147.2,93.4 148.0,93.3 148.8,93.2 149.5,93.1 150.2,93.0 151.0,92.9 151.8,92.8 152.5,92.7 153.2,92.6 154.0,92.6 154.8,92.5 155.5,92.4 156.2,92.3 157.0,92.2 157.8,92.2 158.5,92.1 159.2,92.0 160.0,91.9 160.8,91.9 161.5,91.8 162.2,91.7 163.0,91.6 163.8,91.6 164.5,91.5 165.2,91.5 166.0,91.4 166.7,91.3 167.5,91.3 168.3,91.2 169.0,91.1 169.8,91.1 170.5,91.0 171.2,91.0 172.0,90.9 172.8,90.9 173.5,90.8 174.2,90.8 175.0,90.7 175.8,90.7 176.5,90.6 177.2,90.6 178.0,90.5 178.8,90.5 179.5,90.4 180.2,90.4 181.0,90.4 181.8,90.3 182.5,90.3 183.2,90.2 184.0,90.2 184.8,90.2 185.5,90.1 186.2,90.1 187.0,90.1 187.8,90.0 188.5,90.0 189.2,90.0 190.0,89.9"/>
+              <polyline class="ln thin s-a dash" points="10.0,115.3 10.7,115.2 11.5,115.2 12.3,115.2 13.0,115.1 13.8,115.1 14.5,115.1 15.2,115.0 16.0,115.0 16.8,115.0 17.5,114.9 18.2,114.9 19.0,114.9 19.8,114.8 20.5,114.8 21.2,114.8 22.0,114.7 22.7,114.7 23.5,114.6 24.2,114.6 25.0,114.6 25.7,114.5 26.5,114.5 27.3,114.4 28.0,114.4 28.8,114.3 29.5,114.3 30.2,114.2 31.0,114.2 31.8,114.2 32.5,114.1 33.2,114.1 34.0,114.0 34.8,114.0 35.5,113.9 36.2,113.9 37.0,113.8 37.8,113.7 38.5,113.7 39.2,113.6 40.0,113.6 40.8,113.5 41.5,113.5 42.2,113.4 43.0,113.4 43.8,113.3 44.5,113.2 45.2,113.2 46.0,113.1 46.8,113.1 47.5,113.0 48.2,112.9 49.0,112.9 49.8,112.8 50.5,112.7 51.2,112.7 52.0,112.6 52.8,112.5 53.5,112.5 54.2,112.4 55.0,112.3 55.8,112.3 56.5,112.2 57.2,112.2 58.0,112.1 58.8,112.0 59.5,111.9 60.2,111.9 61.0,111.8 61.8,111.7 62.5,111.7 63.2,111.6 64.0,111.5 64.8,111.5 65.5,111.4 66.2,111.3 67.0,111.3 67.8,111.2 68.5,111.2 69.2,111.1 70.0,111.0 70.8,111.0 71.5,110.9 72.2,110.8 73.0,110.8 73.8,110.7 74.5,110.7 75.2,110.6 76.0,110.5 76.8,110.5 77.5,110.4 78.2,110.4 79.0,110.3 79.8,110.3 80.5,110.2 81.2,110.2 82.0,110.1 82.7,110.1 83.5,110.0 84.2,110.0 85.0,110.0 85.8,109.9 86.5,109.9 87.2,109.8 88.0,109.8 88.8,109.8 89.5,109.7 90.2,109.7 91.0,109.7 91.8,109.7 92.5,109.6 93.2,109.6 94.0,109.6 94.8,109.6 95.5,109.6 96.2,109.6 97.0,109.6 97.8,109.5 98.5,109.5 99.2,109.5 100.0,109.5 100.8,109.5 101.5,109.5 102.3,109.5 103.0,109.6 103.8,109.6 104.5,109.6 105.2,109.6 106.0,109.6 106.8,109.6 107.5,109.6 108.2,109.7 109.0,109.7 109.8,109.7 110.5,109.7 111.2,109.8 112.0,109.8 112.8,109.8 113.5,109.9 114.3,109.9 115.0,110.0 115.8,110.0 116.5,110.0 117.2,110.1 118.0,110.1 118.8,110.2 119.5,110.2 120.2,110.3 121.0,110.3 121.8,110.4 122.5,110.4 123.2,110.5 124.0,110.5 124.8,110.6 125.5,110.7 126.2,110.7 127.0,110.8 127.8,110.8 128.5,110.9 129.2,111.0 130.0,111.0 130.8,111.1 131.5,111.2 132.2,111.2 133.0,111.3 133.8,111.3 134.5,111.4 135.2,111.5 136.0,111.5 136.8,111.6 137.5,111.7 138.2,111.7 139.0,111.8 139.8,111.9 140.5,111.9 141.2,112.0 142.0,112.1 142.8,112.2 143.5,112.2 144.2,112.3 145.0,112.3 145.8,112.4 146.5,112.5 147.2,112.5 148.0,112.6 148.8,112.7 149.5,112.7 150.2,112.8 151.0,112.9 151.8,112.9 152.5,113.0 153.2,113.1 154.0,113.1 154.8,113.2 155.5,113.2 156.2,113.3 157.0,113.4 157.8,113.4 158.5,113.5 159.2,113.5 160.0,113.6 160.8,113.6 161.5,113.7 162.2,113.7 163.0,113.8 163.8,113.9 164.5,113.9 165.2,114.0 166.0,114.0 166.7,114.1 167.5,114.1 168.3,114.2 169.0,114.2 169.8,114.2 170.5,114.3 171.2,114.3 172.0,114.4 172.8,114.4 173.5,114.5 174.2,114.5 175.0,114.6 175.8,114.6 176.5,114.6 177.2,114.7 178.0,114.7 178.8,114.8 179.5,114.8 180.2,114.8 181.0,114.9 181.8,114.9 182.5,114.9 183.2,115.0 184.0,115.0 184.8,115.0 185.5,115.1 186.2,115.1 187.0,115.1 187.8,115.2 188.5,115.2 189.2,115.2 190.0,115.3"/>
+              <text x="210" y="20" class="b">tanh</text>
+              <line class="ax" x1="210.0" y1="116.5" x2="390.0" y2="116.5"/>
+              <line class="ax" x1="300.0" y1="150.0" x2="300.0" y2="30.0"/>
+              <line class="grid" x1="210.0" y1="88.6" x2="390.0" y2="88.6"/>
+              <text x="208.0" y="92.6" text-anchor="end" class="sm">1</text>
+              <polyline class="ln s-v" points="210.0,144.3 210.8,144.3 211.5,144.3 212.2,144.3 213.0,144.3 213.8,144.2 214.5,144.2 215.2,144.2 216.0,144.2 216.8,144.2 217.5,144.2 218.2,144.2 219.0,144.2 219.8,144.2 220.5,144.1 221.2,144.1 222.0,144.1 222.8,144.1 223.5,144.1 224.2,144.1 225.0,144.0 225.8,144.0 226.5,144.0 227.2,144.0 228.0,144.0 228.8,143.9 229.5,143.9 230.2,143.9 231.0,143.9 231.8,143.8 232.5,143.8 233.2,143.8 234.0,143.7 234.8,143.7 235.5,143.7 236.2,143.6 237.0,143.6 237.8,143.6 238.5,143.5 239.2,143.5 240.0,143.4 240.8,143.4 241.5,143.3 242.2,143.3 243.0,143.2 243.8,143.1 244.5,143.1 245.2,143.0 246.0,142.9 246.8,142.9 247.5,142.8 248.2,142.7 249.0,142.6 249.8,142.5 250.5,142.4 251.2,142.3 252.0,142.2 252.8,142.1 253.5,142.0 254.2,141.9 255.0,141.8 255.8,141.6 256.5,141.5 257.2,141.4 258.0,141.2 258.8,141.1 259.5,140.9 260.2,140.7 261.0,140.6 261.8,140.4 262.5,140.2 263.2,140.0 264.0,139.8 264.8,139.6 265.5,139.3 266.2,139.1 267.0,138.9 267.8,138.6 268.5,138.3 269.2,138.1 270.0,137.8 270.8,137.5 271.5,137.2 272.2,136.8 273.0,136.5 273.8,136.2 274.5,135.8 275.2,135.4 276.0,135.0 276.8,134.6 277.5,134.2 278.2,133.8 279.0,133.4 279.8,132.9 280.5,132.5 281.2,132.0 282.0,131.5 282.8,131.0 283.5,130.5 284.2,130.0 285.0,129.4 285.8,128.9 286.5,128.3 287.2,127.7 288.0,127.1 288.8,126.5 289.5,125.9 290.2,125.3 291.0,124.6 291.8,124.0 292.5,123.3 293.2,122.7 294.0,122.0 294.8,121.3 295.5,120.7 296.2,120.0 297.0,119.3 297.8,118.6 298.5,117.9 299.2,117.2 300.0,116.5 300.8,115.8 301.5,115.1 302.2,114.4 303.0,113.7 303.8,113.0 304.5,112.4 305.2,111.7 306.0,111.0 306.8,110.3 307.5,109.7 308.2,109.0 309.0,108.4 309.8,107.7 310.5,107.1 311.2,106.5 312.0,105.9 312.8,105.3 313.5,104.7 314.2,104.2 315.0,103.6 315.8,103.1 316.5,102.5 317.2,102.0 318.0,101.5 318.8,101.0 319.5,100.6 320.2,100.1 321.0,99.6 321.8,99.2 322.5,98.8 323.2,98.4 324.0,98.0 324.8,97.6 325.5,97.2 326.2,96.9 327.0,96.5 327.8,96.2 328.5,95.9 329.2,95.6 330.0,95.3 330.8,95.0 331.5,94.7 332.2,94.4 333.0,94.2 333.8,93.9 334.5,93.7 335.2,93.5 336.0,93.2 336.8,93.0 337.5,92.8 338.2,92.6 339.0,92.5 339.8,92.3 340.5,92.1 341.2,92.0 342.0,91.8 342.8,91.7 343.5,91.5 344.2,91.4 345.0,91.3 345.8,91.1 346.5,91.0 347.2,90.9 348.0,90.8 348.8,90.7 349.5,90.6 350.2,90.5 351.0,90.4 351.8,90.3 352.5,90.2 353.2,90.2 354.0,90.1 354.8,90.0 355.5,90.0 356.2,89.9 357.0,89.8 357.8,89.8 358.5,89.7 359.2,89.7 360.0,89.6 360.8,89.6 361.5,89.5 362.2,89.5 363.0,89.4 363.8,89.4 364.5,89.4 365.2,89.3 366.0,89.3 366.8,89.2 367.5,89.2 368.2,89.2 369.0,89.2 369.8,89.1 370.5,89.1 371.2,89.1 372.0,89.1 372.8,89.0 373.5,89.0 374.2,89.0 375.0,89.0 375.8,89.0 376.5,88.9 377.2,88.9 378.0,88.9 378.8,88.9 379.5,88.9 380.2,88.9 381.0,88.9 381.8,88.8 382.5,88.8 383.2,88.8 384.0,88.8 384.8,88.8 385.5,88.8 386.2,88.8 387.0,88.8 387.8,88.8 388.5,88.8 389.2,88.7 390.0,88.7"/>
+              <polyline class="ln thin s-a dash" points="210.0,116.2 210.8,116.2 211.5,116.2 212.2,116.2 213.0,116.2 213.8,116.2 214.5,116.1 215.2,116.1 216.0,116.1 216.8,116.1 217.5,116.1 218.2,116.0 219.0,116.0 219.8,116.0 220.5,116.0 221.2,115.9 222.0,115.9 222.8,115.9 223.5,115.8 224.2,115.8 225.0,115.8 225.8,115.7 226.5,115.7 227.2,115.7 228.0,115.6 228.8,115.6 229.5,115.5 230.2,115.5 231.0,115.4 231.8,115.4 232.5,115.3 233.2,115.2 234.0,115.2 234.8,115.1 235.5,115.0 236.2,115.0 237.0,114.9 237.8,114.8 238.5,114.7 239.2,114.6 240.0,114.5 240.8,114.4 241.5,114.3 242.2,114.2 243.0,114.1 243.8,114.0 244.5,113.9 245.2,113.8 246.0,113.6 246.8,113.5 247.5,113.3 248.2,113.2 249.0,113.0 249.8,112.9 250.5,112.7 251.2,112.5 252.0,112.3 252.8,112.1 253.5,111.9 254.2,111.7 255.0,111.5 255.8,111.2 256.5,111.0 257.2,110.7 258.0,110.5 258.8,110.2 259.5,109.9 260.2,109.6 261.0,109.3 261.8,109.0 262.5,108.7 263.2,108.3 264.0,108.0 264.8,107.6 265.5,107.3 266.2,106.9 267.0,106.5 267.8,106.1 268.5,105.7 269.2,105.2 270.0,104.8 270.8,104.3 271.5,103.9 272.2,103.4 273.0,102.9 273.8,102.4 274.5,101.9 275.2,101.4 276.0,100.9 276.8,100.4 277.5,99.9 278.2,99.3 279.0,98.8 279.8,98.3 280.5,97.7 281.2,97.2 282.0,96.7 282.8,96.1 283.5,95.6 284.2,95.1 285.0,94.6 285.8,94.1 286.5,93.6 287.2,93.1 288.0,92.6 288.8,92.2 289.5,91.8 290.2,91.4 291.0,91.0 291.8,90.6 292.5,90.3 293.2,90.0 294.0,89.7 294.8,89.4 295.5,89.2 296.2,89.0 297.0,88.9 297.8,88.8 298.5,88.7 299.2,88.6 300.0,88.6 300.8,88.6 301.5,88.7 302.2,88.8 303.0,88.9 303.8,89.0 304.5,89.2 305.2,89.4 306.0,89.7 306.8,90.0 307.5,90.3 308.2,90.6 309.0,91.0 309.8,91.4 310.5,91.8 311.2,92.2 312.0,92.6 312.8,93.1 313.5,93.6 314.2,94.1 315.0,94.6 315.8,95.1 316.5,95.6 317.2,96.1 318.0,96.7 318.8,97.2 319.5,97.7 320.2,98.3 321.0,98.8 321.8,99.3 322.5,99.9 323.2,100.4 324.0,100.9 324.8,101.4 325.5,101.9 326.2,102.4 327.0,102.9 327.8,103.4 328.5,103.9 329.2,104.3 330.0,104.8 330.8,105.2 331.5,105.7 332.2,106.1 333.0,106.5 333.8,106.9 334.5,107.3 335.2,107.6 336.0,108.0 336.8,108.3 337.5,108.7 338.2,109.0 339.0,109.3 339.8,109.6 340.5,109.9 341.2,110.2 342.0,110.5 342.8,110.7 343.5,111.0 344.2,111.2 345.0,111.5 345.8,111.7 346.5,111.9 347.2,112.1 348.0,112.3 348.8,112.5 349.5,112.7 350.2,112.9 351.0,113.0 351.8,113.2 352.5,113.3 353.2,113.5 354.0,113.6 354.8,113.8 355.5,113.9 356.2,114.0 357.0,114.1 357.8,114.2 358.5,114.3 359.2,114.4 360.0,114.5 360.8,114.6 361.5,114.7 362.2,114.8 363.0,114.9 363.8,115.0 364.5,115.0 365.2,115.1 366.0,115.2 366.8,115.2 367.5,115.3 368.2,115.4 369.0,115.4 369.8,115.5 370.5,115.5 371.2,115.6 372.0,115.6 372.8,115.7 373.5,115.7 374.2,115.7 375.0,115.8 375.8,115.8 376.5,115.8 377.2,115.9 378.0,115.9 378.8,115.9 379.5,116.0 380.2,116.0 381.0,116.0 381.8,116.0 382.5,116.1 383.2,116.1 384.0,116.1 384.8,116.1 385.5,116.1 386.2,116.2 387.0,116.2 387.8,116.2 388.5,116.2 389.2,116.2 390.0,116.2"/>
+              <text x="10" y="180" class="b">ReLU</text>
+              <line class="ax" x1="10.0" y1="276.5" x2="190.0" y2="276.5"/>
+              <line class="ax" x1="100.0" y1="310.0" x2="100.0" y2="190.0"/>
+              <line class="grid" x1="10.0" y1="248.6" x2="190.0" y2="248.6"/>
+              <text x="8.0" y="252.6" text-anchor="end" class="sm">1</text>
+              <polyline class="ln s-v" points="10.0,276.5 10.7,276.5 11.5,276.5 12.3,276.5 13.0,276.5 13.8,276.5 14.5,276.5 15.2,276.5 16.0,276.5 16.8,276.5 17.5,276.5 18.2,276.5 19.0,276.5 19.8,276.5 20.5,276.5 21.2,276.5 22.0,276.5 22.7,276.5 23.5,276.5 24.2,276.5 25.0,276.5 25.7,276.5 26.5,276.5 27.3,276.5 28.0,276.5 28.8,276.5 29.5,276.5 30.2,276.5 31.0,276.5 31.8,276.5 32.5,276.5 33.2,276.5 34.0,276.5 34.8,276.5 35.5,276.5 36.2,276.5 37.0,276.5 37.8,276.5 38.5,276.5 39.2,276.5 40.0,276.5 40.8,276.5 41.5,276.5 42.2,276.5 43.0,276.5 43.8,276.5 44.5,276.5 45.2,276.5 46.0,276.5 46.8,276.5 47.5,276.5 48.2,276.5 49.0,276.5 49.8,276.5 50.5,276.5 51.2,276.5 52.0,276.5 52.8,276.5 53.5,276.5 54.2,276.5 55.0,276.5 55.8,276.5 56.5,276.5 57.2,276.5 58.0,276.5 58.8,276.5 59.5,276.5 60.2,276.5 61.0,276.5 61.8,276.5 62.5,276.5 63.2,276.5 64.0,276.5 64.8,276.5 65.5,276.5 66.2,276.5 67.0,276.5 67.8,276.5 68.5,276.5 69.2,276.5 70.0,276.5 70.8,276.5 71.5,276.5 72.2,276.5 73.0,276.5 73.8,276.5 74.5,276.5 75.2,276.5 76.0,276.5 76.8,276.5 77.5,276.5 78.2,276.5 79.0,276.5 79.8,276.5 80.5,276.5 81.2,276.5 82.0,276.5 82.7,276.5 83.5,276.5 84.2,276.5 85.0,276.5 85.8,276.5 86.5,276.5 87.2,276.5 88.0,276.5 88.8,276.5 89.5,276.5 90.2,276.5 91.0,276.5 91.8,276.5 92.5,276.5 93.2,276.5 94.0,276.5 94.8,276.5 95.5,276.5 96.2,276.5 97.0,276.5 97.8,276.5 98.5,276.5 99.2,276.5 100.0,276.5 100.8,275.8 101.5,275.1 102.3,274.4 103.0,273.7 103.8,273.0 104.5,272.3 105.2,271.6 106.0,270.9 106.8,270.2 107.5,269.5 108.2,268.8 109.0,268.1 109.8,267.4 110.5,266.7 111.2,266.0 112.0,265.3 112.8,264.7 113.5,264.0 114.3,263.3 115.0,262.6 115.8,261.9 116.5,261.2 117.2,260.5 118.0,259.8 118.8,259.1 119.5,258.4 120.2,257.7 121.0,257.0 121.8,256.3 122.5,255.6 123.2,254.9 124.0,254.2 124.8,253.5 125.5,252.8 126.2,252.1 127.0,251.4 127.8,250.7 128.5,250.0 129.2,249.3 130.0,248.6 130.8,247.9 131.5,247.2 132.2,246.5 133.0,245.8 133.8,245.1 134.5,244.4 135.2,243.7 136.0,243.0 136.8,242.3 137.5,241.6 138.2,240.9 139.0,240.2 139.8,239.5 140.5,238.8 141.2,238.1 142.0,237.4 142.8,236.7 143.5,236.0 144.2,235.3 145.0,234.7 145.8,234.0 146.5,233.3 147.2,232.6 148.0,231.9 148.8,231.2 149.5,230.5 150.2,229.8 151.0,229.1 151.8,228.4 152.5,227.7 153.2,227.0 154.0,226.3 154.8,225.6 155.5,224.9 156.2,224.2 157.0,223.5 157.8,222.8 158.5,222.1 159.2,221.4 160.0,220.7 160.8,220.0 161.5,219.3 162.2,218.6 163.0,217.9 163.8,217.2 164.5,216.5 165.2,215.8 166.0,215.1 166.7,214.4 167.5,213.7 168.3,213.0 169.0,212.3 169.8,211.6 170.5,210.9 171.2,210.2 172.0,209.5 172.8,208.8 173.5,208.1 174.2,207.4 175.0,206.7 175.8,206.0 176.5,205.3 177.2,204.7 178.0,204.0 178.8,203.3 179.5,202.6 180.2,201.9 181.0,201.2 181.8,200.5 182.5,199.8 183.2,199.1 184.0,198.4 184.8,197.7 185.5,197.0 186.2,196.3 187.0,195.6 187.8,194.9 188.5,194.2 189.2,193.5 190.0,192.8"/>
+              <path class="ln thin s-a dash" d="M10.0,276.5 L100.0,276.5 M100.0,248.6 L190.0,248.6"/>
+              <text x="210" y="180" class="b">leaky ReLU (a = 0.1)</text>
+              <line class="ax" x1="210.0" y1="276.5" x2="390.0" y2="276.5"/>
+              <line class="ax" x1="300.0" y1="310.0" x2="300.0" y2="190.0"/>
+              <line class="grid" x1="210.0" y1="248.6" x2="390.0" y2="248.6"/>
+              <text x="208.0" y="252.6" text-anchor="end" class="sm">1</text>
+              <polyline class="ln s-v" points="210.0,284.9 210.8,284.8 211.5,284.7 212.2,284.7 213.0,284.6 213.8,284.5 214.5,284.5 215.2,284.4 216.0,284.3 216.8,284.3 217.5,284.2 218.2,284.1 219.0,284.0 219.8,284.0 220.5,283.9 221.2,283.8 222.0,283.8 222.8,283.7 223.5,283.6 224.2,283.6 225.0,283.5 225.8,283.4 226.5,283.3 227.2,283.3 228.0,283.2 228.8,283.1 229.5,283.1 230.2,283.0 231.0,282.9 231.8,282.9 232.5,282.8 233.2,282.7 234.0,282.7 234.8,282.6 235.5,282.5 236.2,282.4 237.0,282.4 237.8,282.3 238.5,282.2 239.2,282.2 240.0,282.1 240.8,282.0 241.5,282.0 242.2,281.9 243.0,281.8 243.8,281.7 244.5,281.7 245.2,281.6 246.0,281.5 246.8,281.5 247.5,281.4 248.2,281.3 249.0,281.3 249.8,281.2 250.5,281.1 251.2,281.0 252.0,281.0 252.8,280.9 253.5,280.8 254.2,280.8 255.0,280.7 255.8,280.6 256.5,280.6 257.2,280.5 258.0,280.4 258.8,280.3 259.5,280.3 260.2,280.2 261.0,280.1 261.8,280.1 262.5,280.0 263.2,279.9 264.0,279.9 264.8,279.8 265.5,279.7 266.2,279.7 267.0,279.6 267.8,279.5 268.5,279.4 269.2,279.4 270.0,279.3 270.8,279.2 271.5,279.2 272.2,279.1 273.0,279.0 273.8,279.0 274.5,278.9 275.2,278.8 276.0,278.7 276.8,278.7 277.5,278.6 278.2,278.5 279.0,278.5 279.8,278.4 280.5,278.3 281.2,278.3 282.0,278.2 282.8,278.1 283.5,278.0 284.2,278.0 285.0,277.9 285.8,277.8 286.5,277.8 287.2,277.7 288.0,277.6 288.8,277.6 289.5,277.5 290.2,277.4 291.0,277.3 291.8,277.3 292.5,277.2 293.2,277.1 294.0,277.1 294.8,277.0 295.5,276.9 296.2,276.9 297.0,276.8 297.8,276.7 298.5,276.7 299.2,276.6 300.0,276.5 300.8,275.8 301.5,275.1 302.2,274.4 303.0,273.7 303.8,273.0 304.5,272.3 305.2,271.6 306.0,270.9 306.8,270.2 307.5,269.5 308.2,268.8 309.0,268.1 309.8,267.4 310.5,266.7 311.2,266.0 312.0,265.3 312.8,264.7 313.5,264.0 314.2,263.3 315.0,262.6 315.8,261.9 316.5,261.2 317.2,260.5 318.0,259.8 318.8,259.1 319.5,258.4 320.2,257.7 321.0,257.0 321.8,256.3 322.5,255.6 323.2,254.9 324.0,254.2 324.8,253.5 325.5,252.8 326.2,252.1 327.0,251.4 327.8,250.7 328.5,250.0 329.2,249.3 330.0,248.6 330.8,247.9 331.5,247.2 332.2,246.5 333.0,245.8 333.8,245.1 334.5,244.4 335.2,243.7 336.0,243.0 336.8,242.3 337.5,241.6 338.2,240.9 339.0,240.2 339.8,239.5 340.5,238.8 341.2,238.1 342.0,237.4 342.8,236.7 343.5,236.0 344.2,235.3 345.0,234.7 345.8,234.0 346.5,233.3 347.2,232.6 348.0,231.9 348.8,231.2 349.5,230.5 350.2,229.8 351.0,229.1 351.8,228.4 352.5,227.7 353.2,227.0 354.0,226.3 354.8,225.6 355.5,224.9 356.2,224.2 357.0,223.5 357.8,222.8 358.5,222.1 359.2,221.4 360.0,220.7 360.8,220.0 361.5,219.3 362.2,218.6 363.0,217.9 363.8,217.2 364.5,216.5 365.2,215.8 366.0,215.1 366.8,214.4 367.5,213.7 368.2,213.0 369.0,212.3 369.8,211.6 370.5,210.9 371.2,210.2 372.0,209.5 372.8,208.8 373.5,208.1 374.2,207.4 375.0,206.7 375.8,206.0 376.5,205.3 377.2,204.7 378.0,204.0 378.8,203.3 379.5,202.6 380.2,201.9 381.0,201.2 381.8,200.5 382.5,199.8 383.2,199.1 384.0,198.4 384.8,197.7 385.5,197.0 386.2,196.3 387.0,195.6 387.8,194.9 388.5,194.2 389.2,193.5 390.0,192.8"/>
+              <path class="ln thin s-a dash" d="M210.0,273.7 L300.0,273.7 M300.0,248.6 L390.0,248.6"/>
+              <text x="10" y="340" class="b">GELU</text>
+              <line class="ax" x1="10.0" y1="436.5" x2="190.0" y2="436.5"/>
+              <line class="ax" x1="100.0" y1="470.0" x2="100.0" y2="350.0"/>
+              <line class="grid" x1="10.0" y1="408.6" x2="190.0" y2="408.6"/>
+              <text x="8.0" y="412.6" text-anchor="end" class="sm">1</text>
+              <polyline class="ln s-v" points="10.0,436.6 10.7,436.6 11.5,436.6 12.3,436.7 13.0,436.7 13.8,436.7 14.5,436.7 15.2,436.7 16.0,436.7 16.8,436.7 17.5,436.7 18.2,436.8 19.0,436.8 19.8,436.8 20.5,436.8 21.2,436.8 22.0,436.8 22.7,436.9 23.5,436.9 24.2,436.9 25.0,436.9 25.7,437.0 26.5,437.0 27.3,437.0 28.0,437.1 28.8,437.1 29.5,437.1 30.2,437.2 31.0,437.2 31.8,437.2 32.5,437.3 33.2,437.3 34.0,437.4 34.8,437.4 35.5,437.5 36.2,437.5 37.0,437.6 37.8,437.6 38.5,437.7 39.2,437.7 40.0,437.8 40.8,437.8 41.5,437.9 42.2,438.0 43.0,438.0 43.8,438.1 44.5,438.2 45.2,438.2 46.0,438.3 46.8,438.4 47.5,438.5 48.2,438.5 49.0,438.6 49.8,438.7 50.5,438.8 51.2,438.9 52.0,439.0 52.8,439.0 53.5,439.1 54.2,439.2 55.0,439.3 55.8,439.4 56.5,439.5 57.2,439.6 58.0,439.7 58.8,439.8 59.5,439.8 60.2,439.9 61.0,440.0 61.8,440.1 62.5,440.2 63.2,440.3 64.0,440.4 64.8,440.4 65.5,440.5 66.2,440.6 67.0,440.7 67.8,440.7 68.5,440.8 69.2,440.9 70.0,440.9 70.8,441.0 71.5,441.0 72.2,441.1 73.0,441.1 73.8,441.2 74.5,441.2 75.2,441.2 76.0,441.2 76.8,441.3 77.5,441.3 78.2,441.3 79.0,441.2 79.8,441.2 80.5,441.2 81.2,441.2 82.0,441.1 82.7,441.0 83.5,441.0 84.2,440.9 85.0,440.8 85.8,440.7 86.5,440.6 87.2,440.5 88.0,440.4 88.8,440.2 89.5,440.1 90.2,439.9 91.0,439.7 91.8,439.5 92.5,439.3 93.2,439.1 94.0,438.9 94.8,438.6 95.5,438.4 96.2,438.1 97.0,437.8 97.8,437.5 98.5,437.2 99.2,436.9 100.0,436.5 100.8,436.2 101.5,435.8 102.3,435.4 103.0,435.0 103.8,434.6 104.5,434.2 105.2,433.7 106.0,433.3 106.8,432.8 107.5,432.3 108.2,431.8 109.0,431.3 109.8,430.8 110.5,430.3 111.2,429.7 112.0,429.2 112.8,428.6 113.5,428.1 114.3,427.5 115.0,426.9 115.8,426.3 116.5,425.6 117.2,425.0 118.0,424.4 118.8,423.7 119.5,423.0 120.2,422.4 121.0,421.7 121.8,421.0 122.5,420.3 123.2,419.6 124.0,418.9 124.8,418.2 125.5,417.5 126.2,416.8 127.0,416.0 127.8,415.3 128.5,414.5 129.2,413.8 130.0,413.0 130.8,412.3 131.5,411.5 132.2,410.7 133.0,410.0 133.8,409.2 134.5,408.4 135.2,407.7 136.0,406.9 136.8,406.1 137.5,405.3 138.2,404.5 139.0,403.7 139.8,403.0 140.5,402.2 141.2,401.4 142.0,400.6 142.8,399.8 143.5,399.0 144.2,398.2 145.0,397.4 145.8,396.7 146.5,395.9 147.2,395.1 148.0,394.3 148.8,393.5 149.5,392.7 150.2,392.0 151.0,391.2 151.8,390.4 152.5,389.6 153.2,388.9 154.0,388.1 154.8,387.3 155.5,386.5 156.2,385.8 157.0,385.0 157.8,384.2 158.5,383.5 159.2,382.7 160.0,382.0 160.8,381.2 161.5,380.5 162.2,379.7 163.0,379.0 163.8,378.2 164.5,377.5 165.2,376.7 166.0,376.0 166.7,375.2 167.5,374.5 168.3,373.8 169.0,373.0 169.8,372.3 170.5,371.5 171.2,370.8 172.0,370.1 172.8,369.4 173.5,368.6 174.2,367.9 175.0,367.2 175.8,366.5 176.5,365.7 177.2,365.0 178.0,364.3 178.8,363.6 179.5,362.9 180.2,362.1 181.0,361.4 181.8,360.7 182.5,360.0 183.2,359.3 184.0,358.6 184.8,357.9 185.5,357.2 186.2,356.4 187.0,355.7 187.8,355.0 188.5,354.3 189.2,353.6 190.0,352.9"/>
+              <polyline class="ln thin s-a dash" points="10.0,436.8 10.7,436.9 11.5,436.9 12.3,436.9 13.0,436.9 13.8,437.0 14.5,437.0 15.2,437.0 16.0,437.1 16.8,437.1 17.5,437.1 18.2,437.2 19.0,437.2 19.8,437.2 20.5,437.3 21.2,437.3 22.0,437.4 22.7,437.4 23.5,437.5 24.2,437.5 25.0,437.6 25.7,437.6 26.5,437.7 27.3,437.7 28.0,437.8 28.8,437.8 29.5,437.9 30.2,438.0 31.0,438.0 31.8,438.1 32.5,438.2 33.2,438.2 34.0,438.3 34.8,438.4 35.5,438.4 36.2,438.5 37.0,438.6 37.8,438.7 38.5,438.7 39.2,438.8 40.0,438.9 40.8,439.0 41.5,439.0 42.2,439.1 43.0,439.2 43.8,439.3 44.5,439.3 45.2,439.4 46.0,439.5 46.8,439.5 47.5,439.6 48.2,439.7 49.0,439.7 49.8,439.8 50.5,439.8 51.2,439.9 52.0,439.9 52.8,440.0 53.5,440.0 54.2,440.0 55.0,440.1 55.8,440.1 56.5,440.1 57.2,440.1 58.0,440.1 58.8,440.1 59.5,440.1 60.2,440.1 61.0,440.0 61.8,440.0 62.5,439.9 63.2,439.9 64.0,439.8 64.8,439.7 65.5,439.6 66.2,439.5 67.0,439.4 67.8,439.3 68.5,439.1 69.2,439.0 70.0,438.8 70.8,438.7 71.5,438.5 72.2,438.3 73.0,438.1 73.8,437.8 74.5,437.6 75.2,437.3 76.0,437.1 76.8,436.8 77.5,436.5 78.2,436.2 79.0,435.9 79.8,435.5 80.5,435.2 81.2,434.8 82.0,434.4 82.7,434.1 83.5,433.7 84.2,433.2 85.0,432.8 85.8,432.4 86.5,431.9 87.2,431.5 88.0,431.0 88.8,430.5 89.5,430.0 90.2,429.5 91.0,429.0 91.8,428.5 92.5,428.0 93.2,427.5 94.0,427.0 94.8,426.4 95.5,425.9 96.2,425.3 97.0,424.8 97.8,424.2 98.5,423.7 99.2,423.1 100.0,422.6 100.8,422.0 101.5,421.4 102.3,420.9 103.0,420.3 103.8,419.8 104.5,419.2 105.2,418.7 106.0,418.2 106.8,417.6 107.5,417.1 108.2,416.6 109.0,416.1 109.8,415.6 110.5,415.1 111.2,414.6 112.0,414.1 112.8,413.6 113.5,413.2 114.3,412.7 115.0,412.3 115.8,411.9 116.5,411.5 117.2,411.1 118.0,410.7 118.8,410.3 119.5,409.9 120.2,409.6 121.0,409.3 121.8,408.9 122.5,408.6 123.2,408.3 124.0,408.0 124.8,407.8 125.5,407.5 126.2,407.3 127.0,407.1 127.8,406.8 128.5,406.6 129.2,406.5 130.0,406.3 130.8,406.1 131.5,406.0 132.2,405.8 133.0,405.7 133.8,405.6 134.5,405.5 135.2,405.4 136.0,405.3 136.8,405.2 137.5,405.2 138.2,405.1 139.0,405.1 139.8,405.1 140.5,405.0 141.2,405.0 142.0,405.0 142.8,405.0 143.5,405.0 144.2,405.0 145.0,405.0 145.8,405.1 146.5,405.1 147.2,405.1 148.0,405.2 148.8,405.2 149.5,405.3 150.2,405.3 151.0,405.4 151.8,405.4 152.5,405.5 153.2,405.6 154.0,405.6 154.8,405.7 155.5,405.8 156.2,405.9 157.0,405.9 157.8,406.0 158.5,406.1 159.2,406.2 160.0,406.2 160.8,406.3 161.5,406.4 162.2,406.5 163.0,406.5 163.8,406.6 164.5,406.7 165.2,406.7 166.0,406.8 166.7,406.9 167.5,407.0 168.3,407.0 169.0,407.1 169.8,407.2 170.5,407.2 171.2,407.3 172.0,407.3 172.8,407.4 173.5,407.4 174.2,407.5 175.0,407.6 175.8,407.6 176.5,407.7 177.2,407.7 178.0,407.7 178.8,407.8 179.5,407.8 180.2,407.9 181.0,407.9 181.8,408.0 182.5,408.0 183.2,408.0 184.0,408.1 184.8,408.1 185.5,408.1 186.2,408.1 187.0,408.2 187.8,408.2 188.5,408.2 189.2,408.2 190.0,408.3"/>
+              <line class="ln s-v" x1="220" y1="380" x2="250" y2="380"/><text x="258" y="384">the function φ(z)</text>
+              <line class="ln thin s-a dash" x1="220" y1="410" x2="250" y2="410"/><text x="258" y="414">its slope φ′(z)</text>
+              <text x="220" y="350" class="sm">Each panel: z from −3 to 3.</text>
+              <text x="220" y="444" class="sm">Where the dashed line sits</text><text x="220" y="458" class="sm">at 0, no gradient flows.</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 9.3</b> Each activation (solid) with its slope (dashed). Sigmoid and tanh
+            have slopes that fall toward 0 at both ends: this is saturation. ReLU's slope is 1 for positive
+            $z$ and 0 for negative $z$. Leaky ReLU is drawn with $a = 0.1$ so you can see the leak; with the
+            usual $a = 0.01$ it looks almost like ReLU.</figcaption>
+          </figure>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
           <p class="codecap">every switch on the same inputs</p>
@@ -299,108 +435,119 @@ print(y)     # tensor(0.)      negative vote -> neuron stays silent</code></pre>
 
 z = torch.tensor([-2.0, -0.5, 0.0, 0.5, 2.0])
 
-print(torch.sigmoid(z))                    # (0,1):  [0.12, 0.38, 0.50, 0.62, 0.88]
-print(torch.tanh(z))                       # (-1,1): [-0.96, -0.46, 0.00, 0.46, 0.96]
-print(torch.relu(z))                       # [0,inf):[0.00, 0.00, 0.00, 0.50, 2.00]
-print(torch.nn.functional.leaky_relu(z))   # negatives leak: [-0.02, -0.005, 0, 0.5, 2]</code></pre>
+print(torch.sigmoid(z))                    # tensor([0.1192, 0.3775, 0.5000, 0.6225, 0.8808])
+print(torch.tanh(z))                       # tensor([-0.9640, -0.4621,  0.0000,  0.4621,  0.9640])
+print(torch.relu(z))                       # tensor([0.0000, 0.0000, 0.0000, 0.5000, 2.0000])
+print(torch.nn.functional.leaky_relu(z))   # tensor([-0.0200, -0.0050,  0.0000,  0.5000,  2.0000])</code></pre>
 
           <div class="callout pitfall">
             <div class="callout__label"><span class="ic">▲</span> Watch out</div>
-            <p>Don't reach for sigmoid or tanh in deep hidden layers by default. Because they flatten at the
-            ends, stacking many of them makes gradients shrink layer after layer until the early layers
-            barely learn — the <strong>vanishing gradient</strong> problem. Sigmoid still has a proper home:
-            the <em>final</em> layer of a binary classifier, where you genuinely want a 0-to-1 probability.
-            For the hidden layers in between, start with ReLU.</p>
+            <p>Do not use sigmoid or tanh in deep hidden layers by default. They are flat at the ends. When
+            you stack many of them, the gradients shrink layer after layer, and the early layers barely
+            learn. This is the <strong>vanishing gradient</strong> problem
+            (<a href="12-training-dynamics.html">Section 12</a>). Sigmoid still has a proper place: the
+            <em>final</em> layer of a binary classifier, where you want a probability between 0 and 1. For
+            the hidden layers, start with ReLU.</p>
           </div>
 
           <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">A neuron uses ReLU and its pre-activation is <code>z = −3.0</code>. What is its output, and what is the gradient flowing back through it during training?</span>
+                <span class="check__q">A ReLU neuron has pre-activation $z = -3$. What is its output, and what gradient flows back through it? What would change with Leaky ReLU ($a = 0.01$)?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>Since $z = -3.0 \lt 0$,
-                $\text{ReLU}(z) = \max(0, -3) = 0$ — the neuron is
-                silent. And ReLU's slope for negative inputs is <strong>0</strong>, so no gradient flows
-                back through this neuron on this example: it learns nothing from it. If the neuron sits in
-                the negative zone for every example, it's a <em>dead neuron</em> that never recovers — the
-                exact problem Leaky ReLU's small negative slope is designed to prevent.</p>
+                <p>With ReLU, the output is $\max(0, -3) = 0$ and the slope is <strong>0</strong>. So no
+                gradient flows back on this example, and the neuron's weights learn nothing from it. If $z$
+                is negative for every example, the neuron is dead. With Leaky ReLU, the output is
+                $0.01 \times (-3) = -0.03$ and the slope is $0.01$. The gradient is small but not zero, so the
+                weights can still change and the neuron can recover.</p>
+              </div>
+            </details>
+          </div>
+
+          <div class="check-wrap">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">Why can't we use a hard step function (output 1 if $z \gt 0$, else 0) as the activation and train it with gradients?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>The step function is flat everywhere except at $z = 0$, where it jumps. So its slope is
+                0 at every point where it is defined. Gradient descent multiplies by this slope, so every
+                weight gradient would be zero, and nothing would ever change. Sigmoid is a smooth version of
+                the step: it has the same “off, then on” shape, but its slope is never exactly zero.</p>
               </div>
             </details>
           </div>
 
           <!-- ===================== THE PROOF ===================== -->
-          <h2><span class="h-num">4</span>Why nonlinearity is not optional</h2>
+          <h2><span class="h-num">4</span>Why nonlinearity is necessary</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>Here is the claim, and it is worth proving because it justifies the entire existence of
-          activation functions: <strong>if you stack layers with no activation between them, the whole stack
-          is exactly equal to a single layer.</strong> A hundred plain matrix multiplies in a row have no
-          more power than one. The switch is the only thing that makes depth mean anything.</p>
+          <p>Here is the claim, and we will prove it. It is the reason activation functions exist.
+          <strong>if you stack layers with no activation between them, the whole stack equals a single
+          layer.</strong> A hundred plain matrix multiplies in a row have no more power than one. The
+          switch is the only thing that makes depth useful.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>Lay straight rulers end to end, as many as you like. Every ruler is straight, so the whole
-            chain is still one straight line — you never bend it into a curve, no matter how many rulers you
-            add. A linear layer is a straight ruler. To draw a curve you need a bend somewhere, and the
-            activation is the only place a bend can enter. No bend, no curve; no nonlinearity, no real
-            depth.</p>
+            <p>Place straight rulers end to end in one line, as many as you like. The chain is still one
+            straight line. You never get a curve, no matter how many rulers you add. A linear layer is a
+            straight ruler. To draw a curve you need a bend somewhere, and the activation is the only place
+            where a bend can enter.</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>Take two layers with <strong>no</strong> activation. The first maps
-          $\mathbf{x}$ to
-          $\mathbf{h}$, the second maps
-          $\mathbf{h}$ to
-          $\mathbf{y}$:</p>
+          <p>Take two layers with <strong>no</strong> activation. The first maps $\mathbf{x}$ to
+          $\mathbf{h}$, and the second maps $\mathbf{h}$ to $\mathbf{y}$:</p>
           $$ \mathbf{h} = \mathbf{W}_1\mathbf{x} + \mathbf{b}_1, \qquad
              \mathbf{y} = \mathbf{W}_2\mathbf{h} + \mathbf{b}_2 $$
-          <p>Now substitute the first equation into the second and simplify, one honest step at a time:</p>
+          <p>Now substitute the first equation into the second and simplify, one step at a time:</p>
           $$ \begin{aligned}
              \mathbf{y} &= \mathbf{W}_2\mathbf{h} + \mathbf{b}_2 \\[2pt]
                         &= \mathbf{W}_2\big(\mathbf{W}_1\mathbf{x} + \mathbf{b}_1\big) + \mathbf{b}_2
                         &&\text{(plug in } \mathbf{h}\text{)} \\[2pt]
                         &= \mathbf{W}_2\mathbf{W}_1\mathbf{x} + \mathbf{W}_2\mathbf{b}_1 + \mathbf{b}_2
-                        &&\text{(multiply through)} \\[2pt]
+                        &&\text{(multiply out)} \\[2pt]
                         &= \underbrace{\big(\mathbf{W}_2\mathbf{W}_1\big)}_{\mathbf{W}'}\mathbf{x}
                            + \underbrace{\big(\mathbf{W}_2\mathbf{b}_1 + \mathbf{b}_2\big)}_{\mathbf{b}'}
                         &&\text{(group the constants)} \\[2pt]
                         &= \mathbf{W}'\mathbf{x} + \mathbf{b}'
              \end{aligned} $$
-          <p class="gloss"><b>In words:</b> the two weight matrices multiply together into one new matrix
-          $\mathbf{W}' = \mathbf{W}_2\mathbf{W}_1$, and the two biases
-          fold into one new bias $\mathbf{b}' = \mathbf{W}_2\mathbf{b}_1 + \mathbf{b}_2$.
-          The result, $\mathbf{y} = \mathbf{W}'\mathbf{x} + \mathbf{b}'$,
-          is a <em>single</em> linear layer. The two-layer network and this one-layer network compute the
-          identical function.</p>
+          <p class="gloss"><b>In words:</b> the two weight matrices multiply into one new matrix
+          $\mathbf{W}' = \mathbf{W}_2\mathbf{W}_1$. The two biases combine into one new bias
+          $\mathbf{b}' = \mathbf{W}_2\mathbf{b}_1 + \mathbf{b}_2$. The result,
+          $\mathbf{y} = \mathbf{W}'\mathbf{x} + \mathbf{b}'$, is a <em>single</em> linear layer. The
+          two-layer network and this one-layer network compute the same function.</p>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> The punchline</div>
-            <p>Nothing in that derivation used the number two. Chain 100 activation-free layers and the same
-            collapse happens 99 times over: the product
-            $\mathbf{W}_{100}\cdots\mathbf{W}_2\mathbf{W}_1$ is just
-            <em>some</em> matrix $\mathbf{W}'$, and all the biases
-            fold into one $\mathbf{b}'$. A 100-layer linear network
-            is <strong>exactly</strong> as expressive as one layer — it can only ever draw straight lines
-            (technically, flat planes). All those extra parameters buy you nothing. The activation is what
-            breaks the collapse: because $\text{activation}(\mathbf{W}_2\,\text{activation}(\mathbf{W}_1\mathbf{x}))$
-            can't be flattened into one matrix, each real layer adds genuine new power.</p>
+            <p>Nothing in that derivation depends on the number two. Chain 100 layers without activations,
+            and the same collapse happens 99 times. The product $\mathbf{W}_{100}\cdots\mathbf{W}_1$ is
+            some single matrix $\mathbf{W}'$, and all the biases combine into one $\mathbf{b}'$. So a
+            100-layer linear network is <strong>exactly</strong> as expressive as one layer. It can only
+            draw straight lines (in more dimensions, flat planes). The extra parameters add nothing. The
+            activation breaks the collapse. The expression $\phi(\mathbf{W}_2\,\phi(\mathbf{W}_1\mathbf{x}))$
+            cannot be rewritten as one matrix times $\mathbf{x}$, so each real layer adds new power.</p>
           </div>
 
-          <p>So what <em>can</em> a network do once you put the nonlinearity back? Far more than you might
-          guess. The <strong>universal approximation theorem</strong> states that a network with just one
-          hidden layer — as long as it has a nonlinear activation and enough neurons — can approximate
-          <em>any</em> continuous function to any accuracy you want. “Approximate” means get as close as you
-          like everywhere; “continuous function” means any smooth input-to-output rule without sudden jumps.
-          In plain terms: the bend the activation provides, repeated across enough neurons, can be assembled
-          into any curve at all. That theorem is why neural networks are worth building — and it is silent,
-          worthless, the moment you delete the activation.</p>
+          <p>So what <em>can</em> a network do once the nonlinearity is back? A lot. The <strong>universal
+          approximation theorem</strong> says the following. Take a network with one hidden layer, a
+          nonlinear activation (such as ReLU or sigmoid), and enough neurons. It can approximate any
+          continuous function on a bounded range of inputs, as closely as you want. “Continuous” means the
+          function has no sudden jumps; it does not need to be smooth. “Bounded range” means a limited region,
+          for example every input between −10 and 10. We will not prove this here. The idea: each neuron
+          contributes one bend, and enough bends, placed well, can follow any curve. The theorem says
+          nothing about how many neurons you need, or whether training will find the right weights. And
+          without the activation, the theorem does not apply at all.</p>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
           <p class="codecap">watch two linear layers collapse into one</p>
           <pre><code class="language-python">import torch
+torch.manual_seed(0)
 
 W1 = torch.randn(4, 3); b1 = torch.randn(4)
 W2 = torch.randn(2, 4); b2 = torch.randn(2)
@@ -411,7 +558,7 @@ y_two = W2 @ (W1 @ x + b1) + b2
 
 # the single equivalent layer, built from the proof
 W_eq = W2 @ W1                 # (2x4)(4x3) -> (2x3)
-b_eq = W2 @ b1 + b2            # folded bias
+b_eq = W2 @ b1 + b2            # combined bias
 y_one = W_eq @ x + b_eq
 
 print(torch.allclose(y_two, y_one))   # True  -> same function, one layer</code></pre>
@@ -420,16 +567,16 @@ print(torch.allclose(y_two, y_one))   # True  -> same function, one layer</code>
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">A colleague builds a 10-layer network but forgets to add any activation functions. During training the loss drops a little then plateaus, and the model does no better than plain linear regression. Why?</span>
+                <span class="check__q">A colleague builds a 10-layer network but forgets the activation functions. The loss drops a little, then stops improving, and the model does no better than linear regression. Why? And what happens if you add ReLU only after layer 5?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>Without activations, all ten layers collapse into a single linear map
-                $\mathbf{W}'\mathbf{x} + \mathbf{b}'$ by the proof
-                above. The model literally <em>is</em> a linear model, so it can never beat one — the nine
-                extra layers add parameters but zero expressive power. It plateaus wherever a straight-line
-                fit plateaus. The fix is one line per layer: wrap each hidden layer's output in a
-                nonlinearity like ReLU, and the collapse can no longer happen.</p>
+                <p>Without activations, the ten layers collapse into one linear map
+                $\mathbf{W}'\mathbf{x} + \mathbf{b}'$ (see the proof above). The model <em>is</em> a linear
+                model, so it cannot beat one. It stops where a straight-line fit stops. With ReLU after layer
+                5 only, layers 1–5 collapse into one linear layer, and layers 6–10 collapse into another. So
+                you get a network with one hidden layer: nonlinear, but still much less than ten real layers.
+                The fix is an activation after every hidden layer.</p>
               </div>
             </details>
           </div>
@@ -438,17 +585,17 @@ print(torch.allclose(y_two, y_one))   # True  -> same function, one layer</code>
           <h2><span class="h-num">5</span>A real layer in PyTorch</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>You now have every piece: weights, bias, matrix multiply, activation. PyTorch bundles the
-          weighted sum and bias into <code>nn.Linear</code> and keeps the activation separate, so you compose
-          them yourself. Let's run a batch through one hidden layer with ReLU and watch the shapes flow — the
-          shapes are the proof that everything above is wired correctly.</p>
+          <p>You now have every piece: weights, bias, matrix multiply, activation. PyTorch combines the
+          weighted sum and the bias in <code>nn.Linear</code>. It keeps the activation separate, so you
+          combine the two yourself. Let's send a batch through one hidden layer with ReLU and follow the
+          shapes. If the shapes are right, the wiring is right.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>It's a two-stage assembly line. Station one (<code>Linear</code>) takes each incoming part,
-            weighs and combines it, and hands on a rough result. Station two (<code>ReLU</code>) is quality
-            control: anything below the bar is set to zero, the rest passes through unchanged. Same two
-            stations run on every item on the belt (every example in the batch), in lockstep.</p>
+            <p>Think of a two-station assembly line. Station one (<code>Linear</code>) takes each part and
+            combines its measurements into a rough result. Station two (<code>ReLU</code>) is a quality
+            check: it sets every value below zero to zero and passes the rest unchanged. The same two
+            stations process every item on the belt (every example in the batch).</p>
           </div>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
@@ -467,40 +614,55 @@ print("input :", x.shape)                      # torch.Size([32, 784])
 z = layer(x)                                   # weighted sum + bias:  x @ W.T + b
 print("linear:", z.shape)                      # torch.Size([32, 128])
 
-h = relu(z)                                    # apply the switch element-wise
+h = relu(z)                                    # apply the switch to every entry
 print("relu  :", h.shape)                      # torch.Size([32, 128])
 
-# proof the activation actually clipped the negatives:
-print("min after relu:", h.min().item())       # 0.0  -> nothing negative survives</code></pre>
+# check that the activation removed the negatives:
+print("min after relu:", h.min().item())       # 0.0  -> nothing negative remains</code></pre>
 
-          <p class="gloss"><b>In words:</b> the batch goes in as $(32, 784)$,
-          <code>Linear</code> turns each 784-number example into 128 numbers giving
-          $(32, 128)$, and <code>ReLU</code> keeps that shape while
-          zeroing every negative entry. Each row is one example's journey through the layer; the batch
-          dimension (32) just rides along untouched.</p>
+          <p class="gloss"><b>In words:</b> the batch goes in with shape $(32, 784)$. <code>Linear</code>
+          turns each 784-number example into 128 numbers, which gives $(32, 128)$. <code>ReLU</code> keeps
+          that shape and sets every negative entry to zero. Each row is one example. The batch dimension
+          (32) passes through unchanged.</p>
 
           <div class="callout pitfall">
             <div class="callout__label"><span class="ic">▲</span> Watch out</div>
-            <p>The <code>in_features</code> you pass to <code>nn.Linear</code> must equal the last dimension
-            of your input, and the next layer's <code>in_features</code> must equal this layer's
-            <code>out_features</code>. Mismatch and PyTorch throws a shape error the instant you call the
-            layer. When a network won't run, print the shape after every layer — the break is always where
-            two numbers that should match, don't.</p>
+            <p>The <code>in_features</code> of <code>nn.Linear</code> must equal the last dimension of its
+            input. The next layer's <code>in_features</code> must equal this layer's
+            <code>out_features</code>. If they do not match, PyTorch raises a shape error when you call the
+            layer. When a network does not run, print the shape after every layer. The error is where two
+            numbers that should be equal are different.</p>
+          </div>
+
+          <div class="check-wrap">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">You add a second layer <code>nn.Linear(784, 10)</code> after the ReLU above and call it on <code>h</code>. What happens, and what is the fix?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>PyTorch raises a shape error. The tensor <code>h</code> has shape (32, 128), so its last
+                dimension is 128, but the new layer expects 784 input features. The fix is
+                <code>nn.Linear(128, 10)</code>: its <code>in_features</code> must equal the previous
+                layer's <code>out_features</code>. The output then has shape (32, 10).</p>
+              </div>
+            </details>
           </div>
 
           <hr />
 
           <h2><span class="h-num">6</span>What to carry forward</h2>
           <ul>
-            <li>A <strong>neuron</strong> is $\text{activation}(\mathbf{w}^\top\mathbf{x} + b)$ — a weighted vote (weights say how much each input matters) plus a bias (baseline lean), pushed through a nonlinear switch.</li>
-            <li>A <strong>layer</strong> runs many neurons at once and is just one matrix multiply: $\mathbf{h} = \text{activation}(\mathbf{W}\mathbf{x} + \mathbf{b})$, mapping <b>n</b> inputs to <b>m</b> outputs.</li>
-            <li><strong>Activations</strong> differ by output range and gradient behaviour. <strong>ReLU</strong> ($\max(0,z)$) is the default hidden-layer switch: cheap and non-saturating for positive inputs. Sigmoid/tanh saturate; Leaky ReLU avoids dead neurons; GELU is the transformer default.</li>
-            <li><strong>The proof:</strong> stacked linear layers with no activation collapse to one layer — $\mathbf{W}'\mathbf{x} + \mathbf{b}'$. Nonlinearity is what makes depth real, and with it an MLP can approximate any continuous function.</li>
+            <li>A <strong>neuron</strong> computes $\phi(\mathbf{w}^\top\mathbf{x} + b)$: a weighted vote (weights say how much each input matters) plus a bias (the default lean), passed through a nonlinear switch $\phi$.</li>
+            <li>A <strong>layer</strong> runs many neurons at once with one matrix multiply: $\mathbf{h} = \phi(\mathbf{W}\mathbf{x} + \mathbf{b})$. It maps $n$ inputs to $m$ outputs, and $\mathbf{W}$ has shape $(m, n)$.</li>
+            <li><strong>Activations</strong> differ in output range and gradient behavior. <strong>ReLU</strong> ($\max(0,z)$) is the default for hidden layers: cheap, and it does not saturate for positive inputs. Sigmoid and tanh saturate. Leaky ReLU avoids dead neurons. GELU is the transformer default.</li>
+            <li><strong>The proof:</strong> stacked linear layers with no activation collapse to one layer, $\mathbf{W}'\mathbf{x} + \mathbf{b}'$. Nonlinearity makes depth useful. With it, a network with one hidden layer can approximate any continuous function on a bounded input range.</li>
           </ul>
-          <p>We have a network that can compute a forward pass. But its weights are random, so its answers
-          are nonsense. Next we learn how to <em>fix</em> those weights — how the gradient flows back through
-          every neuron and every activation to teach the whole stack at once. That's
-          <a href="10-backprop.html">backpropagation</a>, and it's where the network finally starts to learn.</p>
+          <p>We now have a network that can compute a forward pass. But its weights are random, so its
+          answers are nonsense. Next we learn how to <em>correct</em> those weights: how the gradient flows
+          back through every neuron and every activation to train the whole stack at once. That is
+          <a href="10-backprop.html">backpropagation</a>, and it is where the network starts to learn.</p>
 
           <div class="complete-bar" data-complete>
             <span class="complete-bar__text">Finished this section? Mark it done to fill your progress bar.</span>
