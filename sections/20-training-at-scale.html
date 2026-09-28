@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Training at Scale · ML Without the Magic</title>
-  <meta name="description" content="Batch norm vs layer norm, dropout, mixed precision, gradient accumulation, and an honest overview of distributed training — the practical machinery behind training large models." />
+  <meta name="description" content="Batch norm vs layer norm, dropout, mixed precision, gradient accumulation, and an overview of distributed training: the practical tools behind training large models." />
   <link rel="stylesheet" href="../assets/vendor/fonts/fonts.css" />
   <link rel="stylesheet" href="../assets/course.css" />
   <link rel="stylesheet" href="../assets/vendor/katex/katex.min.css" />
@@ -38,7 +38,7 @@
         <header class="lesson-head">
           <p class="lesson-eyebrow">Part 5 · Deep Learning Architectures <span class="dot"></span> Section 20</p>
           <h1 class="lesson-title">Training at Scale</h1>
-          <p class="lesson-standfirst">The gap between a model that trains on paper and one that trains on real hardware, in real time, on real data — normalization, dropout, half-precision numbers, and splitting work across machines.</p>
+          <p class="lesson-standfirst">What changes when a model trains on real hardware, in real time, on real data: normalization, dropout, half-precision numbers, and splitting work across machines.</p>
           <div class="lesson-meta">
             <span><b>28 min</b> read</span>
           </div>
@@ -55,127 +55,222 @@
         </header>
 
         <div class="prose">
-          <p class="lead">Everything so far has assumed you can just call <code>loss.backward()</code> and
-          <code>optimizer.step()</code> and be done. At real scale, a handful of practical techniques stand
-          between that idea and a model that actually trains stably, fits in memory, and finishes before
-          the deadline. None of it is exotic; all of it is necessary.</p>
+          <p class="lead">So far we assumed you can call <code>loss.backward()</code> and
+          <code>optimizer.step()</code> and be done. At real scale, you need a few practical techniques
+          more. They make the model train stably, fit in memory, and finish in time. None of them is
+          exotic, and all of them are necessary.</p>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> The one idea to hold onto</div>
-            <p>Every technique in this section solves one of two problems: keeping the numbers flowing
-            through the network <strong>well-behaved</strong> (normalization, dropout, mixed precision), or
-            making the most of <strong>limited hardware</strong> (gradient accumulation, distributed
-            training). Know which problem you're solving and the right tool is obvious.</p>
+            <p>Every technique in this section solves one of two problems. Some keep the numbers
+            flowing through the network <strong>well-behaved</strong> (normalization, dropout, mixed
+            precision). Others make the most of <strong>limited hardware</strong> (gradient
+            accumulation, distributed training). Know which problem you are solving, and the right tool
+            follows.</p>
           </div>
 
           <!-- ===================== NORMALIZATION ===================== -->
           <h2><span class="h-num">1</span>Normalization: the general recipe</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>As data flows through a deep network, the scale of the numbers at each layer can drift —
-          growing too large, shrinking too small, or shifting off-center — which makes training unstable.
-          <strong>Normalization</strong> is a layer that resets the numbers back to a well-behaved range
-          (centered around zero, with a controlled spread) at each step, then lets the network relearn
-          whatever scale and offset it actually needs.</p>
+          <p>As data flows through a deep network, the scale of the numbers at each layer can drift.
+          They can grow too large, shrink too small, or move off center, and this makes training
+          unstable. <strong>Normalization</strong> is a layer that brings the numbers back to a
+          well-behaved range: centered around zero, with a controlled spread. Then it lets the network
+          learn whatever scale and offset it needs.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>A sound engineer normalizes every microphone's volume to the same baseline level before a
-            concert, so no one instrument drowns out the others just because it happened to start too loud
-            or too quiet. Then, deliberately, they turn some instruments up and others down to get the mix
-            they actually want. Reset to a common baseline, then re-adjust on purpose — that's normalization.</p>
+            <p>A sound engineer first sets every microphone to the same baseline level before a
+            concert. So no instrument is too loud only because it started too loud. Then the engineer
+            turns some instruments up and others down on purpose, to get the mix they want. Reset to a
+            common baseline, then adjust on purpose: that is normalization.</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>The recipe is always the same two steps: first normalize, then let the network scale and shift
-          the result by its own learned amount.</p>
+          <p>The recipe is always the same two steps: first normalize, then let the network scale and
+          shift the result by its own learned amount.</p>
           $$
           \begin{aligned}
           z &= \frac{x - \mu}{\sqrt{\sigma^2 + \epsilon}} \\
           y &= \gamma\, z + \beta
           \end{aligned}
           $$
-          <p class="gloss"><b>In words:</b> <b>μ</b> (mu) is the mean and <b>σ²</b> (sigma-squared) is the
-          variance (how spread out the values are) — subtracting the mean and dividing by the spread gives
-          <b>z</b>, a version of <b>x</b> centered at 0 with spread 1. <b>ε</b> (epsilon) is a tiny constant
-          added purely so we never divide by zero when the variance happens to be 0. Then <b>γ</b> (gamma)
-          and <b>β</b> (beta) are <em>learned</em> numbers that rescale and re-shift the normalized value —
-          they let the network undo the normalization partially or fully if that turns out to be what's
-          best, rather than being stuck with "always centered at 0."</p>
+          <p class="gloss"><b>In words:</b> $\mu$ (mu) is the mean and $\sigma^2$ (sigma squared) is
+          the variance, which measures how spread out the values are. Subtracting the mean and
+          dividing by the standard deviation $\sigma$ gives $z$: a version of $x$ with mean 0 and
+          spread 1. $\epsilon$ (epsilon) is a tiny constant, for example $10^{-5}$, so we never divide
+          by zero. Then $\gamma$ (gamma) and $\beta$ (beta) are <em>learned</em> numbers that rescale
+          and shift the normalized value. They let the network undo the normalization, partly or
+          fully, if that works better. With $\gamma = \sigma$ and $\beta = \mu$ (ignoring $\epsilon$),
+          the layer gives back $x$ exactly.</p>
 
           <div class="callout definition">
             <div class="callout__label">Definition</div>
-            <p>The only real design choice in any normalization layer is <em>which numbers you average
-            together</em> to compute <b>μ</b> and <b>σ²</b>. Batch norm and layer norm are the same formula
-            above, applied over two different groups of numbers.</p>
-          </div>
-
-          <!-- ===================== BATCHNORM VS LAYERNORM ===================== -->
-          <h2><span class="h-num">2</span>Batch norm vs layer norm: which numbers get averaged</h2>
-
-          <p class="beat beat--intuition">Intuition first</p>
-          <p><strong>Batch normalization</strong> computes <b>μ</b> and <b>σ²</b> for each feature
-          separately, averaging <em>across all examples in the mini-batch</em>. <strong>Layer
-          normalization</strong> computes <b>μ</b> and <b>σ²</b> for each example separately, averaging
-          <em>across all features of that one example</em>. Same formula, one crucial difference: which
-          direction you slice the data to gather statistics from.</p>
-
-          <div class="callout parallel">
-            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p><strong>Batch norm</strong> is grading on a curve, per subject: your score on the math test
-            gets adjusted based on how the <em>whole class</em> did on that test — it depends on your
-            classmates. <strong>Layer norm</strong> is normalizing one student against their own report
-            card: comparing your math score to your own scores in history, art, and gym — it only ever
-            depends on you, never on anyone else in the room.</p>
-          </div>
-
-          <p class="beat beat--code">The same thing in PyTorch</p>
-          <pre><code class="language-python">import torch, torch.nn as nn
-
-x = torch.randn(32, 4)   # 32 examples in the batch, 4 features each
-
-bn = nn.BatchNorm1d(num_features=4)
-y_bn = bn(x)              # mean/var for each of the 4 features, computed across all 32 examples
-
-ln = nn.LayerNorm(normalized_shape=4)
-y_ln = ln(x)              # mean/var for each example, computed across its own 4 features</code></pre>
-
-          <div class="callout keyidea">
-            <div class="callout__label"><span class="ic">◆</span> Why transformers use layer norm</div>
-            <p>Layer norm's statistics never depend on other examples in the batch, which buys three things
-            transformers (<a href="18-transformers.html">Section 18</a>) need: it works fine with a
-            <strong>batch size of 1</strong> (batch norm degenerates there, since a single example gives a
-            variance of essentially zero); it doesn't care that different sequences in a batch have
-            <strong>different lengths</strong>, since it never mixes examples together; and it behaves
-            <strong>identically at training and test time</strong>, with no separate "running statistics"
-            bookkeeping that batch norm requires to make evaluation match training.</p>
-          </div>
-
-          <div class="callout pitfall">
-            <div class="callout__label"><span class="ic">▲</span> Watch out</div>
-            <p>Batch norm needs to behave the same on a single test example as it did on a full training
-            batch, so it tracks a <em>running average</em> of <b>μ</b> and <b>σ²</b> during training and
-            switches to using that running average at evaluation time — which is exactly what
-            <code>model.eval()</code> tells it to do (see <a href="15-debugging.html">Section 15</a>). Layer
-            norm has no such distinction: it computes real statistics from the actual input every single
-            time, train or eval, so there is nothing extra to get wrong.</p>
+            <p>The only real design choice in a normalization layer is <em>which numbers you average
+            together</em> to compute $\mu$ and $\sigma^2$. Batch norm and layer norm use the same formula
+            above, over two different groups of numbers.</p>
           </div>
 
           <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">Why does batch normalization behave badly (or fail outright) with a batch size of 1?</span>
+                <span class="check__q">A layer outputs the values $2, 4, 6$. Normalize them with $\epsilon = 0$, $\gamma = 1$, $\beta = 0$. Then say what changes if $\gamma = 3$ and $\beta = 1$.</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>Batch norm computes each feature's mean and variance <em>across the examples in the
-                batch</em>. With only one example, the "mean" of a single number is just that number, and
-                the variance is exactly 0 — the statistics carry no real information about spread, and
-                dividing by <code>sqrt(0 + ε)</code> makes the normalized value dominated entirely by the
-                tiny constant <b>ε</b>, not by anything meaningful in the data. Layer norm is unaffected,
-                because it always has many features within the one example to average over, regardless of
-                how many examples are in the batch.</p>
+                <p>The mean is $\mu = 4$. The variance is $\sigma^2 = (4 + 0 + 4)/3 = 8/3$, so
+                $\sigma \approx 1.63$. Then $z \approx (-1.22, 0, 1.22)$. With $\gamma = 3$ and
+                $\beta = 1$, the output is $y = 3z + 1 \approx (-2.67, 1, 4.67)$. The normalization
+                fixed the scale; the learned $\gamma$ and $\beta$ then chose a new one.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- ===================== BATCHNORM VS LAYERNORM ===================== -->
+          <h2><span class="h-num">2</span>Batch norm vs layer norm: which numbers get averaged</h2>
+
+          <p class="beat beat--intuition">Intuition first</p>
+          <p><strong>Batch normalization</strong> computes $\mu$ and $\sigma^2$ for each feature
+          separately. It averages <em>across all examples in the mini-batch</em>. <strong>Layer
+          normalization</strong> computes $\mu$ and $\sigma^2$ for each example separately. It averages
+          <em>across all features of that one example</em>. The formula is the same; the difference is
+          the direction in which you slice the data.</p>
+
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 380 210" role="img" aria-labelledby="fig-scale-1-t">
+                <title id="fig-scale-1-t">A batch of 6 examples by 4 features, twice. Batch norm averages one column (one feature over all examples); layer norm averages one row (one example over all features).</title>
+<text x="96" y="20" text-anchor="middle" class="b lg">batch norm</text>
+<text x="96" y="40" text-anchor="middle">features →</text>
+<rect class="f-k" x="40" y="50" width="25" height="17" rx="3"/>
+<rect class="f-v" x="68" y="50" width="25" height="17" rx="3"/>
+<rect class="f-k" x="96" y="50" width="25" height="17" rx="3"/>
+<rect class="f-k" x="124" y="50" width="25" height="17" rx="3"/>
+<rect class="f-k" x="40" y="70" width="25" height="17" rx="3"/>
+<rect class="f-v" x="68" y="70" width="25" height="17" rx="3"/>
+<rect class="f-k" x="96" y="70" width="25" height="17" rx="3"/>
+<rect class="f-k" x="124" y="70" width="25" height="17" rx="3"/>
+<rect class="f-k" x="40" y="90" width="25" height="17" rx="3"/>
+<rect class="f-v" x="68" y="90" width="25" height="17" rx="3"/>
+<rect class="f-k" x="96" y="90" width="25" height="17" rx="3"/>
+<rect class="f-k" x="124" y="90" width="25" height="17" rx="3"/>
+<rect class="f-k" x="40" y="110" width="25" height="17" rx="3"/>
+<rect class="f-v" x="68" y="110" width="25" height="17" rx="3"/>
+<rect class="f-k" x="96" y="110" width="25" height="17" rx="3"/>
+<rect class="f-k" x="124" y="110" width="25" height="17" rx="3"/>
+<rect class="f-k" x="40" y="130" width="25" height="17" rx="3"/>
+<rect class="f-v" x="68" y="130" width="25" height="17" rx="3"/>
+<rect class="f-k" x="96" y="130" width="25" height="17" rx="3"/>
+<rect class="f-k" x="124" y="130" width="25" height="17" rx="3"/>
+<rect class="f-k" x="40" y="150" width="25" height="17" rx="3"/>
+<rect class="f-v" x="68" y="150" width="25" height="17" rx="3"/>
+<rect class="f-k" x="96" y="150" width="25" height="17" rx="3"/>
+<rect class="f-k" x="124" y="150" width="25" height="17" rx="3"/>
+<text x="30" y="110" text-anchor="middle" transform="rotate(-90 30 110)">examples →</text>
+<text x="96" y="188" text-anchor="middle" class="tv b">one feature, all examples</text>
+<text x="286" y="20" text-anchor="middle" class="b lg">layer norm</text>
+<text x="286" y="40" text-anchor="middle">features →</text>
+<rect class="f-k" x="230" y="50" width="25" height="17" rx="3"/>
+<rect class="f-k" x="258" y="50" width="25" height="17" rx="3"/>
+<rect class="f-k" x="286" y="50" width="25" height="17" rx="3"/>
+<rect class="f-k" x="314" y="50" width="25" height="17" rx="3"/>
+<rect class="f-k" x="230" y="70" width="25" height="17" rx="3"/>
+<rect class="f-k" x="258" y="70" width="25" height="17" rx="3"/>
+<rect class="f-k" x="286" y="70" width="25" height="17" rx="3"/>
+<rect class="f-k" x="314" y="70" width="25" height="17" rx="3"/>
+<rect class="f-a" x="230" y="90" width="25" height="17" rx="3"/>
+<rect class="f-a" x="258" y="90" width="25" height="17" rx="3"/>
+<rect class="f-a" x="286" y="90" width="25" height="17" rx="3"/>
+<rect class="f-a" x="314" y="90" width="25" height="17" rx="3"/>
+<rect class="f-k" x="230" y="110" width="25" height="17" rx="3"/>
+<rect class="f-k" x="258" y="110" width="25" height="17" rx="3"/>
+<rect class="f-k" x="286" y="110" width="25" height="17" rx="3"/>
+<rect class="f-k" x="314" y="110" width="25" height="17" rx="3"/>
+<rect class="f-k" x="230" y="130" width="25" height="17" rx="3"/>
+<rect class="f-k" x="258" y="130" width="25" height="17" rx="3"/>
+<rect class="f-k" x="286" y="130" width="25" height="17" rx="3"/>
+<rect class="f-k" x="314" y="130" width="25" height="17" rx="3"/>
+<rect class="f-k" x="230" y="150" width="25" height="17" rx="3"/>
+<rect class="f-k" x="258" y="150" width="25" height="17" rx="3"/>
+<rect class="f-k" x="286" y="150" width="25" height="17" rx="3"/>
+<rect class="f-k" x="314" y="150" width="25" height="17" rx="3"/>
+<text x="220" y="110" text-anchor="middle" transform="rotate(-90 220 110)">examples →</text>
+<text x="286" y="188" text-anchor="middle" class="ta b">one example, all features</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 20.1</b> The same batch (rows are examples, columns are features). Batch norm computes one mean and variance per <em>column</em>, so it mixes examples. Layer norm computes one per <em>row</em>, so each example is handled alone.</figcaption>
+          </figure>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p><strong>Batch norm</strong> is grading on a curve, per subject. Your math score is
+            adjusted by how the <em>whole class</em> did on that test, so it depends on your
+            classmates. <strong>Layer norm</strong> compares one student with their own report card:
+            your math score against your own scores in history, art, and sports. It depends only on
+            you, never on anyone else in the room.</p>
+          </div>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">batch norm vs layer norm on the same batch</p>
+          <pre><code class="language-python">import torch, torch.nn as nn
+
+torch.manual_seed(0)
+x = torch.randn(32, 4)   # 32 examples in the batch, 4 features each
+
+bn = nn.BatchNorm1d(num_features=4)
+y_bn = bn(x)              # mean/var for each of the 4 features, across all 32 examples
+
+ln = nn.LayerNorm(normalized_shape=4)
+y_ln = ln(x)              # mean/var for each example, across its own 4 features
+
+print(y_bn.std(dim=0, correction=0))      # tensor([1.0000, 1.0000, 1.0000, 1.0000], ...)
+print(y_ln.std(dim=1, correction=0)[:3])  # tensor([1.0000, 1.0000, 1.0000], ...)</code></pre>
+          <p class="gloss"><b>In words:</b> after batch norm, each <em>column</em> (feature) has
+          spread 1. After layer norm, each <em>row</em> (example) has spread 1. Both means are 0 in
+          the same directions. (The <code>...</code> stands for the <code>grad_fn</code> part of the
+          printout.)</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> Why transformers use layer norm</div>
+            <p>Layer norm's statistics never depend on other examples in the batch. This gives
+            transformers (<a href="18-transformers.html">Section 18</a>) three things they need:</p>
+            <ul>
+              <li>It works with a <strong>batch size of 1</strong>. Batch norm cannot train there,
+              because one example has no spread across the batch.</li>
+              <li>It does not care that sequences in a batch have <strong>different lengths</strong>,
+              because it never mixes examples.</li>
+              <li>It behaves <strong>the same at training and test time</strong>. Batch norm needs
+              extra “running statistics” for evaluation to match training.</li>
+            </ul>
+          </div>
+
+          <div class="callout pitfall">
+            <div class="callout__label"><span class="ic">▲</span> Watch out</div>
+            <p>At test time, batch norm may see a single example, but it must still behave as in
+            training. So during training it keeps a <em>running average</em> of $\mu$ and $\sigma^2$.
+            At evaluation time it uses that running average instead of batch statistics. This is what
+            <code>model.eval()</code> switches on (see <a href="15-debugging.html">Section 15</a>).
+            Layer norm has no such difference. It computes its statistics from the actual input every
+            time, in training and in evaluation, so there is nothing extra to get wrong.</p>
+          </div>
+
+          <div class="check-wrap">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">You call <code>nn.BatchNorm1d(4)</code> in training mode on a batch of shape <code>(1, 4)</code>. What would the formula give, and what does PyTorch do?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>With one example, each feature's mean is that single value, so $x - \mu = 0$
+                exactly and the variance is 0. The normalized value is $z = 0/\sqrt{\epsilon} = 0$, so
+                every output would be $\beta$, whatever the input was. The layer would carry no
+                information. PyTorch refuses to do this and raises
+                <code>ValueError: Expected more than 1 value per channel when training</code>. In
+                <code>eval()</code> mode it works, because it uses the running statistics. Layer norm
+                has no problem: it averages over the 4 features of the one example.</p>
               </div>
             </details>
           </div>
@@ -184,51 +279,61 @@ y_ln = ln(x)              # mean/var for each example, computed across its own 4
           <h2><span class="h-num">3</span>Dropout: forcing redundancy</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p><strong>Dropout</strong> randomly zeroes out a fraction of a layer's units on every forward
-          pass during training. The network can no longer lean too heavily on any one unit, because that
-          unit might vanish on the very next step — so it's forced to spread the useful signal across many
-          units instead, which reduces overfitting.</p>
+          <p><strong>Dropout</strong> randomly sets a fraction of a layer's units to zero on every
+          forward pass during training. The network cannot depend too much on any one unit, because
+          that unit may be gone on the next step. So it must spread the useful signal across many
+          units, and this reduces overfitting.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>A sports team that rotates who starts each game, even its best player, ends up with a squad
-            where several players can competently fill any role. If the team only ever depended on one
-            star, losing that player to injury would be catastrophic. Dropout is that rotation policy,
-            applied to a neural network's units instead of a roster.</p>
+            <p>A sports team that rotates who starts each game, even its best player, gets a squad
+            where several players can fill any role. A team that always depends on one star is in
+            trouble when that player is injured. Dropout is that rotation policy, applied to the units
+            of a neural network.</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>During training, each unit is independently zeroed with probability <code>p</code>, and the
-          survivors are scaled up by <code>1/(1-p)</code> so the expected total signal stays the same:</p>
+          <p>During training, each unit is set to zero with probability $p$, independently of the
+          others. The surviving units are scaled up by $1/(1-p)$, so the expected value stays the
+          same:</p>
           $$ \text{dropout}(x_i) = \begin{cases} 0 & \text{with probability } p \\ \dfrac{x_i}{1-p} & \text{with probability } 1-p \end{cases} $$
-          <p class="gloss"><b>In words:</b> flip a biased coin for every unit. Heads (chance <b>p</b>): that
-          unit outputs 0 this step. Tails: the unit's value is divided by <b>1 − p</b> to make up for the
-          units that got zeroed, so the layer's total output stays roughly the same size on average whether
-          or not dropout is active. This rescaling is called <em>inverted dropout</em>, and it's what lets
-          dropout be a no-op at test time with zero extra work.</p>
+          <p class="gloss"><b>In words:</b> flip a biased coin for every unit. With chance $p$ the unit
+          outputs 0 this step. Otherwise its value is divided by $1 - p$ to make up for the zeroed
+          units. The expected output is then $p \cdot 0 + (1-p) \cdot x_i/(1-p) = x_i$, the same as
+          without dropout. This rescaling is called <em>inverted dropout</em>. Because of it, dropout
+          can do nothing at test time, with no extra work.</p>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
-          <pre><code class="language-python">drop = nn.Dropout(p=0.5)
+          <p class="codecap">dropout in training mode and in eval mode</p>
+          <pre><code class="language-python">import torch, torch.nn as nn
 
-model.train()
-y = drop(x)     # roughly half the entries become 0; survivors are doubled (1/(1-0.5))
+torch.manual_seed(0)
+drop = nn.Dropout(p=0.5)
+x = torch.ones(8)
 
-model.eval()
-y = drop(x)     # identity -- dropout does nothing at eval time, x passes through unchanged</code></pre>
+drop.train()    # inside a model, model.train() does this for every layer
+print(drop(x))  # tensor([0., 0., 2., 0., 0., 0., 2., 2.])  survivors doubled: 1/(1-0.5)
+
+drop.eval()     # inside a model, model.eval() does this
+print(drop(x))  # tensor([1., 1., 1., 1., 1., 1., 1., 1.])  identity at eval time</code></pre>
+          <p class="gloss"><b>In words:</b> in training mode each entry becomes 0 or 2. Here 3 of 8
+          survived; on average half do. In eval mode the layer passes $x$ through unchanged. When
+          dropout sits inside a model, <code>model.train()</code> and <code>model.eval()</code> set this
+          mode for all its layers.</p>
 
           <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">You forgot to call model.eval() before running validation. Predictions come out worse than expected and change slightly every time you re-run the same input. Why, specifically?</span>
+                <span class="check__q">Someone writes their own dropout: in training it zeros each unit with $p = 0.5$ but does <em>not</em> divide by $1 - p$. In eval it passes $x$ through. What goes wrong at test time, and how would you fix it without changing training?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>In training mode, dropout is still active: each forward pass zeroes a different random
-                subset of units, so the same input produces a different, noisier output every call — and
-                you're effectively evaluating with a random, incomplete slice of the network rather than the
-                full model. Calling <code>model.eval()</code> turns dropout into the identity function, so
-                every unit contributes every time, giving stable, deterministic, and stronger predictions.</p>
+                <p>In training, the next layer sees inputs whose expected value is $0.5\,x$, and it
+                learns weights for that scale. At test time it suddenly gets $x$, twice as large on
+                average, so its outputs are off. One fix is to multiply by $1 - p = 0.5$ at test time
+                (this is the original, non-inverted dropout). Inverted dropout moves that factor into
+                training instead, so evaluation needs no change.</p>
               </div>
             </details>
           </div>
@@ -237,66 +342,225 @@ y = drop(x)     # identity -- dropout does nothing at eval time, x passes throug
           <h2><span class="h-num">4</span>Mixed precision: same math, half the bits</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>Every number in a network is normally stored as a 32-bit float (<code>fp32</code>). Modern GPUs
-          can run much faster, and store roughly twice as much in memory, using a 16-bit format instead —
-          either <strong>fp16</strong> or <strong>bf16</strong> (two different ways of packing a number into
-          16 bits). <strong>Mixed precision</strong> training runs most of the network's math in 16-bit
-          numbers while keeping a few sensitive spots — like the master copy of the weights — in 32-bit, to
-          get the speed without losing correctness.</p>
+          <p>Every number in a network is normally stored as a 32-bit float (<dfn>fp32</dfn>). Modern
+          GPUs run much faster with a 16-bit format, and they can store about twice as many numbers in
+          the same memory. There are two common 16-bit formats, <dfn>fp16</dfn> and <dfn>bf16</dfn>,
+          which divide the 16 bits in different ways. <strong>Mixed precision</strong> training runs
+          most of the math in 16 bits. It keeps a few sensitive parts in 32 bits, such as the master
+          copy of the weights. You get the speed without losing correctness.</p>
+
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 380 225" role="img" aria-labelledby="fig-scale-2-t">
+                <title id="fig-scale-2-t">Bit layouts: fp32 has 1 sign, 8 exponent and 23 fraction bits; fp16 has 1, 5 and 10; bf16 has 1, 8 and 7.</title>
+<text x="20" y="18" class="b lg">fp32</text>
+<text x="68" y="18">0.1 is stored as 0.1000000015</text>
+<rect class="f-r" x="20.0" y="26" width="9.0" height="18"/>
+<rect class="f-a" x="30.5" y="26" width="9.0" height="18"/>
+<rect class="f-a" x="41.0" y="26" width="9.0" height="18"/>
+<rect class="f-a" x="51.5" y="26" width="9.0" height="18"/>
+<rect class="f-a" x="62.0" y="26" width="9.0" height="18"/>
+<rect class="f-a" x="72.5" y="26" width="9.0" height="18"/>
+<rect class="f-a" x="83.0" y="26" width="9.0" height="18"/>
+<rect class="f-a" x="93.5" y="26" width="9.0" height="18"/>
+<rect class="f-a" x="104.0" y="26" width="9.0" height="18"/>
+<rect class="f-v" x="114.5" y="26" width="9.0" height="18"/>
+<rect class="f-v" x="125.0" y="26" width="9.0" height="18"/>
+<rect class="f-v" x="135.5" y="26" width="9.0" height="18"/>
+<rect class="f-v" x="146.0" y="26" width="9.0" height="18"/>
+<rect class="f-v" x="156.5" y="26" width="9.0" height="18"/>
+<rect class="f-v" x="167.0" y="26" width="9.0" height="18"/>
+<rect class="f-v" x="177.5" y="26" width="9.0" height="18"/>
+<rect class="f-v" x="188.0" y="26" width="9.0" height="18"/>
+<rect class="f-v" x="198.5" y="26" width="9.0" height="18"/>
+<rect class="f-v" x="209.0" y="26" width="9.0" height="18"/>
+<rect class="f-v" x="219.5" y="26" width="9.0" height="18"/>
+<rect class="f-v" x="230.0" y="26" width="9.0" height="18"/>
+<rect class="f-v" x="240.5" y="26" width="9.0" height="18"/>
+<rect class="f-v" x="251.0" y="26" width="9.0" height="18"/>
+<rect class="f-v" x="261.5" y="26" width="9.0" height="18"/>
+<rect class="f-v" x="272.0" y="26" width="9.0" height="18"/>
+<rect class="f-v" x="282.5" y="26" width="9.0" height="18"/>
+<rect class="f-v" x="293.0" y="26" width="9.0" height="18"/>
+<rect class="f-v" x="303.5" y="26" width="9.0" height="18"/>
+<rect class="f-v" x="314.0" y="26" width="9.0" height="18"/>
+<rect class="f-v" x="324.5" y="26" width="9.0" height="18"/>
+<rect class="f-v" x="335.0" y="26" width="9.0" height="18"/>
+<rect class="f-v" x="345.5" y="26" width="9.0" height="18"/>
+<text x="25.2" y="60" text-anchor="middle" class="tr">s</text>
+<text x="72.5" y="60" text-anchor="middle" class="ta">exponent 8</text>
+<text x="235.2" y="60" text-anchor="middle" class="tv">fraction 23</text>
+<text x="20" y="96" class="b lg">fp16</text>
+<text x="68" y="96">0.1 is stored as 0.09998</text>
+<rect class="f-r" x="20.0" y="104" width="9.0" height="18"/>
+<rect class="f-a" x="30.5" y="104" width="9.0" height="18"/>
+<rect class="f-a" x="41.0" y="104" width="9.0" height="18"/>
+<rect class="f-a" x="51.5" y="104" width="9.0" height="18"/>
+<rect class="f-a" x="62.0" y="104" width="9.0" height="18"/>
+<rect class="f-a" x="72.5" y="104" width="9.0" height="18"/>
+<rect class="f-v" x="83.0" y="104" width="9.0" height="18"/>
+<rect class="f-v" x="93.5" y="104" width="9.0" height="18"/>
+<rect class="f-v" x="104.0" y="104" width="9.0" height="18"/>
+<rect class="f-v" x="114.5" y="104" width="9.0" height="18"/>
+<rect class="f-v" x="125.0" y="104" width="9.0" height="18"/>
+<rect class="f-v" x="135.5" y="104" width="9.0" height="18"/>
+<rect class="f-v" x="146.0" y="104" width="9.0" height="18"/>
+<rect class="f-v" x="156.5" y="104" width="9.0" height="18"/>
+<rect class="f-v" x="167.0" y="104" width="9.0" height="18"/>
+<rect class="f-v" x="177.5" y="104" width="9.0" height="18"/>
+<text x="25.2" y="138" text-anchor="middle" class="tr">s</text>
+<text x="56.8" y="138" text-anchor="middle" class="ta">exp 5</text>
+<text x="135.5" y="138" text-anchor="middle" class="tv">fraction 10</text>
+<text x="20" y="174" class="b lg">bf16</text>
+<text x="68" y="174">0.1 is stored as 0.1001</text>
+<rect class="f-r" x="20.0" y="182" width="9.0" height="18"/>
+<rect class="f-a" x="30.5" y="182" width="9.0" height="18"/>
+<rect class="f-a" x="41.0" y="182" width="9.0" height="18"/>
+<rect class="f-a" x="51.5" y="182" width="9.0" height="18"/>
+<rect class="f-a" x="62.0" y="182" width="9.0" height="18"/>
+<rect class="f-a" x="72.5" y="182" width="9.0" height="18"/>
+<rect class="f-a" x="83.0" y="182" width="9.0" height="18"/>
+<rect class="f-a" x="93.5" y="182" width="9.0" height="18"/>
+<rect class="f-a" x="104.0" y="182" width="9.0" height="18"/>
+<rect class="f-v" x="114.5" y="182" width="9.0" height="18"/>
+<rect class="f-v" x="125.0" y="182" width="9.0" height="18"/>
+<rect class="f-v" x="135.5" y="182" width="9.0" height="18"/>
+<rect class="f-v" x="146.0" y="182" width="9.0" height="18"/>
+<rect class="f-v" x="156.5" y="182" width="9.0" height="18"/>
+<rect class="f-v" x="167.0" y="182" width="9.0" height="18"/>
+<rect class="f-v" x="177.5" y="182" width="9.0" height="18"/>
+<text x="25.2" y="216" text-anchor="middle" class="tr">s</text>
+<text x="72.5" y="216" text-anchor="middle" class="ta">exponent 8</text>
+<text x="151.2" y="216" text-anchor="middle" class="tv">fraction 7</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 20.2</b> How each format splits its bits. The exponent bits (amber) set the <em>range</em>. The fraction bits (violet) set the <em>precision</em>. bf16 keeps fp32's 8 exponent bits, so it has the same range. fp16 keeps more fraction bits but has only 5 exponent bits. The stored values of 0.1 were computed with PyTorch.</figcaption>
+          </figure>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>A tailor doesn't measure every cut to the nearest micrometer — a millimeter of precision is
-            plenty for cloth, and using a coarser tool is faster and cheaper. But for one critical piece,
-            like fitting a watch gear, they switch back to the precise tool. Mixed precision is using the
-            coarser, faster measurement everywhere it's safe, and the precise one only where it truly
-            matters.</p>
+            <p>A shop rounds each receipt to the whole dollar, but it keeps the account balance to the
+            cent. Rounding receipts is fast and good enough. But suppose the balance itself were kept
+            in whole dollars: a purchase of 40 cents would round to zero and vanish, again and again.
+            Mixed precision works the same way. The forward and backward math uses 16 bits (the
+            receipts), while the master weights stay in fp32 (the balance). Many small updates can
+            then still add up.</p>
           </div>
 
-          <p class="beat beat--math">Now the math: why loss scaling exists</p>
-          <p><code>fp16</code> can represent numbers only within a much narrower range than <code>fp32</code>
-          before rounding them to zero. Many gradients during training are legitimately tiny — say,
-          <code>1e-8</code> — and a value that small can <strong>underflow</strong> in <code>fp16</code>
-          (round down to exactly 0.0), silently deleting a real gradient. <strong>Loss scaling</strong>
-          fixes this with one multiplication and one division:</p>
-          $$ \text{scaled\_loss} = s \cdot L, \qquad \nabla_{\text{used}} = \frac{1}{s}\,\nabla(\text{scaled\_loss}) $$
-          <p class="gloss"><b>In words:</b> multiply the loss <b>L</b> by a large scale factor <b>s</b>
-          (e.g. 1024 or higher) before calling <code>backward()</code>. By the chain rule, every gradient
-          computed from that scaled loss is also multiplied by <b>s</b>, which pushes tiny gradients up out
-          of the underflow zone and into a range <code>fp16</code> can represent. Right before the optimizer
-          uses them, divide back by the same <b>s</b> so the actual weight update is correct. <code>bf16</code>
-          has the same exponent range as <code>fp32</code> (it just drops precision, not range), so it
-          rarely needs this trick at all.</p>
+          <p>You can see that last point directly. In fp16, the numbers near 1.0 are about 0.001
+          apart. So <code>1.0 + 1e-4</code> rounds back to <code>1.0</code>, and a small weight update
+          is lost. In fp32 it gives <code>1.0001</code>.</p>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>fp16 has only 5 exponent bits, so its range is narrow. Its largest value is 65,504. Its
+          smallest normal value is $2^{-14} \approx 6.1 \times 10^{-5}$. Below that, fp16 has
+          <dfn>subnormal</dfn> numbers, which reach down to $2^{-24} \approx 6 \times 10^{-8}$ but with
+          fewer significant digits. Anything smaller <strong>underflows</strong>: it rounds to exactly
+          0. Many gradients during training are this small, for example $10^{-8}$. In fp16 such a
+          gradient becomes 0, and a real gradient is lost without any warning.
+          <strong>Loss scaling</strong> fixes this with one multiplication and one division:</p>
+          $$ L_{\text{scaled}} = s \cdot L, \qquad \nabla_{\text{used}} = \frac{1}{s}\,\nabla L_{\text{scaled}} $$
+          <p class="gloss"><b>In words:</b> multiply the loss $L$ by a large scale factor $s$ (for
+          example $2^{16} = 65536$) before calling <code>backward()</code>. By the chain rule, every
+          gradient computed from the scaled loss is also multiplied by $s$. This moves tiny gradients
+          out of the underflow zone into the range fp16 can store. Before the optimizer uses them,
+          divide by the same $s$ in fp32, so the weight update is correct. The format bf16 has the same exponent
+          range as fp32 (it drops precision, not range), so it rarely needs this trick.</p>
+
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 40 380 135" role="img" aria-labelledby="fig-scale-3-t">
+                <title id="fig-scale-3-t">A logarithmic number line for fp16: values below 6e-8 round to zero, values from 6e-8 to 6.1e-5 are subnormal, and values up to 65504 are normal. A gradient of 1e-8 times 65536 becomes 6.6e-4, inside the normal range.</title>
+                <defs>
+                  <marker id="ar20c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="f-i" d="M0,0 L10,5 L0,10 z"/></marker>
+                </defs>
+<rect class="f-rs" x="30.0" y="56" width="58.3" height="34"/>
+<text x="59.1" y="77" text-anchor="middle" >→ 0</text>
+<rect class="f-as" x="88.3" y="56" width="63.2" height="34"/>
+<text x="119.9" y="77" text-anchor="middle" >subnormal</text>
+<rect class="f-gs" x="151.5" y="56" width="189.6" height="34"/>
+<text x="246.3" y="77" text-anchor="middle" class="b">normal range</text>
+<line class="ax" x1="30" y1="90" x2="366" y2="90"/>
+<line class="ax" x1="30" y1="90" x2="30" y2="95"/>
+<text x="30" y="109" text-anchor="middle">1e-10</text>
+<line class="ax" x1="72" y1="90" x2="72" y2="95"/>
+<text x="72" y="109" text-anchor="middle">1e-8</text>
+<line class="ax" x1="114" y1="90" x2="114" y2="95"/>
+<text x="114" y="109" text-anchor="middle">1e-6</text>
+<line class="ax" x1="156" y1="90" x2="156" y2="95"/>
+<text x="156" y="109" text-anchor="middle">1e-4</text>
+<line class="ax" x1="198" y1="90" x2="198" y2="95"/>
+<text x="198" y="109" text-anchor="middle">1e-2</text>
+<line class="ax" x1="240" y1="90" x2="240" y2="95"/>
+<text x="240" y="109" text-anchor="middle">1</text>
+<line class="ax" x1="282" y1="90" x2="282" y2="95"/>
+<text x="282" y="109" text-anchor="middle">1e2</text>
+<line class="ax" x1="324" y1="90" x2="324" y2="95"/>
+<text x="324" y="109" text-anchor="middle">1e4</text>
+<line class="ax" x1="366" y1="90" x2="366" y2="95"/>
+<text x="366" y="109" text-anchor="middle">1e6</text>
+<circle class="f-r" cx="72" cy="90" r="5"/>
+<circle class="f-g" cx="173.1" cy="90" r="5"/>
+<path class="ln thin s-i" d="M72,118 Q122.57303927154884,152 170.1,120" marker-end="url(#ar20c)"/>
+<text x="72" y="140" text-anchor="middle" class="tr b">1e-8</text>
+<text x="122.6" y="162" text-anchor="middle">× 65536</text>
+<text x="179.1" y="140" class="tg b">6.6e-4</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 20.3</b> What fp16 can store, on a log scale. A gradient of $10^{-8}$ falls in the zone that rounds to 0. Multiplied by the loss scale 65536, it becomes about $6.6 \times 10^{-4}$, well inside the normal range. For bf16 the normal range goes down to about $10^{-38}$, far off the left edge.</figcaption>
+          </figure>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
-          <pre><code class="language-python">scaler = torch.cuda.amp.GradScaler()
+          <p class="codecap">underflow and loss scaling, checked on the CPU</p>
+          <pre><code class="language-python">import torch
+
+g = torch.tensor(1e-8)                     # a small but real fp32 gradient
+print(g.half())                            # tensor(0., dtype=torch.float16)  underflow
+s = 65536.0                                # loss scale, 2**16
+print((g * s).half())                      # tensor(0.0007, dtype=torch.float16)  safe
+print((g * s).half().float() / s)          # tensor(9.9972e-09)  unscaled in fp32
+print(g.bfloat16())                        # tensor(1.0012e-08, dtype=torch.bfloat16)
+
+w = torch.tensor(1.0, dtype=torch.float16)
+print(w + torch.tensor(1e-4, dtype=torch.float16))   # tensor(1., dtype=torch.float16)  lost
+print(torch.tensor(1.0) + 1e-4)                      # tensor(1.0001)  kept in fp32</code></pre>
+
+          <p>In a real training loop, PyTorch does the scaling for you. The loop below assumes a CUDA
+          GPU and the <code>model</code>, <code>optimizer</code>, <code>criterion</code>, and
+          <code>loader</code> from <a href="14-nn-module.html">Section 14</a>.</p>
+          <p class="codecap">a mixed-precision training loop with a gradient scaler</p>
+          <pre><code class="language-python">scaler = torch.amp.GradScaler("cuda")     # starts with s = 65536 and adapts it
 
 for xb, yb in loader:
     optimizer.zero_grad()
-    with torch.cuda.amp.autocast(dtype=torch.float16):
+    with torch.autocast("cuda", dtype=torch.float16):   # run the forward pass in fp16 where safe
         out = model(xb)
         loss = criterion(out, yb)
 
     scaler.scale(loss).backward()   # scale the loss up before backward
     scaler.step(optimizer)          # unscales gradients, then steps (skips the step if any are inf/NaN)
     scaler.update()                 # adjusts the scale factor for the next iteration</code></pre>
+          <p class="gloss"><b>In words:</b> <code>autocast</code> runs each operation in fp16 when that
+          is safe and in fp32 when it is not. The weights themselves stay in fp32. If a scaled gradient
+          overflows to <code>inf</code>, the scaler skips that step and lowers $s$. If many steps go
+          well, it raises $s$ again. With <code>dtype=torch.bfloat16</code> you can usually drop the
+          scaler.</p>
 
           <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">A gradient of 3e-8 is a real, non-zero value in fp32 but becomes exactly 0.0 in fp16. What does loss scaling do about it, mechanically?</span>
+                <span class="check__q">A gradient is $3 \times 10^{-8}$. What does fp16 store for it? And what happens if you use a scale of only $s = 1024$?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>Loss scaling multiplies the loss by a large constant <b>s</b> before <code>backward()</code>
-                runs, so by the chain rule every downstream gradient — including this one — is also
-                multiplied by <b>s</b>. A gradient of <code>3e-8 × 1024 ≈ 3e-5</code> is comfortably inside
-                <code>fp16</code>'s representable range and no longer rounds to zero. After
-                <code>backward()</code>, the scaled gradients are divided by <b>s</b> again before the
-                optimizer applies them, so the final weight update is mathematically the same as if you'd
-                never scaled anything — you only used the scaling to survive the trip through 16-bit
-                storage.</p>
+                <p>It does not become 0. It rounds to the smallest fp16 subnormal, $2^{-24} \approx
+                5.96 \times 10^{-8}$, which is about twice the true value. So the gradient is kept, but
+                with a large error. With $s = 1024$ the scaled value is about $3.1 \times 10^{-5}$.
+                That is still below the smallest normal value $6.1 \times 10^{-5}$, so it is subnormal
+                and has only a few correct digits. A larger scale such as 65536 moves it to about
+                $2 \times 10^{-3}$, fully in the normal range. After <code>backward()</code> the
+                gradients are divided by $s$ again, so the update is the same as without scaling.</p>
               </div>
             </details>
           </div>
@@ -305,128 +569,232 @@ for xb, yb in loader:
           <h2><span class="h-num">5</span>Gradient accumulation: a bigger batch on smaller memory</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>Sometimes the batch size you want doesn't fit in GPU memory. <strong>Gradient
-          accumulation</strong> fakes a large batch by processing several small "micro-batches" one at a
-          time, adding up their gradients without resetting them, and only calling
-          <code>optimizer.step()</code> once every few micro-batches — as if all of them had been one big
-          batch all along.</p>
+          <p>Sometimes the batch size you want does not fit in GPU memory. <strong>Gradient
+          accumulation</strong> builds a large batch from several small <dfn>micro-batches</dfn>. It
+          processes them one at a time and adds up their gradients without resetting them. It calls
+          <code>optimizer.step()</code> only once every few micro-batches, as if they were all one big
+          batch.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>You want to deposit 400 dollars but your wallet only holds 100 at a time. You make four trips to
-            the ATM, but you don't deposit each 100 separately into different sub-accounts — you add them
-            up and it's exactly as if you'd deposited 400 once. Gradient accumulation is four small trips
-            that add up to the one big deposit you actually wanted.</p>
+            <p>You survey 128 people, but your room holds only 32 at a time. So you run four sessions.
+            To get the average answer of all 128, you add the four session averages and divide by 4.
+            If you forget to divide, you report 4 times the true average. Gradient accumulation is the
+            same: each micro-batch loss is already an average, so you divide it by the number of
+            micro-batches.</p>
           </div>
 
+          <p class="beat beat--math">Now the math</p>
+          <p>Split a batch of $N$ examples into $M$ micro-batches of $N/M$ examples each. Let $L_m$ be
+          the mean loss of micro-batch $m$. The mean loss of the full batch is then the mean of the
+          micro-batch means:</p>
+          $$ L = \frac{1}{N}\sum_{n=1}^{N} \ell_n = \frac{1}{M}\sum_{m=1}^{M} \underbrace{\frac{M}{N}\sum_{n \in m} \ell_n}_{L_m} = \sum_{m=1}^{M} \frac{L_m}{M} $$
+          <p class="gloss"><b>In words:</b> $\ell_n$ is the loss of example $n$. Because gradients add
+          up, $\nabla L = \sum_m \nabla (L_m / M)$. So if each micro-batch calls
+          <code>backward()</code> on $L_m / M$, the summed <code>.grad</code> is exactly the gradient of
+          one full batch.</p>
+
           <p class="beat beat--code">The same thing in PyTorch</p>
-          <pre><code class="language-python">accumulation_steps = 4        # 4 micro-batches of 32 == an effective batch of 128
-optimizer.zero_grad()
+          <p class="codecap">four micro-batches give the same gradient as one batch of 128</p>
+          <pre><code class="language-python">import torch, torch.nn as nn
 
-for i, (xb, yb) in enumerate(loader):
-    out = model(xb)
-    loss = criterion(out, yb) / accumulation_steps   # average, not sum, across micro-batches
-    loss.backward()                                   # gradients ACCUMULATE in .grad (no zero_grad yet)
+torch.manual_seed(0)
+model = nn.Linear(10, 1)
+criterion = nn.MSELoss()
+X, Y = torch.randn(128, 10), torch.randn(128, 1)
 
-    if (i + 1) % accumulation_steps == 0:
-        optimizer.step()
-        optimizer.zero_grad()</code></pre>
+# (a) one true batch of 128
+model.zero_grad()
+criterion(model(X), Y).backward()
+g_full = model.weight.grad.clone()
+
+# (b) 4 micro-batches of 32, each loss divided by 4
+accumulation_steps = 4
+model.zero_grad()
+for xb, yb in zip(X.split(32), Y.split(32)):
+    loss = criterion(model(xb), yb) / accumulation_steps
+    loss.backward()                      # gradients ADD UP in .grad (no zero_grad yet)
+g_acc = model.weight.grad.clone()
+
+print(torch.allclose(g_full, g_acc, atol=1e-6))                 # True
+print((g_acc * accumulation_steps).norm() / g_full.norm())      # tensor(4.)  without the division</code></pre>
+          <p class="gloss"><b>In words:</b> the accumulated gradient matches the full-batch gradient.
+          Without the division it would be 4 times larger. In a real loop you call
+          <code>optimizer.step()</code> and <code>optimizer.zero_grad()</code> once every
+          <code>accumulation_steps</code> micro-batches, for example with
+          <code>if (i + 1) % accumulation_steps == 0:</code>.</p>
 
           <div class="callout pitfall">
             <div class="callout__label"><span class="ic">▲</span> Watch out</div>
-            <p>Dividing the loss by <code>accumulation_steps</code> is not optional. Skip it and four
-            accumulated micro-batch gradients add up to roughly 4× the gradient a true batch of 128 would
-            have produced — which behaves like secretly training with a 4× larger learning rate, and can
-            destabilize training in a way that looks like an unrelated bug.</p>
+            <p>Dividing the loss by <code>accumulation_steps</code> is not optional. Without it, four
+            accumulated micro-batch gradients add up to 4 times the gradient of a true batch of 128.
+            With plain SGD this acts like a 4 times larger learning rate. It can make training
+            unstable in a way that looks like an unrelated bug.</p>
           </div>
 
           <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">You accumulate gradients over 4 micro-batches of size 32 but forget to divide the loss by 4. How does this actually change what the optimizer does, compared to a true batch of 128?</span>
+                <span class="check__q">You forget to divide by 4, but your optimizer is Adam, not SGD. Does the mistake still matter as much?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>A true batch of 128 with a mean-reduced loss produces one gradient that's the average
-                over 128 examples. Without dividing, summing 4 un-averaged micro-batch losses (each already
-                averaged over its own 32) produces a gradient that's roughly 4x too large before the
-                optimizer step. The optimizer then applies an update as if the learning rate were 4x higher
-                than configured — which can cause instability or divergence that has nothing to do with the
-                model itself, only with this missing division.</p>
+                <p>Much less. Adam divides each gradient by a running estimate of its own size (<a
+                href="12-training-dynamics.html">Section 12</a>). If every gradient is 4 times larger,
+                that estimate is also 4 times larger, and the ratio is almost unchanged. Only the small
+                $\epsilon$ in the denominator breaks the cancellation. In a quick test, three Adam steps
+                moved the weights by the same amount with and without the factor 4, while SGD moved them
+                about twice as far. It is still a bug: gradient clipping, weight decay, and logged
+                gradient norms all see the wrong size.</p>
               </div>
             </details>
           </div>
 
           <!-- ===================== DISTRIBUTED TRAINING ===================== -->
-          <h2><span class="h-num">6</span>Distributed training: an honest overview</h2>
+          <h2><span class="h-num">6</span>Distributed training: an overview</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>When a model or dataset is too large for one machine, the work is split across several. There
-          is no single "distributed training" technique — there are a few different things you can split,
-          and real systems often combine them. None of it is magic: it all costs communication between
-          machines, and that communication is usually the actual bottleneck, not the computation.</p>
+          <p>When a model or dataset is too large for one machine, the work is split across several.
+          There is no single “distributed training” technique. You can split different things, and
+          real systems often combine several splits. Every split costs communication between devices,
+          and that communication is often the real limit, not the computation.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>A restaurant kitchen with one overloaded chef can add more chefs. You could give each chef an
-            identical copy of the full menu and have them each cook different tables' orders (data
-            parallelism). Or you could have one chef only do sauces and hand plates to a chef who only does
-            grilling, in a chain (pipeline parallelism). Either way, the moment plates need to move between
-            chefs is the moment things can slow down — coordination has a cost.</p>
+            <p>A school must grade a large stack of exams. It can give each teacher the same answer key
+            and a different pile of exams (data parallelism). Or each teacher can grade only one page
+            and pass the exam to the next teacher (pipeline parallelism). Either way, the teachers must
+            coordinate: meet to combine notes, or wait for the exam from the previous teacher. That
+            coordination costs time.</p>
           </div>
 
-          <p class="beat beat--math">Data parallelism, the workhorse</p>
-          <p>The most common setup by far is <strong>data parallelism</strong>: every device (GPU) holds a
-          full, identical copy of the model. Each device processes a different slice of the data and
-          computes its own gradients independently. Then, before anyone updates their weights, all devices
-          combine their gradients with an <strong>all-reduce</strong> — a collective operation where every
-          device ends up with the same combined (typically averaged) gradient — so every replica applies an
-          identical update and stays in sync.</p>
+          <h3>Data parallelism, the most common setup</h3>
+          <p>In <strong>data parallelism</strong>, every device (GPU) holds a full copy of the model.
+          Each device processes a different slice of the data and computes its own gradients. Then,
+          before any weights change, all devices combine their gradients with an
+          <strong>all-reduce</strong>. An all-reduce is a group operation after which every device holds
+          the same combined (usually averaged) gradient. So every copy applies the same update and the
+          copies stay the same. With 4 GPUs of 32 examples each, this is the gradient of one batch of
+          128, as in gradient accumulation.</p>
 
+          <p>A full copy on every GPU wastes memory. With Adam, each parameter also needs two optimizer
+          values and a gradient. <dfn>Sharded</dfn> data parallelism fixes this: each GPU stores only
+          its share of the weights, gradients, and optimizer state, and collects the rest when it needs
+          them. This is <dfn>ZeRO</dfn> (from DeepSpeed) and <dfn>FSDP</dfn> (Fully Sharded Data
+          Parallel, in PyTorch).</p>
+
+          <p>When the model itself is split, there are other options:</p>
           <ul>
-            <li><strong>Model / tensor parallelism</strong> — the model itself is too big to fit on one
-            device, so individual layers, or even individual matrices within a layer, are split across
-            devices, and a single forward pass requires those devices to exchange intermediate results.</li>
-            <li><strong>Pipeline parallelism</strong> — different layers of the model live on different
-            devices, and data flows through them like a factory assembly line, with each device handing its
-            output to the next.</li>
+            <li><strong>Tensor parallelism</strong>: single layers, or even single matrices, are split
+            across devices. One forward pass then needs those devices to exchange intermediate
+            results.</li>
+            <li><strong>Pipeline parallelism</strong>: different layers live on different devices. Data
+            flows through them like an assembly line, and each device passes its output to the
+            next.</li>
+            <li><strong>Expert parallelism</strong>: in a mixture-of-experts model, different experts
+            live on different devices, and each token is sent to the device of its expert (<a
+            href="22-moe.html">Section 22</a>).</li>
           </ul>
 
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 380 258" role="img" aria-labelledby="fig-scale-4-t">
+                <title id="fig-scale-4-t">Top: three GPUs each hold the full model and a different data slice, and an all-reduce averages their gradients. Bottom: three GPUs each hold a third of the layers and pass activations along.</title>
+                <defs>
+                  <marker id="ar20d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="f-i" d="M0,0 L10,5 L0,10 z"/></marker>
+                </defs>
+<text x="10" y="18" class="b lg">Data parallelism</text>
+<rect class="f-vs" x="10" y="30" width="112" height="56" rx="8"/>
+<text x="66" y="50" text-anchor="middle" class="b">GPU 0</text>
+<text x="66" y="66" text-anchor="middle">full model</text>
+<text x="66" y="80" text-anchor="middle">data slice 0</text>
+<line class="ln thin s-i" x1="66" y1="89" x2="66" y2="104" marker-end="url(#ar20d)"/>
+<rect class="f-vs" x="135" y="30" width="112" height="56" rx="8"/>
+<text x="191" y="50" text-anchor="middle" class="b">GPU 1</text>
+<text x="191" y="66" text-anchor="middle">full model</text>
+<text x="191" y="80" text-anchor="middle">data slice 1</text>
+<line class="ln thin s-i" x1="191" y1="89" x2="191" y2="104" marker-end="url(#ar20d)"/>
+<rect class="f-vs" x="260" y="30" width="112" height="56" rx="8"/>
+<text x="316" y="50" text-anchor="middle" class="b">GPU 2</text>
+<text x="316" y="66" text-anchor="middle">full model</text>
+<text x="316" y="80" text-anchor="middle">data slice 2</text>
+<line class="ln thin s-i" x1="316" y1="89" x2="316" y2="104" marker-end="url(#ar20d)"/>
+<rect class="f-as" x="10" y="108" width="362" height="28" rx="8"/>
+<text x="191" y="127" text-anchor="middle" class="b">all-reduce: every GPU gets the average gradient</text>
+<text x="10" y="172" class="b lg">Pipeline parallelism</text>
+<rect class="f-gs" x="10" y="184" width="112" height="44" rx="8"/>
+<text x="66" y="202" text-anchor="middle" class="b">GPU 0</text>
+<text x="66" y="218" text-anchor="middle">layers 1–4</text>
+<line class="ln thin s-i" x1="124" y1="206" x2="132" y2="206" marker-end="url(#ar20d)"/>
+<rect class="f-gs" x="135" y="184" width="112" height="44" rx="8"/>
+<text x="191" y="202" text-anchor="middle" class="b">GPU 1</text>
+<text x="191" y="218" text-anchor="middle">layers 5–8</text>
+<line class="ln thin s-i" x1="249" y1="206" x2="257" y2="206" marker-end="url(#ar20d)"/>
+<rect class="f-gs" x="260" y="184" width="112" height="44" rx="8"/>
+<text x="316" y="202" text-anchor="middle" class="b">GPU 2</text>
+<text x="316" y="218" text-anchor="middle">layers 9–12</text>
+<text x="191" y="248" text-anchor="middle">each GPU passes its activations to the next</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 20.4</b> Two ways to split the work. In data parallelism the devices exchange <em>gradients</em> once per step. In pipeline parallelism they pass <em>activations</em> forward (and their gradients backward) between layers.</figcaption>
+          </figure>
+
           <div class="callout keyidea">
-            <div class="callout__label"><span class="ic">◆</span> The honest bottleneck</div>
-            <p>Adding devices doesn't automatically make training proportionally faster. Every one of these
-            strategies requires devices to send data to each other — gradients in data parallelism,
-            activations in tensor and pipeline parallelism — over a network that is almost always slower
-            than the computation itself. Past a certain scale, training speed is limited by how fast
-            machines can talk to each other, not by how fast any one of them can compute. This is why
-            hardware interconnect (the physical links between devices) matters as much as raw compute in
-            large-scale training.</p>
+            <div class="callout__label"><span class="ic">◆</span> The real bottleneck</div>
+            <p>Adding devices does not automatically make training proportionally faster. Every
+            strategy needs devices to send data to each other: gradients in data parallelism,
+            activations in tensor and pipeline parallelism. The links between devices are usually
+            slower than the computation. Past a certain scale, training speed depends on how fast
+            devices can communicate, not on how fast each one computes. This is why the interconnect
+            (the physical links between devices) matters as much as raw compute in large-scale
+            training.</p>
+          </div>
+
+          <div class="check-wrap">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">A model fits on one GPU for inference but runs out of memory in training with Adam. You have 8 GPUs. Does plain data parallelism help? What would?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>Plain data parallelism does not help with memory. Every GPU still holds the full
+                weights, gradients, and Adam state, so each one runs out of memory the same way. It only
+                helps with speed. Sharded data parallelism (FSDP or ZeRO) does help. Each of the 8 GPUs
+                stores about one eighth of the gradients and optimizer state (and, in the full version,
+                of the weights). Smaller micro-batches with gradient accumulation also reduce activation
+                memory.</p>
+              </div>
+            </details>
           </div>
 
           <hr />
 
           <h2><span class="h-num">7</span>What to carry forward</h2>
           <ul>
-            <li>Every normalization layer is <strong>normalize, then scale-and-shift</strong>:
-            $y = \gamma(x-\mu)/\sqrt{\sigma^2+\epsilon} + \beta$. The
-            only difference between variants is which numbers <b>μ</b> and <b>σ²</b> are computed over.</li>
-            <li><strong>Batch norm</strong> normalizes each feature across the batch (depends on other
-            examples); <strong>layer norm</strong> normalizes each example across its own features
-            (independent of the batch) — which is why transformers use layer norm.</li>
-            <li><strong>Dropout</strong> randomly zeroes units during training to prevent over-reliance on
-            any one of them, and is switched off entirely by <code>model.eval()</code>.</li>
-            <li><strong>Mixed precision</strong> trades numeric range for speed and memory; <strong>loss
-            scaling</strong> keeps tiny <code>fp16</code> gradients from rounding to zero.</li>
-            <li><strong>Gradient accumulation</strong> simulates a large batch on limited memory by summing
-            (averaged) micro-batch gradients before one optimizer step.</li>
-            <li><strong>Distributed training</strong> splits either the data (data parallelism) or the model
-            itself (model/tensor/pipeline parallelism) across devices — and communication between devices,
-            not raw compute, is usually the real limiting factor.</li>
+            <li>Every normalization layer is <strong>normalize, then scale and shift</strong>:
+            $$y = \gamma\,\frac{x-\mu}{\sqrt{\sigma^2+\epsilon}} + \beta.$$ The only difference between
+            variants is which numbers $\mu$ and $\sigma^2$ are computed over.</li>
+            <li><strong>Batch norm</strong> normalizes each feature across the batch (it depends on
+            other examples). <strong>Layer norm</strong> normalizes each example across its own features
+            (it is independent of the batch), which is why transformers use layer norm.</li>
+            <li><strong>Dropout</strong> randomly zeros units during training so the network does not
+            depend on any one of them. <code>model.eval()</code> switches it off.</li>
+            <li><strong>Mixed precision</strong> trades precision (and, for fp16, range) for speed and
+            memory. <strong>Loss scaling</strong> keeps tiny fp16 gradients from rounding to zero, and
+            fp32 master weights keep small updates.</li>
+            <li><strong>Gradient accumulation</strong> builds a large batch on limited memory by summing
+            micro-batch gradients, each divided by the number of micro-batches, before one optimizer
+            step.</li>
+            <li><strong>Distributed training</strong> splits the data (data parallelism, optionally
+            sharded with FSDP or ZeRO) or the model (tensor, pipeline, or expert parallelism) across
+            devices. Communication between devices, not raw compute, is often the real limit.</li>
           </ul>
 
-          <p>Next we switch from building to reading — how to pull a real algorithm out of a research
-          paper in <a href="21-reading-papers.html">Section 21</a>, the last skill before the capstone.</p>
+          <p>Next we move from building to reading: how to get a real algorithm out of a research
+          paper, in <a href="21-reading-papers.html">Section 21</a>. It is the last skill before the
+          capstone.</p>
 
           <div class="complete-bar" data-complete>
             <span class="complete-bar__text">Finished this section? Mark it done to fill your progress bar.</span>
