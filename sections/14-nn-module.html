@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>nn.Module &amp; the Training Loop · ML Without the Magic</title>
-  <meta name="description" content="How nn.Module snaps layers together, how Dataset and DataLoader feed them minibatches, and the six-line training loop — zero_grad, forward, loss, backward, step — that every PyTorch model runs." />
+  <meta name="description" content="How nn.Module snaps layers together, how Dataset and DataLoader feed them minibatches, and the training loop of five calls (zero_grad, forward, loss, backward, step) that every PyTorch model runs." />
   <link rel="stylesheet" href="../assets/vendor/fonts/fonts.css" />
   <link rel="stylesheet" href="../assets/course.css" />
   <link rel="stylesheet" href="../assets/vendor/katex/katex.min.css" />
@@ -38,54 +38,63 @@
         <header class="lesson-head">
           <p class="lesson-eyebrow">Part 4 · PyTorch <span class="dot"></span> Section 14</p>
           <h1 class="lesson-title">nn.Module &amp; the Training Loop</h1>
-          <p class="lesson-standfirst">Six lines — zero_grad, forward, loss, backward, step — are the entire engine behind every PyTorch model you will ever train; once you can annotate every line, you can read anyone's code.</p>
+          <p class="lesson-standfirst">Five calls (zero_grad, forward, loss, backward, step) train every PyTorch model. Once you can explain each one, you can read other people's training code.</p>
           <div class="lesson-meta">
-            <span><b>26 min</b> read</span>
-            <span><b>You'll learn:</b> nn.Module · Dataset &amp; DataLoader · the canonical training loop · GPU basics</span>
+            <span><b>30 min</b> read</span>
+          </div>
+          <div class="objectives">
+            <div class="objectives__label">You'll learn</div>
+            <ul>
+              <li>nn.Module</li>
+              <li>Dataset &amp; DataLoader</li>
+              <li>the standard training loop</li>
+              <li>GPU basics</li>
+            </ul>
           </div>
         </header>
 
         <div class="prose">
-          <p class="lead">You now know tensors and autograd cold: you can build a computation graph and
-          get gradients out of it. <code>nn.Module</code> is nothing more than a tidy way to organize
-          many such graphs — the weights, the layers, the forward computation — into a reusable object.
-          Everything from here on is organization, not new math.</p>
+          <p class="lead">You now know tensors and autograd. You can build a computation graph and get
+          gradients from it. <code>nn.Module</code> is a clean way to organize many such graphs (the
+          weights, the layers, the forward computation) into one reusable object. From here on, the new
+          ideas are about organization, not new math.</p>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> The one idea to hold onto</div>
-            <p><code>nn.Module</code> is a box that remembers its own parameters and knows how to
-            compute its own output. The <strong>training loop</strong> is a short, fixed recipe that
-            repeatedly feeds data through that box, measures how wrong it was, and nudges the parameters
-            to be less wrong. Nothing in a PyTorch project is more important than these two ideas.</p>
+            <p><code>nn.Module</code> is a box that remembers its own parameters and knows how to compute
+            its own output. The <strong>training loop</strong> is a short, fixed procedure. It feeds data
+            through that box again and again, measures how wrong the output is, and moves the parameters
+            to make it less wrong. Every PyTorch project is built on these two ideas.</p>
           </div>
 
           <!-- ===================== NN.MODULE ===================== -->
           <h2><span class="h-num">1</span>nn.Module: a container that tracks its own parts</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p><code>nn.Module</code> is PyTorch's base class for "a thing that has learnable numbers and
-          a way to use them." You subclass it, declare your layers in <code>__init__</code>, and write
-          how data flows through them in <code>forward</code>. In return, PyTorch automatically finds
-          every parameter you declared — no matter how deeply nested — so you never have to track them
-          by hand.</p>
+          <p><code>nn.Module</code> is PyTorch's base class for “a thing that has learnable numbers and a
+          way to use them.” You write a subclass of it. You declare your layers in <code>__init__</code>,
+          and you write how data flows through them in <code>forward</code>. In return, PyTorch finds every
+          parameter you declared, however deeply nested. You never have to keep a list of them by
+          hand.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>Lego blocks. A single brick (one <code>nn.Linear</code> layer) does one small thing. Snap
-            several bricks together in a fixed order and you get something bigger — a wall, a car, a
-            model. <code>nn.Module</code> is both the brick and the rule for snapping bricks together:
-            a module can contain other modules, and the outside world just sees one bigger module.</p>
+            <p>Lego bricks. A single brick (one <code>nn.Linear</code> layer) does one small thing. Connect
+            several bricks in a fixed order and you get something bigger, such as a wall or a car.
+            <code>nn.Module</code> is both the brick and the rule for connecting bricks. A module can
+            contain other modules, and from the outside the result looks like one bigger module.</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>A tiny MLP (multi-layer perceptron, a stack of linear layers with a nonlinearity between
-          them) with one hidden layer computes:</p>
-          $$ \mathbf{h} = \sigma(\mathbf{W}_1\mathbf{x} + \mathbf{b}_1), \qquad \hat{\mathbf{y}} = \mathbf{W}_2\mathbf{h} + \mathbf{b}_2 $$
-          <p class="gloss"><b>In words:</b> transform the input <b>x</b> with the first layer's weights
-          and bias, squash it through a nonlinearity <b>σ</b> (so the network can learn curves, not just
-          straight lines), then transform that hidden result with a second layer to get the prediction
-          <b>ŷ</b>. Each <b>W</b> and <b>b</b> here is exactly the kind of leaf, learnable tensor from
-          <a href="13-tensors-autograd.html">Section 13</a>.</p>
+          <p>A tiny MLP (multi-layer perceptron: linear layers with a nonlinearity between them) with one
+          hidden layer computes:</p>
+          $$ \mathbf{h} = \phi(\mathbf{W}_1\mathbf{x} + \mathbf{b}_1), \qquad \hat{\mathbf{y}} = \mathbf{W}_2\mathbf{h} + \mathbf{b}_2 $$
+          <p class="gloss"><b>In words:</b> transform the input $\mathbf{x}$ with the first layer's weights
+          and bias. Pass the result through a nonlinearity $\phi$ (here ReLU), so the network can learn
+          curves, not only straight lines. Then transform the hidden result $\mathbf{h}$ with a second layer
+          to get the prediction $\hat{\mathbf{y}}$. Each $\mathbf{W}$ and $\mathbf{b}$ is a learnable leaf
+          tensor, as in <a href="13-tensors-autograd.html">Section 13</a>. $\mathbf{W}_1$ has shape (out,
+          in), like every <code>nn.Linear</code> weight.</p>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
           <p class="codecap">a two-layer MLP as an nn.Module</p>
@@ -94,74 +103,142 @@ import torch.nn as nn
 
 class TinyMLP(nn.Module):
     def __init__(self, in_features, hidden, out_features):
-        super().__init__()                          # required: wires up PyTorch's bookkeeping
+        super().__init__()                          # required: sets up PyTorch's bookkeeping
         self.layer1 = nn.Linear(in_features, hidden)  # holds W1, b1 -- created and tracked for you
-        self.act    = nn.ReLU()                       # the nonlinearity sigma
+        self.act    = nn.ReLU()                       # the nonlinearity phi
         self.layer2 = nn.Linear(hidden, out_features) # holds W2, b2
 
     def forward(self, x):
-        h = self.act(self.layer1(x))   # h = sigma(W1 x + b1)
+        h = self.act(self.layer1(x))   # h = phi(W1 x + b1)
         return self.layer2(h)          # y_hat = W2 h + b2
 
 model = TinyMLP(in_features=784, hidden=64, out_features=10)
 
 x = torch.randn(32, 784)   # a batch of 32 flattened 28x28 images
-y_hat = model(x)            # calls forward() under the hood
-print(y_hat.shape)           # torch.Size([32, 10])
+y_hat = model(x)           # calls forward() for you
+print(y_hat.shape)         # torch.Size([32, 10])
 
 for name, p in model.named_parameters():
-    print(name, p.shape)     # layer1.weight, layer1.bias, layer2.weight, layer2.bias -- found automatically</code></pre>
+    print(name, p.shape)   # found automatically:
+# layer1.weight torch.Size([64, 784])
+# layer1.bias torch.Size([64])
+# layer2.weight torch.Size([10, 64])
+# layer2.bias torch.Size([10])</code></pre>
 
           <div class="callout definition">
             <div class="callout__label">Definition</div>
-            <p>Calling <code>model(x)</code> is what actually runs <code>forward</code> — never call
-            <code>model.forward(x)</code> directly. The wrapper that <code>__call__</code> provides also
-            handles some bookkeeping (like hooks) that you'd otherwise skip.</p>
+            <p>Calling <code>model(x)</code> runs <code>forward</code>. Do not call
+            <code>model.forward(x)</code> directly. <code>model(x)</code> goes through
+            <code>__call__</code>, which also runs some bookkeeping (like hooks) that a direct call would
+            skip.</p>
           </div>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">Why must <code>self.layer1 = nn.Linear(...)</code> be assigned as an attribute inside <code>__init__</code>, rather than created fresh inside <code>forward</code> every call?</span>
+                <span class="check__q">A classmate writes <code>h = nn.Linear(784, 64)(x)</code> inside <code>forward</code> instead of creating <code>self.layer1</code> in <code>__init__</code>. The code runs. What goes wrong during training?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>Because <code>nn.Module</code> discovers its parameters by scanning the attributes set
-                in <code>__init__</code>. If you built a fresh <code>nn.Linear</code> inside
-                <code>forward</code>, you'd get brand-new, randomly initialized weights on every single
-                forward pass — nothing would ever be learned, since the "same" weights you trained a
-                moment ago would already be gone. The weights have to persist as attributes of the module
-                to be found by <code>.parameters()</code> and updated by the optimizer.</p>
+                <p>Every forward pass creates a brand-new layer with new random weights. Those weights are
+                not attributes of the module, so <code>model.parameters()</code> does not list them and the
+                optimizer never updates them. Even if it did, they would be thrown away at the next call.
+                So the first layer never learns. Parameters must be created once, as attributes in
+                <code>__init__</code>, so they persist and can be found.</p>
               </div>
             </details>
           </div>
 
           <!-- ===================== DATASET / DATALOADER ===================== -->
-          <h2><span class="h-num">2</span>Dataset &amp; DataLoader: feeding the model in bite-sized batches</h2>
+          <h2><span class="h-num">2</span>Dataset &amp; DataLoader: feeding the model in small batches</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>A <strong>Dataset</strong> is just an object that knows two things: how many examples it
-          has, and how to fetch the <em>n</em>-th one. A <strong>DataLoader</strong> wraps it and handles
-          the fiddly parts — grouping examples into minibatches, shuffling their order each epoch, and
-          handing you one batch at a time in a simple loop.</p>
+          <p>A <strong>Dataset</strong> is an object that knows two things: how many examples it has, and
+          how to fetch the <em>n</em>-th one. A <strong>DataLoader</strong> wraps it and does the detailed
+          work. It groups examples into minibatches. It shuffles their order each epoch (one full pass over
+          the data). And it gives you one batch at a time in a simple loop.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>A Dataset is a filing cabinet of index cards — ask for card #47 and you get it. A
-            DataLoader is the assistant who grabs a random handful of cards at a time, hands you that
-            stack, shuffles the cabinet's order overnight, and repeats. You never touch the cabinet
-            directly; you just say "next stack, please."</p>
+            <p>A Dataset is a filing cabinet of numbered cards: ask for card 47 and you get it. A
+            DataLoader is an assistant. At the start of each round, the assistant decides a new random
+            order for the cards. Then the assistant hands you the cards in small stacks, in that order,
+            until every card has been used once. You only say “next stack, please.”</p>
           </div>
 
-          <p>Why bother with small stacks instead of processing everything at once? As covered in
-          <a href="12-training-dynamics.html">Section 12</a>, computing the exact gradient over the
-          entire dataset before every single update is slow and memory-hungry; a <strong>minibatch</strong>
-          — a random, modest-sized slice of the data — gives a noisy but cheap-to-compute estimate of
-          that gradient, and taking many small, noisy steps gets you to a good answer faster than taking
-          few, perfectly accurate ones.</p>
+          <p>Why use small stacks instead of all the data at once? As
+          <a href="12-training-dynamics.html">Section 12</a> explained, the exact gradient over the whole
+          dataset is slow and uses a lot of memory. A <strong>minibatch</strong> (a random, modest-sized
+          part of the data) gives a noisy but cheap estimate of that gradient. Many small, noisy steps
+          usually reach a good model faster than a few exact ones.</p>
+
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="15 0 415 215" role="img" aria-labelledby="fig-14-1-t">
+                <title id="fig-14-1-t">A dataset of ten examples numbered 0 to 9 is put in a shuffled order, then cut into batches of 4, 4 and 2.</title>
+                <defs>
+                  <marker id="ar14a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                    <path class="f-i" d="M0,0 L10,5 L0,10 z"/>
+                  </marker>
+                </defs>
+                <text x="50" y="20" class="b">Dataset: examples 0 to 9</text>
+                <g>
+                  <rect class="f-k s-f thin" x="50" y="28" width="340" height="30"/>
+                  <line class="s-f thin" x1="84" y1="28" x2="84" y2="58"/><line class="s-f thin" x1="118" y1="28" x2="118" y2="58"/>
+                  <line class="s-f thin" x1="152" y1="28" x2="152" y2="58"/><line class="s-f thin" x1="186" y1="28" x2="186" y2="58"/>
+                  <line class="s-f thin" x1="220" y1="28" x2="220" y2="58"/><line class="s-f thin" x1="254" y1="28" x2="254" y2="58"/>
+                  <line class="s-f thin" x1="288" y1="28" x2="288" y2="58"/><line class="s-f thin" x1="322" y1="28" x2="322" y2="58"/>
+                  <line class="s-f thin" x1="356" y1="28" x2="356" y2="58"/>
+                  <text x="67" y="48" text-anchor="middle">0</text><text x="101" y="48" text-anchor="middle">1</text>
+                  <text x="135" y="48" text-anchor="middle">2</text><text x="169" y="48" text-anchor="middle">3</text>
+                  <text x="203" y="48" text-anchor="middle">4</text><text x="237" y="48" text-anchor="middle">5</text>
+                  <text x="271" y="48" text-anchor="middle">6</text><text x="305" y="48" text-anchor="middle">7</text>
+                  <text x="339" y="48" text-anchor="middle">8</text><text x="373" y="48" text-anchor="middle">9</text>
+                </g>
+                <line class="s-i thin" x1="220" y1="62" x2="220" y2="84" marker-end="url(#ar14a)"/>
+                <text x="232" y="78" class="sm">shuffle=True: new order each epoch</text>
+                <g>
+                  <rect class="f-vs s-v thin" x="50" y="92" width="340" height="30"/>
+                  <line class="s-v thin" x1="84" y1="92" x2="84" y2="122"/><line class="s-v thin" x1="118" y1="92" x2="118" y2="122"/>
+                  <line class="s-v thin" x1="152" y1="92" x2="152" y2="122"/><line class="s-v thin" x1="186" y1="92" x2="186" y2="122"/>
+                  <line class="s-v thin" x1="220" y1="92" x2="220" y2="122"/><line class="s-v thin" x1="254" y1="92" x2="254" y2="122"/>
+                  <line class="s-v thin" x1="288" y1="92" x2="288" y2="122"/><line class="s-v thin" x1="322" y1="92" x2="322" y2="122"/>
+                  <line class="s-v thin" x1="356" y1="92" x2="356" y2="122"/>
+                  <text x="67" y="112" text-anchor="middle">6</text><text x="101" y="112" text-anchor="middle">7</text>
+                  <text x="135" y="112" text-anchor="middle">1</text><text x="169" y="112" text-anchor="middle">4</text>
+                  <text x="203" y="112" text-anchor="middle">2</text><text x="237" y="112" text-anchor="middle">0</text>
+                  <text x="271" y="112" text-anchor="middle">9</text><text x="305" y="112" text-anchor="middle">8</text>
+                  <text x="339" y="112" text-anchor="middle">3</text><text x="373" y="112" text-anchor="middle">5</text>
+                </g>
+                <line class="s-i thin" x1="220" y1="126" x2="220" y2="148" marker-end="url(#ar14a)"/>
+                <text x="232" y="142" class="sm">batch_size=4</text>
+                <g>
+                  <rect class="f-gs s-g thin" x="30" y="156" width="136" height="30"/>
+                  <rect class="f-gs s-g thin" x="186" y="156" width="136" height="30"/>
+                  <rect class="f-gs s-g thin" x="342" y="156" width="68" height="30"/>
+                  <line class="s-g thin" x1="64" y1="156" x2="64" y2="186"/><line class="s-g thin" x1="98" y1="156" x2="98" y2="186"/><line class="s-g thin" x1="132" y1="156" x2="132" y2="186"/>
+                  <line class="s-g thin" x1="220" y1="156" x2="220" y2="186"/><line class="s-g thin" x1="254" y1="156" x2="254" y2="186"/><line class="s-g thin" x1="288" y1="156" x2="288" y2="186"/>
+                  <line class="s-g thin" x1="376" y1="156" x2="376" y2="186"/>
+                  <text x="47" y="176" text-anchor="middle">6</text><text x="81" y="176" text-anchor="middle">7</text>
+                  <text x="115" y="176" text-anchor="middle">1</text><text x="149" y="176" text-anchor="middle">4</text>
+                  <text x="203" y="176" text-anchor="middle">2</text><text x="237" y="176" text-anchor="middle">0</text>
+                  <text x="271" y="176" text-anchor="middle">9</text><text x="305" y="176" text-anchor="middle">8</text>
+                  <text x="359" y="176" text-anchor="middle">3</text><text x="393" y="176" text-anchor="middle">5</text>
+                </g>
+                <text x="98" y="204" text-anchor="middle" class="tg b">batch 1</text>
+                <text x="254" y="204" text-anchor="middle" class="tg b">batch 2</text>
+                <text x="376" y="204" text-anchor="middle" class="tg b">batch 3</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 14.1</b> What a DataLoader does in one epoch (real order from
+            <code>torch.manual_seed(0)</code>). It shuffles the indices, then cuts them into batches. Each
+            example is used once per epoch. The last batch is smaller when the batch size does not divide
+            the dataset size (use <code>drop_last=True</code> to skip it).</figcaption>
+          </figure>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">a Dataset and a DataLoader</p>
           <pre><code class="language-python">import torch
 from torch.utils.data import Dataset, DataLoader
 
@@ -170,12 +247,13 @@ class ToyDataset(Dataset):
         self.X, self.y = X, y
 
     def __len__(self):
-        return len(self.X)              # how many examples total
+        return len(self.X)               # how many examples in total
 
     def __getitem__(self, idx):
         return self.X[idx], self.y[idx]  # one example, by index
 
-X = torch.randn(1000, 784)     # 1000 fake flattened images
+torch.manual_seed(0)
+X = torch.randn(1000, 784)         # 1000 fake flattened images
 y = torch.randint(0, 10, (1000,))  # 1000 fake labels, classes 0-9
 
 dataset = ToyDataset(X, y)
@@ -185,110 +263,188 @@ for batch_x, batch_y in loader:
     print(batch_x.shape, batch_y.shape)   # torch.Size([32, 784]) torch.Size([32])
     break</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">Why does the DataLoader use <code>shuffle=True</code> during training but you should use <code>shuffle=False</code> for a validation or test loader?</span>
+                <span class="check__q">The dataset has 1,000 examples and <code>batch_size=32</code>. How many batches are in one epoch, and how big is the last one? Why do we shuffle for training but not for validation?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>Shuffling during training stops the model from learning anything about the
-                <em>order</em> examples arrive in (e.g. if all class-0 examples happened to be first) and
-                gives each minibatch a fresh, independent random sample every epoch, which keeps gradient
-                estimates unbiased. For validation or test, you're not updating any weights — you're just
-                measuring performance — so order doesn't affect correctness, and leaving it fixed makes
-                results reproducible and easier to compare run to run.</p>
+                <p>$1000 / 32 = 31.25$, so there are 32 batches: 31 full ones and a last one with
+                $1000 - 31 \cdot 32 = 8$ examples (<code>len(loader)</code> is 32). Shuffling in training
+                stops the model from learning anything about the <em>order</em> of the examples (for
+                example, if all class-0 examples came first). It also gives each epoch different batches.
+                In validation we update no weights; we only measure. The order does not change the
+                result, and a fixed order makes runs easier to compare.</p>
               </div>
             </details>
           </div>
 
           <!-- ===================== TRAINING LOOP ===================== -->
-          <h2><span class="h-num">3</span>The canonical training loop</h2>
+          <h2><span class="h-num">3</span>The standard training loop</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>Every PyTorch training script, no matter how large the model, boils down to the same
-          handful of lines repeated over and over: look at a batch, guess, measure how wrong the guess
-          was, work out how to improve, take a small step in that direction. Below is the whole loop with
-          every line explained — memorize this shape, because you will type some version of it in every
-          project you ever build.</p>
+          <p>Every PyTorch training script, however large the model, repeats the same few lines. Take a
+          batch. Make a guess. Measure how wrong the guess was. Work out how to improve. Take a small step
+          in that direction. Below is the whole loop, with every line explained. Learn this shape well:
+          you will write a version of it in every project.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>Learning to throw darts: throw (forward pass), see how far you missed the bullseye (loss),
-            figure out which way your arm was off and by how much (backward pass), adjust your stance a
-            little (optimizer step), then throw again. Repeat hundreds of times, ideally against many
-            different dartboards, not the same one over and over (that's why we loop over the whole
-            dataset in batches, epoch after epoch).</p>
+            <p>Learning to throw darts. Throw (forward pass). See how far you missed the center (loss).
+            Work out which way your arm was off, and by how much (backward pass). Adjust your stance a
+            little (optimizer step). Throw again, many times. Training does the same with the data. One
+            pass through all the examples is an epoch. The next epoch uses the same examples again,
+            in a new order. The adjustments stay small, so each throw improves your aim a little.</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>Each step nudges every parameter <b>θ</b> in the model a small amount opposite its
-          gradient, scaled by a learning rate <b>α</b> — the same gradient-descent update from
-          <a href="12-training-dynamics.html">Section 12</a>, just now computed by autograd instead of by
-          hand:</p>
+          <p>Each step moves every parameter $\theta$ a small amount against its gradient. With plain SGD
+          (from <a href="12-training-dynamics.html">Section 12</a>) the update is:</p>
           $$ \theta \leftarrow \theta - \alpha \, \nabla_\theta L $$
-          <p class="gloss"><b>In words:</b> take each parameter, subtract a small step (learning rate
-          <b>α</b> times its gradient), and that's the update. <code>optimizer.step()</code> below
-          performs exactly this line for every parameter in the model, all at once.</p>
+          <p class="gloss"><b>In words:</b> for each parameter, subtract the learning rate $\alpha$ times
+          its gradient. <code>optim.SGD</code> performs this line for every parameter at once. The loop
+          below uses <code>optim.Adam</code>, which does a scaled version: it steps along
+          $\hat{m}/(\sqrt{\hat{v}}+\epsilon)$ instead of the raw gradient. Autograd supplies the gradient
+          either way.</p>
 
-          <p class="beat beat--code">The same thing in PyTorch, annotated</p>
-          <p class="codecap">the six lines that train (almost) every PyTorch model</p>
-          <pre><code class="language-python">import torch.nn as nn
-import torch.optim as optim
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 480 290" role="img" aria-labelledby="fig-14-2-t">
+                <title id="fig-14-2-t">The five calls of the training loop in order, with what each one reads and writes, and an arrow from the last call back to the first.</title>
+                <defs>
+                  <marker id="ar14b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                    <path class="f-i" d="M0,0 L10,5 L0,10 z"/>
+                  </marker>
+                </defs>
+                <rect class="f-k s-f thin" x="30" y="12" width="180" height="40" rx="6"/>
+                <rect class="f-vs s-v thin" x="30" y="68" width="180" height="40" rx="6"/>
+                <rect class="f-vs s-v thin" x="30" y="124" width="180" height="40" rx="6"/>
+                <rect class="f-as s-a thin" x="30" y="180" width="180" height="40" rx="6"/>
+                <rect class="f-gs s-g thin" x="30" y="236" width="180" height="40" rx="6"/>
+                <text x="120" y="37" text-anchor="middle" class="b">1  zero_grad()</text>
+                <text x="120" y="93" text-anchor="middle" class="b">2  y_hat = model(x)</text>
+                <text x="120" y="149" text-anchor="middle" class="b">3  loss = loss_fn(y_hat, y)</text>
+                <text x="120" y="205" text-anchor="middle" class="b">4  loss.backward()</text>
+                <text x="120" y="261" text-anchor="middle" class="b">5  optimizer.step()</text>
+                <line class="s-i thin" x1="120" y1="52" x2="120" y2="66" marker-end="url(#ar14b)"/>
+                <line class="s-i thin" x1="120" y1="108" x2="120" y2="122" marker-end="url(#ar14b)"/>
+                <line class="s-i thin" x1="120" y1="164" x2="120" y2="178" marker-end="url(#ar14b)"/>
+                <line class="s-i thin" x1="120" y1="220" x2="120" y2="234" marker-end="url(#ar14b)"/>
+                <path class="s-i thin" d="M30,256 H14 V32 H28" fill="none" marker-end="url(#ar14b)"/>
+                <text x="228" y="29" class="tv">reads: nothing</text>
+                <text x="228" y="45" class="ta">writes: every .grad = None</text>
+                <text x="228" y="85" class="tv">reads: parameters, batch x</text>
+                <text x="228" y="101" class="ta">writes: output, graph</text>
+                <text x="228" y="141" class="tv">reads: y_hat, labels y</text>
+                <text x="228" y="157" class="ta">writes: one number (loss)</text>
+                <text x="228" y="197" class="tv">reads: graph</text>
+                <text x="228" y="213" class="ta">writes: .grad (adds), frees graph</text>
+                <text x="228" y="253" class="tv">reads: .grad (and its own state)</text>
+                <text x="228" y="269" class="ta">writes: parameters</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 14.2</b> The five calls inside the batch loop. Each call reads what an
+            earlier call wrote: <code>backward</code> needs the graph from the forward pass, and
+            <code>step</code> needs the <code>.grad</code> from <code>backward</code>. That is why the
+            order is fixed.</figcaption>
+          </figure>
 
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">the training loop (continues the TinyMLP and DataLoader snippets above)</p>
+          <pre><code class="language-python">import torch.optim as optim
+
+torch.manual_seed(0)
 model = TinyMLP(in_features=784, hidden=64, out_features=10)
-loss_fn = nn.CrossEntropyLoss()          # for multi-class classification -- combines softmax + log-loss
-optimizer = optim.Adam(model.parameters(), lr=1e-3)  # Adam: the adaptive optimizer from Section 12
+loss_fn = nn.CrossEntropyLoss()     # multi-class loss: softmax + log-loss in one step
+optimizer = optim.Adam(model.parameters(), lr=1e-3)  # Adam, from Section 12
 
-for epoch in range(10):                          # 1. one full pass over the data
-    for batch_x, batch_y in loader:              # 2. one minibatch at a time
+for epoch in range(3):                       # one full pass over the data
+    for batch_x, batch_y in loader:          # one minibatch at a time
+        optimizer.zero_grad()                # 1. clear old gradients (see below)
+        y_hat = model(batch_x)               # 2. forward pass: raw scores (logits)
+        loss = loss_fn(y_hat, batch_y)       # 3. how wrong was the guess? one number
+        loss.backward()                      # 4. backward pass: fills .grad for every parameter
+        optimizer.step()                     # 5. move every parameter using its .grad
 
-        optimizer.zero_grad()                    # 3. clear old gradients -- see why below
-        y_hat = model(batch_x)                    # 4. forward pass: the model's current guess
-        loss = loss_fn(y_hat, batch_y)             # 5. how wrong was the guess? one number
-        loss.backward()                            # 6. backward pass: fills in .grad for every parameter
-        optimizer.step()                            # 7. nudge every parameter opposite its gradient
-
-    print(f"epoch {epoch}: loss = {loss.item():.4f}")</code></pre>
+    print(f"epoch {epoch}: loss = {loss.item():.4f}")   # loss of the last batch
+# epoch 0: loss = 2.3341
+# epoch 1: loss = 1.9191
+# epoch 2: loss = 1.4914</code></pre>
+          <p>The labels here are random, so the falling loss only shows that the model is memorizing the
+          1,000 training examples. On validation data it cannot do better than chance, as we will see
+          below.</p>
 
           <div class="callout pitfall">
-            <div class="callout__label"><span class="ic">▲</span> Why <code>zero_grad()</code> comes first</div>
-            <p>As you saw in <a href="13-tensors-autograd.html">Section 13</a>, calling
-            <code>.backward()</code> <strong>adds</strong> to whatever gradient is already sitting in
-            <code>.grad</code> — it never overwrites it. Without <code>optimizer.zero_grad()</code> at
-            the top of the loop, each batch's gradient would pile on top of the last batch's, and the
-            optimizer would take a step based on garbage. Clearing the gradients before every forward
-            pass is what makes each step depend only on the current batch.</p>
+            <div class="callout__label"><span class="ic">▲</span> Watch out</div>
+            <p><code>nn.CrossEntropyLoss</code> wants the <strong>raw scores</strong> (logits) from the
+            last layer. It applies the softmax itself, in a numerically stable way. In
+            <a href="11-mlp-numpy.html">Section 11</a> we applied the softmax by hand. Do not do that
+            here: if you pass softmax outputs, the softmax is applied twice. The model still trains, but
+            badly.</p>
           </div>
 
-          <p>One line-by-line summary, since this shape repeats forever:</p>
+          <div class="callout pitfall">
+            <div class="callout__label"><span class="ic">▲</span> Watch out</div>
+            <p>Why does <code>zero_grad()</code> come first? As you saw in
+            <a href="13-tensors-autograd.html">Section 13</a>, <code>.backward()</code>
+            <strong>adds</strong> to the gradient already in <code>.grad</code>; it never overwrites it.
+            Without <code>optimizer.zero_grad()</code>, each batch's gradient would be added to the last
+            one, and the optimizer would step on the wrong numbers. Clearing the gradients before every
+            backward pass makes each step depend only on the current batch.</p>
+          </div>
+
+          <p>Here is a summary of the five calls:</p>
+          <div class="scroll-x">
           <table>
             <thead><tr><th>Line</th><th>What it does</th></tr></thead>
             <tbody>
-              <tr><td><code>optimizer.zero_grad()</code></td><td>Resets every parameter's <code>.grad</code> to zero before this batch.</td></tr>
-              <tr><td><code>y_hat = model(batch_x)</code></td><td>Forward pass — runs <code>forward()</code>, builds the computation graph.</td></tr>
-              <tr><td><code>loss = loss_fn(y_hat, batch_y)</code></td><td>Compares the guess to the true label, producing one scalar number to minimize.</td></tr>
-              <tr><td><code>loss.backward()</code></td><td>Backward pass — walks the graph, fills <code>.grad</code> on every parameter.</td></tr>
-              <tr><td><code>optimizer.step()</code></td><td>Uses each parameter's fresh <code>.grad</code> to update it (Adam's rule, building on plain gradient descent).</td></tr>
+              <tr><td><code>optimizer.zero_grad()</code></td><td>Clears every parameter's <code>.grad</code> (sets it to <code>None</code>) before this batch.</td></tr>
+              <tr><td><code>y_hat = model(batch_x)</code></td><td>Forward pass: runs <code>forward()</code> and builds the computation graph.</td></tr>
+              <tr><td><code>loss = loss_fn(y_hat, batch_y)</code></td><td>Compares the guess to the true labels and gives one number to minimize.</td></tr>
+              <tr><td><code>loss.backward()</code></td><td>Backward pass: walks the graph and fills <code>.grad</code> on every parameter.</td></tr>
+              <tr><td><code>optimizer.step()</code></td><td>Uses each parameter's new <code>.grad</code> to update it (with Adam's rule here).</td></tr>
             </tbody>
           </table>
+          </div>
 
-          <div class="check">
+          <h3>Measuring on validation data</h3>
+          <p>To check how well the model does on data it has not trained on, run a separate loop. Two
+          things change. First, <code>model.eval()</code> switches some layers (such as dropout and batch
+          normalization) to their evaluation behavior. Our TinyMLP has none, but the habit matters. Second,
+          <code>torch.no_grad()</code> stops autograd from building a graph, because no backward pass
+          follows.</p>
+
+          <p class="codecap">an evaluation loop (continues the training loop above)</p>
+          <pre><code class="language-python">val_set = ToyDataset(torch.randn(200, 784), torch.randint(0, 10, (200,)))
+val_loader = DataLoader(val_set, batch_size=64, shuffle=False)
+
+model.eval()                        # evaluation behavior for dropout, batchnorm, ...
+correct, total = 0, 0
+with torch.no_grad():               # no graph, no .grad: faster, less memory
+    for batch_x, batch_y in val_loader:
+        logits = model(batch_x)
+        correct += (logits.argmax(dim=1) == batch_y).sum().item()
+        total += len(batch_y)
+print(f"val accuracy = {correct / total:.3f}")   # val accuracy = 0.110  (chance is 0.1)
+model.train()                       # back to training behavior before the next epoch</code></pre>
+
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">What would go wrong, concretely, if you swapped the order and called <code>optimizer.step()</code> before <code>loss.backward()</code>?</span>
+                <span class="check__q">You swap two lines, so each iteration runs <code>zero_grad()</code>, forward, loss, <code>step()</code>, then <code>backward()</code>. What happens to the model?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p><code>optimizer.step()</code> reads whatever is currently sitting in each parameter's
-                <code>.grad</code> and uses it to update the parameter. If you call it before
-                <code>backward()</code> has run for this batch, <code>.grad</code> either holds gradients
-                from a previous batch (if you forgot to zero them) or is empty/zero (if you did zero it),
-                so the update would be based on stale or nonexistent information rather than this batch's
-                actual loss. The order forward → loss → backward → step is not stylistic, it's required —
-                each step's input is the previous step's output.</p>
+                <p>It never changes. Since PyTorch 2.0, <code>zero_grad()</code> sets every
+                <code>.grad</code> to <code>None</code> by default. When <code>step()</code> runs next, it
+                finds no gradient and skips every parameter. Then <code>backward()</code> fills
+                <code>.grad</code>, but the next <code>zero_grad()</code> clears it before any step can use
+                it. The loss is printed every epoch, but the weights stay at their initial values. The order
+                forward → loss → backward → step is required, because each call uses what the previous one
+                wrote.</p>
               </div>
             </details>
           </div>
@@ -297,53 +453,89 @@ for epoch in range(10):                          # 1. one full pass over the dat
           <h2><span class="h-num">4</span>GPU basics: same code, different device</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>A GPU (graphics processing unit) can do the same tensor arithmetic as a CPU, just with
-          thousands of small cores working in parallel instead of a few fast ones — a huge speedup for
-          the kind of bulk matrix multiplication neural networks do constantly. Moving your model to a
-          GPU doesn't change any of the code above; it only changes <em>where</em> the numbers live.</p>
+          <p>A GPU (graphics processing unit) does the same tensor arithmetic as a CPU. But it has thousands
+          of small cores that work in parallel, instead of a few fast ones. That gives a large speedup for
+          the big matrix multiplications that neural networks do all the time. Moving your model to a GPU
+          does not change the code above. It only changes <em>where</em> the numbers are stored.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>A CPU is a few expert chefs who can each cook any dish. A GPU is a thousand line cooks who
-            can each only chop one vegetable — individually limited, but if the job is "chop a thousand
-            carrots," a thousand line cooks obliterate a few expert chefs on time. Matrix multiplication
-            is exactly that kind of job: the same simple operation repeated an enormous number of times.</p>
+            <p>A CPU is like a few expert mathematicians who can each solve any problem. A GPU is like a
+            stadium of students who can each only multiply and add. For one hard problem, the experts are
+            better. For a million small multiplications, the stadium finishes first, because everyone
+            works at the same time. Matrix multiplication is that kind of job: the same simple operation,
+            repeated a very large number of times.</p>
           </div>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> The one rule that matters</div>
-            <p>A tensor on the CPU and a tensor on the GPU cannot be combined in one operation — PyTorch
-            will raise an error. The model's parameters and the data you feed it must always live on the
-            <strong>same device</strong>. Move both, every time.</p>
+            <p>A tensor on the CPU and a tensor on the GPU cannot be combined in one operation; PyTorch
+            raises an error. The model's parameters and the data you feed it must be on the
+            <strong>same device</strong>. Move both.</p>
           </div>
 
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 480 170" role="img" aria-labelledby="fig-14-3-t">
+                <title id="fig-14-3-t">Two memory areas, CPU memory and GPU memory, joined by an arrow labeled .to(device). Batches from the DataLoader start in CPU memory; the model parameters and moved batches are in GPU memory.</title>
+                <defs>
+                  <marker id="ar14c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                    <path class="f-i" d="M0,0 L10,5 L0,10 z"/>
+                  </marker>
+                </defs>
+                <rect class="f-k s-f thin" x="12" y="20" width="176" height="136" rx="8"/>
+                <text x="100" y="42" text-anchor="middle" class="b">CPU memory (RAM)</text>
+                <rect class="f-as s-a thin" x="32" y="60" width="136" height="30" rx="5"/>
+                <text x="100" y="80" text-anchor="middle">batch from DataLoader</text>
+                <rect class="f-vs s-v thin" x="32" y="104" width="136" height="30" rx="5"/>
+                <text x="100" y="124" text-anchor="middle">new model (at first)</text>
+                <rect class="f-k s-f thin" x="292" y="20" width="176" height="136" rx="8"/>
+                <text x="380" y="42" text-anchor="middle" class="b">GPU memory</text>
+                <rect class="f-as s-a thin" x="312" y="60" width="136" height="30" rx="5"/>
+                <text x="380" y="80" text-anchor="middle">batch (moved)</text>
+                <rect class="f-vs s-v thin" x="312" y="104" width="136" height="30" rx="5"/>
+                <text x="380" y="124" text-anchor="middle">model parameters</text>
+                <line class="s-i thin" x1="172" y1="75" x2="308" y2="75" marker-end="url(#ar14c)"/>
+                <line class="s-i thin" x1="172" y1="119" x2="308" y2="119" marker-end="url(#ar14c)"/>
+                <text x="240" y="68" text-anchor="middle" class="b">.to(device)</text>
+                <text x="240" y="112" text-anchor="middle" class="b">.to(device)</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 14.3</b> CPU and GPU have separate memory. A new model and every batch
+            from the DataLoader start in CPU memory. <code>.to(device)</code> copies them across. The model
+            moves once; the batches must move every iteration.</figcaption>
+          </figure>
+
           <p class="beat beat--code">The same thing in PyTorch</p>
-          <pre><code class="language-python">import torch
+          <p class="codecap">training on the GPU when one is available (continues the snippets above)</p>
+          <pre><code class="language-python">device = "cuda" if torch.cuda.is_available() else "cpu"
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
-
-model = TinyMLP(in_features=784, hidden=64, out_features=10)
-model.to(device)                 # moves every parameter to the GPU (or leaves it on CPU)
+model = TinyMLP(in_features=784, hidden=64, out_features=10).to(device)
+optimizer = optim.Adam(model.parameters(), lr=1e-3)   # build it AFTER the model
 
 for batch_x, batch_y in loader:
-    batch_x = batch_x.to(device)  # data must move too, every batch
+    batch_x = batch_x.to(device)   # data must move too, every batch
     batch_y = batch_y.to(device)
 
     optimizer.zero_grad()
-    y_hat = model(batch_x)         # now both model and data are on `device` -- this works
+    y_hat = model(batch_x)         # model and data are both on `device`
     loss = loss_fn(y_hat, batch_y)
     loss.backward()
     optimizer.step()</code></pre>
+          <p>Note the order. The optimizer holds references to the parameters it was given. If you build a
+          new model, you must build a new optimizer for it. An optimizer made for an old model updates
+          the old model's parameters, so the new one never trains. Creating the optimizer after
+          <code>.to(device)</code> is the safe habit.</p>
 
           <div class="callout pitfall">
-            <div class="callout__label"><span class="ic">▲</span> The bug you will hit first</div>
-            <p><code>RuntimeError: Expected all tensors to be on the same device, but found at least two
-            devices, cuda:0 and cpu!</code>. This means you moved the model but not the batch (or vice
-            versa). The fix is always the same: find the tensor on the wrong device and add
+            <div class="callout__label"><span class="ic">▲</span> Watch out</div>
+            <p>The device error you will see first: <code>RuntimeError: Expected all tensors to be on the
+            same device, but found at least two devices, cuda:0 and cpu!</code> You moved the model but not
+            the batch, or the reverse. The fix: find the tensor on the wrong device and add
             <code>.to(device)</code>.</p>
           </div>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -351,10 +543,10 @@ for batch_x, batch_y in loader:
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>The forward pass raises a device-mismatch <code>RuntimeError</code> the moment the
-                model's GPU-resident weights try to multiply against the CPU-resident batch. Moving the
-                model once is not enough — every batch of data coming out of the DataLoader starts on the
-                CPU by default and has to be moved explicitly, every single iteration.</p>
+                <p>The forward pass raises the device-mismatch <code>RuntimeError</code> above. The first
+                layer's weights are on the GPU, and the batch is on the CPU. Moving the model once is not
+                enough. Every batch from the DataLoader starts on the CPU and must be moved in every
+                iteration.</p>
               </div>
             </details>
           </div>
@@ -363,13 +555,20 @@ for batch_x, batch_y in loader:
 
           <h2><span class="h-num">5</span>What to carry forward</h2>
           <ul>
-            <li><strong>nn.Module</strong> is a container: declare layers in <code>__init__</code>, define the computation in <code>forward</code>, and PyTorch finds every parameter for you.</li>
-            <li><strong>Dataset</strong> answers "how many, and give me item <em>i</em>"; <strong>DataLoader</strong> turns that into shuffled minibatches automatically.</li>
-            <li>The <strong>training loop</strong> is always: <code>zero_grad</code> → forward → loss → <code>backward</code> → <code>step</code>. Zeroing first matters because gradients accumulate.</li>
-            <li><strong>GPU basics</strong>: <code>.to(device)</code> moves tensors; model and data must always be on the same device before you combine them.</li>
+            <li><strong>nn.Module</strong> is a container. Declare layers in <code>__init__</code>, define
+            the computation in <code>forward</code>, and PyTorch finds every parameter for you.</li>
+            <li><strong>Dataset</strong> answers “how many, and give me item <em>i</em>.”
+            <strong>DataLoader</strong> turns that into shuffled minibatches.</li>
+            <li>The <strong>training loop</strong> is always <code>zero_grad</code> → forward → loss →
+            <code>backward</code> → <code>step</code>. Zeroing first matters because gradients accumulate.
+            Feed <code>CrossEntropyLoss</code> raw logits.</li>
+            <li>For evaluation, use <code>model.eval()</code> and <code>torch.no_grad()</code>, then switch
+            back with <code>model.train()</code>.</li>
+            <li><strong>GPU basics</strong>: <code>.to(device)</code> moves tensors. Model and data must be
+            on the same device, and the optimizer must be built for the model you train.</li>
           </ul>
-          <p>Next we'll cover the debugging habits and shape-checking discipline that keep this loop from
-          silently training the wrong thing.</p>
+          <p>Next, <a href="15-debugging.html">Section 15</a> covers the debugging habits and shape checks
+          that keep this loop from training the wrong thing without any error.</p>
 
           <div class="complete-bar" data-complete>
             <span class="complete-bar__text">Finished this section? Mark it done to fill your progress bar.</span>

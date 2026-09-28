@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Probability & Statistics · ML Without the Magic</title>
-  <meta name="description" content="Random variables, distributions, expectation and variance, the Gaussian, Bayes' rule, and maximum likelihood — the tools for reasoning about uncertainty, and where loss functions come from." />
+  <meta name="description" content="Random variables, distributions, expectation and variance, the Gaussian, Bayes' rule and maximum likelihood: the tools for reasoning about uncertainty, and where loss functions come from." />
   <link rel="stylesheet" href="../assets/vendor/fonts/fonts.css" />
   <link rel="stylesheet" href="../assets/course.css" />
   <link rel="stylesheet" href="../assets/vendor/katex/katex.min.css" />
@@ -38,122 +38,174 @@
         <header class="lesson-head">
           <p class="lesson-eyebrow">Part 1 · Math Foundations <span class="dot"></span> Section 3</p>
           <h1 class="lesson-title">Probability & Statistics</h1>
-          <p class="lesson-standfirst">Models don't output answers, they output beliefs. Probability is the language we use to reason carefully about things we are not sure of — and, quietly, it's where every loss function is born.</p>
+          <p class="lesson-standfirst">Models do not output answers; they output beliefs. Probability is the language for reasoning carefully about things we are not sure of. It is also where the common loss functions come from.</p>
           <div class="lesson-meta">
-            <span><b>30 min</b> read</span>
-            <span><b>You'll learn:</b> distributions · expectation · variance · Bayes' rule · maximum likelihood</span>
+            <span><b>48 min</b> read</span>
+          </div>
+          <div class="objectives">
+            <div class="objectives__label">You'll learn</div>
+            <ul>
+              <li>distributions</li>
+              <li>expectation</li>
+              <li>variance</li>
+              <li>Bayes' rule</li>
+              <li>maximum likelihood</li>
+            </ul>
           </div>
         </header>
 
         <div class="prose">
-          <p class="lead">Machine learning lives in a world of uncertainty. Will this email turn
-          out to be spam? What digit is in this blurry photo? A good model never bangs its fist on
-          the table with a single certain answer — it hands you a <strong>degree of belief</strong>:
-          “90% spam,” “probably a 7, maybe a 1.” Probability is the mathematics of those graded
-          beliefs, and statistics is how we tune them from data. This section builds that toolkit
-          from the ground up.</p>
+          <p class="lead">Machine learning lives in a world of uncertainty. Is this email spam? Which
+          digit is in this blurry photo? A good model does not give a single answer as if it were
+          certain. It gives a <strong>degree of belief</strong>: “90% spam,” “probably a 7, maybe a 1.”
+          Probability is the mathematics of those graded beliefs. Statistics is how we adjust them to fit
+          data. This section builds that toolkit from the start.</p>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> The one idea to hold onto</div>
-            <p>A model outputs a <strong>distribution</strong> — a spread of belief across the
-            possible answers, not one answer. Everything in this section is either a way to
-            <em>describe</em> such a distribution (expectation, variance), a common <em>shape</em>
-            one takes (Bernoulli, Gaussian), or a way to <em>update or fit</em> one from evidence
-            (Bayes, maximum likelihood). Hold that map in your head and the symbols fall into place.</p>
+            <p>A model outputs a <strong>distribution</strong>: belief spread across the possible answers,
+            not one answer. Everything in this section does one of three things. It <em>describes</em> a
+            distribution (expectation, variance). It names a common <em>shape</em> (Bernoulli, Gaussian).
+            Or it <em>updates or fits</em> a distribution from evidence (Bayes, maximum likelihood). Keep
+            that map in mind and the symbols will fall into place.</p>
           </div>
 
           <!-- ===================== RANDOM VARIABLES & DISTRIBUTIONS ===================== -->
-          <h2><span class="h-num">1</span>Random variables & distributions</h2>
+          <h2><span class="h-num">1</span>Random variables and distributions</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>A <strong>random variable</strong> is just a number whose value is uncertain until you
-          look — the outcome of some process you can't predict exactly. Roll a die and call the
-          result <span style="white-space:nowrap">$X$</span>: before the roll, <span style="white-space:nowrap">$X$</span> could be any of 1–6. A
-          <strong>distribution</strong> is the full accounting of that uncertainty: it tells you,
-          for every possible value, how likely that value is. If a random variable is the question
-          (“what will come up?”), the distribution is the complete answer key with the odds
-          written next to each option.</p>
+          <p>A <strong>random variable</strong> is a number whose value is uncertain until you look. It is
+          the outcome of some process you cannot predict exactly. Roll a die and call the result $X$.
+          Before the roll, $X$ could be any of 1 to 6. A <strong>distribution</strong> is the full
+          description of that uncertainty. It tells you, for every possible value, how likely that value
+          is. If the random variable is the question (“what will come up?”), the distribution is the
+          answer sheet, with the chance written next to each option.</p>
 
-          <p>Random variables come in two flavours, and the difference matters for every formula
-          below:</p>
+          <p>Random variables come in two kinds, and the difference matters for every formula below:</p>
           <ul>
-            <li><strong>Discrete</strong> — the values come in separate, countable lumps: 1, 2, 3…
-            You can list them. A die, a coin, the number of emails in your inbox.</li>
-            <li><strong>Continuous</strong> — the values slide smoothly along a range with no gaps:
-            any real number in some interval. A temperature, a height, a waiting time.</li>
+            <li><strong>Discrete</strong>: the values are separate and countable, like 1, 2, 3. You can
+            list them. Examples: a die, a coin, the number of emails in your inbox.</li>
+            <li><strong>Continuous</strong>: the values can be any real number in some range, with no
+            gaps. Examples: a temperature, a height, a waiting time.</li>
           </ul>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>A <strong>die roll</strong> versus <strong>tomorrow's temperature</strong>. The die is
-            discrete: six neat outcomes, each with a clean <span style="white-space:nowrap">$1/6$</span> chance, and it makes sense to
-            ask “what's the probability of exactly a 4?” The temperature is continuous: it could be
-            21.0°, 21.3°, 21.3007°… Asking “what's the chance it's <em>exactly</em> 21.30000…°?” is
-            the wrong question — there are infinitely many values, so any single one has essentially
-            zero chance. Instead you ask “what's the chance it lands <em>between</em> 21° and 22°?”
-            That shift — from exact values to ranges — is the whole difference between the two worlds.</p>
+            <p>Compare a <strong>die roll</strong> with <strong>tomorrow's temperature</strong>. The die is
+            discrete: six outcomes, each with chance $1/6$. It makes sense to ask “what is the chance of a
+            4?” The temperature is continuous: it could be 21.0°, 21.3°, 21.3007°, and so on. Asking “what
+            is the chance it is <em>exactly</em> 21.30000…°?” is the wrong question. There are infinitely
+            many values, so any single one has zero chance. Instead you ask “what is the chance it lands
+            <em>between</em> 21° and 22°?” This shift from single values to ranges is the main difference
+            between the two kinds.</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>For a <strong>discrete</strong> variable we use a <dfn>probability mass function</dfn>,
-          written <span style="white-space:nowrap">$P(X = x)$</span> — the amount of probability sitting <em>on</em> each specific value.
-          Two honest rules hold: every mass is between 0 and 1, and all the masses add up to
-          exactly 1 (something must happen).</p>
+          <p>For a <strong>discrete</strong> variable we use a <dfn>probability mass function</dfn>
+          (PMF), written $P(X = x)$. It is the amount of probability that sits <em>on</em> each value. Two
+          rules always hold. Every mass is between 0 and 1. And all the masses add up to 1 (something must
+          happen).</p>
           $$ 0 \le P(X = x) \le 1, \qquad \sum_{x} P(X = x) = 1 $$
-          <p class="gloss"><b>In words:</b> each outcome gets a share of belief between “impossible”
-          (0) and “certain” (1), and the shares of all outcomes together make one whole. For a fair
-          die, <span style="white-space:nowrap">$P(X = x) = 1/6$</span> for each of the six faces, and <span style="white-space:nowrap">$6 \times \tfrac{1}{6} = 1$</span>. The
-          function is called “mass” because you can picture a lump of probability weight parked on
-          each value.</p>
+          <p class="gloss"><b>In words:</b> each outcome gets a share of belief between “impossible” (0)
+          and “certain” (1). The shares of all outcomes together make one whole. For a fair die,
+          $P(X = x) = 1/6$ for each of the six faces, and $6 \times \tfrac{1}{6} = 1$. It is called “mass”
+          because you can picture a lump of probability placed on each value.</p>
 
-          <p>For a <strong>continuous</strong> variable, single values have zero probability, so we
-          use a <dfn>probability density function</dfn> <span style="white-space:nowrap">$p(x)$</span> instead. Density is not
-          probability itself — it's probability <em>per unit of x</em>, like grams per centimetre.
-          To get an actual probability you must sum the density over a range, which for a smooth
-          curve means taking an <strong>integral</strong> (the area under the curve):</p>
+          <p>For a <strong>continuous</strong> variable, single values have zero probability. So we use a
+          <dfn>probability density function</dfn> (PDF) $p(x)$ instead. Density is not probability. It is
+          probability <em>per unit of $x$</em>, like grams per centimeter. To get a probability, you add
+          up the density over a range. For a smooth curve, that means taking an <strong>integral</strong>
+          (the area under the curve):</p>
           $$ P(a \le X \le b) = \int_{a}^{b} p(x)\,dx, \qquad \int_{-\infty}^{\infty} p(x)\,dx = 1 $$
-          <p class="gloss"><b>In words:</b> the chance that <span style="white-space:nowrap">$X$</span> falls between <b>a</b> and <b>b</b> is
-          the <em>area</em> under the density curve over that stretch. The <span style="white-space:nowrap">$\int$</span> sign is just a
-          continuous cousin of the <span style="white-space:nowrap">$\sum$</span> sign — “add up over a smooth range” instead of “add up
-          over a list.” And the total area under the whole curve is 1, the continuous version of
-          “the masses sum to 1.”</p>
+          <p class="gloss"><b>In words:</b> the chance that $X$ falls between $a$ and $b$ is the
+          <em>area</em> under the density curve over that range. The $\int$ sign is the continuous
+          version of the $\sum$ sign: “add up over a smooth range” instead of “add up over a list.” The
+          total area under the whole curve is 1, the continuous version of “the masses add up to 1.”</p>
+
+<figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 580 245" role="img" aria-labelledby="fig-03-1-t">
+      <title id="fig-03-1-t">Left: six bars for a loaded die, the sixth bar at 0.5. Right: a bell curve with the area between 160 and 180 cm shaded.</title>
+      <line class="ax" x1="45" y1="200" x2="255" y2="200"/>
+      <line class="ax" x1="45" y1="200" x2="45" y2="30"/>
+      <text x="39" y="174.9" class="sm" text-anchor="end">0.1</text>
+      <line class="grid" x1="45" y1="170.9" x2="255" y2="170.9"/>
+      <text x="39" y="131.3" class="sm" text-anchor="end">0.25</text>
+      <line class="grid" x1="45" y1="127.3" x2="255" y2="127.3"/>
+      <text x="39" y="58.5" class="sm" text-anchor="end">0.5</text>
+      <line class="grid" x1="45" y1="54.5" x2="255" y2="54.5"/>
+      <rect class="f-vs ln thin s-v" x="52" y="170.9" width="21" height="29.1"/>
+      <text x="62.5" y="216" text-anchor="middle">1</text>
+      <rect class="f-vs ln thin s-v" x="87" y="170.9" width="21" height="29.1"/>
+      <text x="97.5" y="216" text-anchor="middle">2</text>
+      <rect class="f-vs ln thin s-v" x="122" y="170.9" width="21" height="29.1"/>
+      <text x="132.5" y="216" text-anchor="middle">3</text>
+      <rect class="f-vs ln thin s-v" x="157" y="170.9" width="21" height="29.1"/>
+      <text x="167.5" y="216" text-anchor="middle">4</text>
+      <rect class="f-vs ln thin s-v" x="192" y="170.9" width="21" height="29.1"/>
+      <text x="202.5" y="216" text-anchor="middle">5</text>
+      <rect class="f-v" x="227" y="54.5" width="21" height="145.5"/>
+      <text x="237.5" y="216" text-anchor="middle">6</text>
+      <text x="150" y="22" class="lg b" text-anchor="middle">PMF: loaded die</text>
+      <text x="150" y="234" class="sm" text-anchor="middle">face</text>
+      <path class="f-as" d="M392.9,200 L392.9,113.4 L393.8,111.2 L394.7,109 L395.6,106.9 L396.6,104.7 L397.5,102.6 L398.4,100.5 L399.4,98.4 L400.3,96.3 L401.2,94.2 L402.1,92.2 L403.1,90.2 L404,88.2 L404.9,86.2 L405.9,84.3 L406.8,82.5 L407.7,80.7 L408.6,78.9 L409.6,77.2 L410.5,75.5 L411.4,73.9 L412.4,72.4 L413.3,70.9 L414.2,69.5 L415.1,68.1 L416.1,66.8 L417,65.6 L417.9,64.5 L418.9,63.4 L419.8,62.4 L420.7,61.5 L421.6,60.7 L422.6,60 L423.5,59.3 L424.4,58.7 L425.4,58.3 L426.3,57.9 L427.2,57.5 L428.1,57.3 L429.1,57.2 L430,57.1 L430.9,57.2 L431.9,57.3 L432.8,57.5 L433.7,57.9 L434.6,58.3 L435.6,58.7 L436.5,59.3 L437.4,60 L438.4,60.7 L439.3,61.5 L440.2,62.4 L441.1,63.4 L442.1,64.5 L443,65.6 L443.9,66.8 L444.9,68.1 L445.8,69.5 L446.7,70.9 L447.6,72.4 L448.6,73.9 L449.5,75.5 L450.4,77.2 L451.4,78.9 L452.3,80.7 L453.2,82.5 L454.1,84.3 L455.1,86.2 L456,88.2 L456.9,90.2 L457.9,92.2 L458.8,94.2 L459.7,96.3 L460.6,98.4 L461.6,100.5 L462.5,102.6 L463.4,104.7 L464.4,106.9 L465.3,109 L466.2,111.2 L467.1,113.4 L467.1,200 z"/>
+      <path class="ln s-v" d="M300,199.7 L300.9,199.7 L301.9,199.6 L302.8,199.6 L303.7,199.6 L304.6,199.5 L305.6,199.5 L306.5,199.4 L307.4,199.4 L308.4,199.3 L309.3,199.3 L310.2,199.2 L311.1,199.1 L312.1,199.1 L313,199 L313.9,198.9 L314.9,198.8 L315.8,198.7 L316.7,198.6 L317.6,198.5 L318.6,198.4 L319.5,198.3 L320.4,198.2 L321.4,198 L322.3,197.9 L323.2,197.7 L324.1,197.5 L325.1,197.4 L326,197.2 L326.9,197 L327.9,196.7 L328.8,196.5 L329.7,196.3 L330.6,196 L331.6,195.7 L332.5,195.4 L333.4,195.1 L334.4,194.8 L335.3,194.5 L336.2,194.1 L337.1,193.7 L338.1,193.3 L339,192.9 L339.9,192.5 L340.9,192 L341.8,191.5 L342.7,191 L343.6,190.4 L344.6,189.9 L345.5,189.3 L346.4,188.6 L347.4,188 L348.3,187.3 L349.2,186.6 L350.1,185.8 L351.1,185.1 L352,184.2 L352.9,183.4 L353.9,182.5 L354.8,181.6 L355.7,180.7 L356.6,179.7 L357.6,178.7 L358.5,177.6 L359.4,176.5 L360.4,175.4 L361.3,174.2 L362.2,173 L363.1,171.7 L364.1,170.4 L365,169.1 L365.9,167.7 L366.9,166.3 L367.8,164.9 L368.7,163.4 L369.6,161.8 L370.6,160.3 L371.5,158.7 L372.4,157 L373.4,155.3 L374.3,153.6 L375.2,151.9 L376.1,150.1 L377.1,148.2 L378,146.4 L378.9,144.5 L379.9,142.6 L380.8,140.6 L381.7,138.6 L382.6,136.6 L383.6,134.6 L384.5,132.5 L385.4,130.5 L386.4,128.4 L387.3,126.3 L388.2,124.1 L389.1,122 L390.1,119.8 L391,117.7 L391.9,115.5 L392.9,113.4 L393.8,111.2 L394.7,109 L395.6,106.9 L396.6,104.7 L397.5,102.6 L398.4,100.5 L399.4,98.4 L400.3,96.3 L401.2,94.2 L402.1,92.2 L403.1,90.2 L404,88.2 L404.9,86.2 L405.9,84.3 L406.8,82.5 L407.7,80.7 L408.6,78.9 L409.6,77.2 L410.5,75.5 L411.4,73.9 L412.4,72.4 L413.3,70.9 L414.2,69.5 L415.1,68.1 L416.1,66.8 L417,65.6 L417.9,64.5 L418.9,63.4 L419.8,62.4 L420.7,61.5 L421.6,60.7 L422.6,60 L423.5,59.3 L424.4,58.7 L425.4,58.3 L426.3,57.9 L427.2,57.5 L428.1,57.3 L429.1,57.2 L430,57.1 L430.9,57.2 L431.9,57.3 L432.8,57.5 L433.7,57.9 L434.6,58.3 L435.6,58.7 L436.5,59.3 L437.4,60 L438.4,60.7 L439.3,61.5 L440.2,62.4 L441.1,63.4 L442.1,64.5 L443,65.6 L443.9,66.8 L444.9,68.1 L445.8,69.5 L446.7,70.9 L447.6,72.4 L448.6,73.9 L449.5,75.5 L450.4,77.2 L451.4,78.9 L452.3,80.7 L453.2,82.5 L454.1,84.3 L455.1,86.2 L456,88.2 L456.9,90.2 L457.9,92.2 L458.8,94.2 L459.7,96.3 L460.6,98.4 L461.6,100.5 L462.5,102.6 L463.4,104.7 L464.4,106.9 L465.3,109 L466.2,111.2 L467.1,113.4 L468.1,115.5 L469,117.7 L469.9,119.8 L470.9,122 L471.8,124.1 L472.7,126.3 L473.6,128.4 L474.6,130.5 L475.5,132.5 L476.4,134.6 L477.4,136.6 L478.3,138.6 L479.2,140.6 L480.1,142.6 L481.1,144.5 L482,146.4 L482.9,148.2 L483.9,150.1 L484.8,151.9 L485.7,153.6 L486.6,155.3 L487.6,157 L488.5,158.7 L489.4,160.3 L490.4,161.8 L491.3,163.4 L492.2,164.9 L493.1,166.3 L494.1,167.7 L495,169.1 L495.9,170.4 L496.9,171.7 L497.8,173 L498.7,174.2 L499.6,175.4 L500.6,176.5 L501.5,177.6 L502.4,178.7 L503.4,179.7 L504.3,180.7 L505.2,181.6 L506.1,182.5 L507.1,183.4 L508,184.2 L508.9,185.1 L509.9,185.8 L510.8,186.6 L511.7,187.3 L512.6,188 L513.6,188.6 L514.5,189.3 L515.4,189.9 L516.4,190.4 L517.3,191 L518.2,191.5 L519.1,192 L520.1,192.5 L521,192.9 L521.9,193.3 L522.9,193.7 L523.8,194.1 L524.7,194.5 L525.6,194.8 L526.6,195.1 L527.5,195.4 L528.4,195.7 L529.4,196 L530.3,196.3 L531.2,196.5 L532.1,196.7 L533.1,197 L534,197.2 L534.9,197.4 L535.9,197.5 L536.8,197.7 L537.7,197.9 L538.6,198 L539.6,198.2 L540.5,198.3 L541.4,198.4 L542.4,198.5 L543.3,198.6 L544.2,198.7 L545.1,198.8 L546.1,198.9 L547,199 L547.9,199.1 L548.9,199.1 L549.8,199.2 L550.7,199.3 L551.6,199.3 L552.6,199.4 L553.5,199.4 L554.4,199.5 L555.4,199.5 L556.3,199.6 L557.2,199.6 L558.1,199.6 L559.1,199.7 L560,199.7"/>
+      <line class="ax" x1="300" y1="200" x2="560" y2="200"/>
+      <text x="318.6" y="216" class="sm" text-anchor="middle">140</text>
+      <text x="355.7" y="216" class="sm" text-anchor="middle">150</text>
+      <text x="392.9" y="216" class="sm" text-anchor="middle">160</text>
+      <text x="430" y="216" class="sm" text-anchor="middle">170</text>
+      <text x="467.1" y="216" class="sm" text-anchor="middle">180</text>
+      <text x="504.3" y="216" class="sm" text-anchor="middle">190</text>
+      <text x="541.4" y="216" class="sm" text-anchor="middle">200</text>
+      <text x="430" y="135.7" class="ta lg b" text-anchor="middle">area ≈ 0.68</text>
+      <text x="430" y="22" class="lg b" text-anchor="middle">PDF: heights (cm)</text>
+      <text x="430" y="234" class="sm" text-anchor="middle">height in cm</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 3.1</b> Left: a PMF puts a lump of probability on each value; the bar heights add up to 1. Right: a PDF is a curve, and probability is area under it. The shaded area between 160&nbsp;cm and 180&nbsp;cm is about 0.68.</figcaption>
+          </figure>
 
           <div class="callout definition">
             <div class="callout__label">Definition</div>
-            <p>A <dfn>distribution</dfn> is the complete description of how likely each value of a
-            random variable is. For discrete variables it's given by a <dfn>PMF</dfn> (mass on each
-            value); for continuous variables by a <dfn>PDF</dfn> (a density curve whose <em>area</em>
-            gives probability). Both always sum/integrate to 1.</p>
+            <p>A <dfn>distribution</dfn> is the complete description of how likely each value of a random
+            variable is. For discrete variables it is a <dfn>PMF</dfn> (a mass on each value). For
+            continuous variables it is a <dfn>PDF</dfn> (a density curve whose <em>area</em> gives
+            probability). The masses add up to 1, and the total area is 1.</p>
           </div>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
           <p class="codecap">a discrete distribution (a loaded die) and sampling from it</p>
           <pre><code class="language-python">import torch
+torch.manual_seed(0)
 
-# a PMF over 6 faces — six numbers that must sum to 1
+# a PMF over 6 faces: six numbers that must add up to 1
 probs = torch.tensor([0.10, 0.10, 0.10, 0.10, 0.10, 0.50])  # face 6 is loaded
-print(probs.sum())                 # tensor(1.0000)  -> a valid distribution
+print(probs.sum())                 # tensor(1.)  -> a valid distribution
 
 die = torch.distributions.Categorical(probs=probs)
 
-# draw 10,000 rolls and see the loaded face show up ~half the time
+# draw 10,000 rolls and count how often the loaded face appears
 samples = die.sample((10_000,))
-print((samples == 5).float().mean())   # ~0.50   (face index 5 == the '6')</code></pre>
+print((samples == 5).float().mean())   # tensor(0.5046)   (index 5 is the face '6')</code></pre>
+          <p class="gloss"><b>In words:</b> <code>Categorical</code> is PyTorch's name for a
+          distribution over a list of outcomes. It numbers the faces from 0, so the face “6” is index 5.
+          The share of 6s in 10,000 rolls is close to 0.5, as the PMF says. A different seed gives a
+          slightly different number, near 0.50.</p>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">Someone hands you a continuous PDF and asks “what is <code>P(X = 3.0)</code> exactly?” Why is the honest answer 0, and what should they have asked instead?</span>
+                <span class="check__q">A PDF has the value $p(3.0) = 2$ at one point. Is that a mistake, since probabilities cannot be above 1? What is $P(X = 3.0)$, and what should you ask instead?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>For a continuous variable there are infinitely many possible values packed into
-                any interval, so the probability piled on any single exact point is zero — the area
-                under a curve over a zero-width slice is zero. The density <code>p(3.0)</code> can be
-                large, but density is not probability. The right question is about a <em>range</em>,
-                e.g. <code>P(2.9 ≤ X ≤ 3.1)</code>, which is the area under the curve between those
-                bounds. This is the single most common confusion when people first meet PDFs.</p>
+                <p>It is not a mistake. A density is probability <em>per unit</em>, so it can be larger
+                than 1 on a narrow range, as long as the total area is 1. $P(X = 3.0)$ is 0: the area over
+                a slice of zero width is zero. The right question is about a <em>range</em>, for example
+                $P(2.9 \le X \le 3.1)$. If the density stays near 2 over that range, the answer is about
+                $2 \times 0.2 = 0.4$.</p>
               </div>
             </details>
           </div>
@@ -162,34 +214,32 @@ print((samples == 5).float().mean())   # ~0.50   (face index 5 == the '6')</code
           <h2><span class="h-num">2</span>Expectation and variance</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>Once you have a distribution, the first thing you want is a one-number summary: “on
-          average, what value should I expect?” That's the <strong>expectation</strong> (also called
-          the <em>mean</em> or <em>expected value</em>), written <span style="white-space:nowrap">$\mathbb{E}[X]$</span>. It is the
-          long-run average you'd converge to if you repeated the random process forever. Crucially,
-          it's a <em>weighted</em> average: outcomes that are more likely pull the average toward
-          them harder.</p>
+          <p>Once you have a distribution, you first want a one-number summary: “on average, what value
+          should I expect?” That is the <strong>expectation</strong> (also called the <em>mean</em> or
+          <em>expected value</em>), written $\mathbb{E}[X]$. It is the long-run average you would reach if
+          you repeated the random process many, many times. It is a <em>weighted</em> average: outcomes
+          that are more likely pull the average toward them more strongly.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>A slot machine pays <em>0 dollars most spins, but 100 dollars one time in fifty</em>. What do you win
-            <strong>per spin on average</strong>? Not 100 dollars (that's rare), not 0 dollars (you do sometimes
-            win). It's each payout weighted by how often it happens:
-            <span style="white-space:nowrap">$\tfrac{49}{50}\times\$0 + \tfrac{1}{50}\times\$100 = \$2$</span> per spin.
-            That 2 dollars is the expectation. The casino sets the machine so your expected win is less than
-            what you paid to play — the “house edge” is just an expectation calculation running in
-            their favour, spin after spin.</p>
+            <p>A slot machine pays <em>0 dollars on most spins, but 100 dollars one time in fifty</em>. What
+            do you win <strong>per spin, on average</strong>? Not 100 dollars (that is rare), and not 0
+            dollars (you do win sometimes). You weight each payout by how often it happens:
+            $\tfrac{49}{50}\times 0 + \tfrac{1}{50}\times 100 = 2$ dollars per spin. Those 2 dollars are the
+            expectation. The casino sets the machine so that your expected win is less than the price of a
+            spin. The casino's profit is an expectation calculation in its favor.</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>For a discrete variable, expectation is the probability-weighted sum of the values:</p>
+          <p>For a discrete variable, the expectation is the probability-weighted sum of the values:</p>
           $$ \mathbb{E}[X] = \sum_{x} x \, P(X = x) $$
-          <p class="gloss"><b>In words:</b> go through every possible value <span style="white-space:nowrap">$x$</span>, multiply it by how
-          likely it is, and add all those products up. Likely values contribute more; rare ones
-          barely nudge the total. The result is the balance point of the distribution — the spot
-          where it would sit level on a seesaw.</p>
+          <p class="gloss"><b>In words:</b> go through every possible value $x$, multiply it by its
+          probability, and add all the products. Likely values contribute more; rare ones barely change
+          the total. The result is the balance point of the distribution: the place where it would
+          balance on a seesaw.</p>
 
-          <p>Let's derive one concretely. A <strong>fair die</strong>: values 1–6, each with
-          probability <span style="white-space:nowrap">$1/6$</span>.</p>
+          <p>Let's compute one. A <strong>fair die</strong> has values 1 to 6, each with probability
+          $1/6$:</p>
           $$
           \begin{aligned}
           \mathbb{E}[X] &= 1\cdot\tfrac{1}{6} + 2\cdot\tfrac{1}{6} + 3\cdot\tfrac{1}{6}
@@ -198,238 +248,278 @@ print((samples == 5).float().mean())   # ~0.50   (face index 5 == the '6')</code
                         &= \tfrac{1}{6}\cdot 21 \;=\; 3.5
           \end{aligned}
           $$
-          <p class="gloss"><b>In words:</b> the expected roll is 3.5. Note you can never actually
-          <em>roll</em> a 3.5 — the expectation is not a possible outcome, it's the long-run average.
-          Roll ten thousand times and the running average will settle very close to 3.5.</p>
+          <p class="gloss"><b>In words:</b> the expected roll is 3.5. You can never <em>roll</em> a 3.5.
+          The expectation does not have to be a possible outcome; it is the long-run average. Roll ten
+          thousand times, and the running average will be very close to 3.5.</p>
 
-          <p>The mean tells you <em>where</em> a distribution sits. The next question is <em>how
-          spread out</em> it is — do outcomes cluster tightly around the mean, or scatter wildly?
-          That's the <strong>variance</strong>, written <span style="white-space:nowrap">$\mathrm{Var}[X]$</span>. We measure each
-          outcome's distance from the mean <span style="white-space:nowrap">$\mu = \mathbb{E}[X]$</span>, <em>square</em> it (so that
-          being too high and too low both count as spread, and never cancel out), and take the
-          expected value of that:</p>
+          <p>The mean tells you <em>where</em> a distribution sits. The next question is <em>how spread
+          out</em> it is. Do outcomes stay close to the mean, or scatter widely? That is the
+          <strong>variance</strong>, written $\mathrm{Var}[X]$. We measure each outcome's distance from
+          the mean $\mu = \mathbb{E}[X]$ and <em>square</em> it. Then we take the expected value of
+          that:</p>
           $$ \mathrm{Var}[X] = \mathbb{E}\big[(X - \mu)^2\big] $$
-          <p class="gloss"><b>In words:</b> variance is the average squared distance from the mean.
-          Big variance means outcomes routinely land far from the average (a wild, unpredictable
-          variable); small variance means they hug it (a steady, reliable one). We square the
-          distances so that a swing of <span style="white-space:nowrap">$+3$</span> and a swing of <span style="white-space:nowrap">$-3$</span> both count as spread rather than
-          erasing each other. The square root of variance, <span style="white-space:nowrap">$\sigma$</span>, is the
-          <dfn>standard deviation</dfn> — the same idea back in the original units.</p>
+          <p class="gloss"><b>In words:</b> variance is the average squared distance from the mean. Large
+          variance means outcomes often land far from the average (an unpredictable variable). Small
+          variance means they stay close to it (a steady one). We square the distances so that a swing of
+          $+3$ and a swing of $-3$ both count as spread, instead of canceling. The square root of the
+          variance, $\sigma$ (sigma), is the <dfn>standard deviation</dfn>. It is the same idea, back in
+          the original units.</p>
+
+          <p>A second form of the variance is often easier to compute. Expand the square and use the fact
+          that an expectation of a sum is the sum of expectations:</p>
+          $$ \begin{aligned}
+            \mathrm{Var}[X] &= \mathbb{E}\big[X^2 - 2\mu X + \mu^2\big] \\[4pt]
+                            &= \mathbb{E}[X^2] - 2\mu\,\mathbb{E}[X] + \mu^2 \\[4pt]
+                            &= \mathbb{E}[X^2] - \mu^2
+          \end{aligned} $$
+          <p class="gloss"><b>In words:</b> the mean of the squares, minus the square of the mean. (The
+          last step uses $\mathbb{E}[X] = \mu$.) For the fair die, $\mathbb{E}[X^2] = \tfrac{1}{6}(1 + 4 +
+          9 + 16 + 25 + 36) = \tfrac{91}{6}$. So $\mathrm{Var}[X] = \tfrac{91}{6} - 3.5^2 = \tfrac{35}{12}
+          \approx 2.92$.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>Two basketball players both average 20 points a game — same expectation. But one
-            scores 19, 21, 20, 20, 20 (a <strong>reliable</strong> player, tiny variance), while the
-            other scores 2, 40, 5, 38, 15 (a <strong>streaky</strong> player, huge variance). The mean
-            can't tell them apart; variance is exactly the number that does. A coach picking who to
-            trust in the final seconds cares about variance as much as the average.</p>
+            <p>Two basketball players both average 20 points a game: same expectation. One scores 19, 21,
+            20, 20, 20 (a <strong>reliable</strong> player, tiny variance). The other scores 2, 40, 5, 38, 15
+            (a <strong>streaky</strong> player, huge variance). The mean cannot tell them apart; the variance
+            can. A coach who chooses a player for the last seconds of a close game cares about variance as
+            much as about the average.</p>
           </div>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">mean and variance, from samples and from lists</p>
           <pre><code class="language-python">import torch
+torch.manual_seed(0)
 
-# simulate the fair die and check both summaries empirically
+# simulate the fair die and check both summaries
 rolls = torch.randint(1, 7, (100_000,)).float()   # 100k rolls of 1..6
 
-print(rolls.mean())                 # ~3.50   matches E[X] we derived by hand
-print(rolls.var(unbiased=False))    # ~2.92   the spread around 3.5
+print(rolls.mean())                 # tensor(3.4991)  close to E[X] = 3.5
+print(rolls.var(correction=0))      # tensor(2.9190)  close to 35/12 = 2.917
 
 # reliable vs streaky: same mean, very different variance
 reliable = torch.tensor([19., 21., 20., 20., 20.])
 streaky  = torch.tensor([ 2., 40.,  5., 38., 15.])
-print(reliable.mean(), streaky.mean())   # both 20.0
-print(reliable.var(),  streaky.var())    # ~0.5   vs   ~326.5</code></pre>
+print(reliable.mean(), streaky.mean())                    # tensor(20.) tensor(20.)
+print(reliable.var(correction=0), streaky.var(correction=0))  # tensor(0.4000) tensor(259.6000)</code></pre>
+          <p class="gloss"><b>In words:</b> <code>correction=0</code> divides by $N$, the number of
+          values. That is the average squared distance, as in our formula. PyTorch's default is
+          <code>correction=1</code>, which divides by $N-1$. This “sample variance” is slightly larger (0.5
+          and 324.5 here). It corrects for the fact that the mean was estimated from the same few values.
+          With 100,000 rolls, the two versions are almost equal.</p>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">A bet pays <code>+$10</code> with probability 0.2 and <code>−$3</code> with probability 0.8. What is the expected payout, and should you take the bet?</span>
+                <span class="check__q">A bet pays $+10$ dollars with probability 0.2 and $-3$ dollars with probability 0.8. What is the expected payout? Now add 5 dollars to every payout. How do the mean and the variance change?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p><code>E[payout] = (0.2)(+10) + (0.8)(−3) = 2.0 − 2.4 = −$0.40</code>. On average you
-                <em>lose</em> 40 cents every time you play, even though the win is bigger than the
-                loss — because the loss happens four times as often. A rational one-number decision
-                says skip it. (In real life you'd also weigh variance and how much you can afford to
-                lose, but the expectation is the first thing to check.)</p>
+                <p>$\mathbb{E} = (0.2)(10) + (0.8)(-3) = 2.0 - 2.4 = -0.40$. On average you
+                <em>lose</em> 40 cents per play. The win is larger than the loss, but the loss happens four
+                times as often. If you add 5 dollars to every payout, the mean rises by 5, to 4.60. The
+                variance does not change: every outcome and the mean move together, so all distances from
+                the mean stay the same.</p>
               </div>
             </details>
           </div>
 
           <!-- ===================== KEY DISTRIBUTIONS ===================== -->
-          <h2><span class="h-num">3</span>Two distributions you'll meet everywhere</h2>
+          <h2><span class="h-num">3</span>Two distributions you will meet everywhere</h2>
 
-          <p>Most of ML leans on a small handful of standard distribution shapes. Two of them show
-          up so often they're worth knowing by heart.</p>
+          <p>Most of ML relies on a small number of standard distribution shapes. Two of them appear so
+          often that they are worth knowing well.</p>
 
           <h3>The Bernoulli: one yes-or-no event</h3>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>The <strong>Bernoulli distribution</strong> is the simplest one there is: a single event
-          with exactly two outcomes, 1 (“success”) or 0 (“failure”), governed by one number
-          <span style="white-space:nowrap">$p$</span> — the probability of the 1. A coin flip, a click-or-no-click, a
-          spam-or-not-spam decision. Whenever a model answers a single yes/no question, a Bernoulli
-          is hiding underneath.</p>
+          <p>The <strong>Bernoulli distribution</strong> is the simplest one there is. It describes a
+          single event with two outcomes, 1 (“success”) or 0 (“failure”). One number $p$ controls it: the
+          probability of a 1. Examples: a coin flip, a click or no click, spam or not spam. Whenever a
+          model answers a single yes/no question, a Bernoulli is behind it.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>A single coin flip with a possibly-bent coin. If the coin comes up heads 70% of the
-            time, then <span style="white-space:nowrap">$p = 0.7$</span>: heads (1) has probability 0.7, tails (0) has probability
-            0.3. That one number <span style="white-space:nowrap">$p$</span> is the entire distribution — nothing else to know.</p>
+            <p>Flip a bent coin that comes up heads 70% of the time. Then $p = 0.7$: heads (1) has
+            probability 0.7, and tails (0) has probability 0.3. That one number $p$ is the entire
+            distribution. There is nothing else to know.</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>Its PMF can be written as a single tidy line that works for both outcomes:</p>
+          <p>Its PMF can be written as one line that works for both outcomes:</p>
           $$ P(X = x) = p^{\,x}\,(1-p)^{\,1-x}, \qquad x \in \{0, 1\} $$
-          <p class="gloss"><b>In words:</b> plug in <span style="white-space:nowrap">$x = 1$</span> and the formula collapses to
-          <span style="white-space:nowrap">$p$</span> (the chance of a 1); plug in <span style="white-space:nowrap">$x = 0$</span> and it collapses to <span style="white-space:nowrap">$1 - p$</span> (the
-          chance of a 0). The exponents are a clever switch: whichever outcome you ask about, the
-          other term's exponent becomes 0 and vanishes (anything to the power 0 is 1). Its mean is
-          <span style="white-space:nowrap">$\mathbb{E}[X] = p$</span> and its variance is <span style="white-space:nowrap">$p(1-p)$</span> — biggest at
-          <span style="white-space:nowrap">$p = 0.5$</span>, the most unpredictable coin.</p>
+          <p class="gloss"><b>In words:</b> put in $x = 1$ and the formula becomes $p$ (the chance of a
+          1). Put in $x = 0$ and it becomes $1 - p$ (the chance of a 0). The exponents work as a switch:
+          for whichever outcome you ask about, the other factor gets exponent 0 and becomes 1.</p>
+
+          <p>Its mean and variance follow from Section 2. Because $X$ is only ever 0 or 1, $X^2 = X$:</p>
+          $$ \begin{aligned}
+            \mathbb{E}[X] &= 0\cdot(1-p) + 1\cdot p = p \\[4pt]
+            \mathbb{E}[X^2] &= 0^2\cdot(1-p) + 1^2\cdot p = p \\[4pt]
+            \mathrm{Var}[X] &= \mathbb{E}[X^2] - \big(\mathbb{E}[X]\big)^2 = p - p^2 = p(1-p)
+          \end{aligned} $$
+          <p class="gloss"><b>In words:</b> the mean of a 0/1 variable is the chance of a 1. The variance
+          $p(1-p)$ is 0 when $p$ is 0 or 1 (no randomness at all). It is largest at $p = 0.5$, where it
+          equals 0.25.</p>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">a Bernoulli coin: sampled and exact</p>
+          <pre><code class="language-python">import torch
+torch.manual_seed(0)
+
+coin = torch.distributions.Bernoulli(probs=0.7)
+flips = coin.sample((100_000,))     # 100k flips, each 0.0 or 1.0
+
+print(flips.mean())                 # tensor(0.7007)  close to p = 0.7
+print(flips.var(correction=0))      # tensor(0.2097)  close to p(1-p) = 0.21
+print(coin.mean, coin.variance)     # tensor(0.7000) tensor(0.2100)  the exact formulas</code></pre>
+          <p class="gloss"><b>In words:</b> the sample mean and variance of many flips come close to the
+          formulas we derived. The distribution object also knows the exact values, $p$ and $p(1-p)$.</p>
 
           <h3>The Gaussian: the bell curve</h3>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>The <strong>Gaussian</strong> (also called the <strong>Normal</strong> distribution) is
-          the famous bell curve: a smooth hump, tall in the middle and tailing off symmetrically on
-          both sides. It's the default shape for a continuous quantity that clusters around a typical
-          value with random wobble either side — heights, measurement errors, exam scores, sensor
+          <p>The <strong>Gaussian</strong> (also called the <strong>normal</strong> distribution) is the
+          well-known bell curve. It is a smooth hump, tall in the middle, and it falls off equally on both
+          sides. It is the default shape for a continuous quantity that stays near a typical value with
+          random variation on either side. Examples: heights, measurement errors, exam scores, sensor
           noise.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>The heights of adults in a city. Most people are near the average, say 170&nbsp;cm.
-            Fewer are 185&nbsp;cm, fewer still 200&nbsp;cm; the same thinning-out happens toward the
-            short end. Plot how many people sit at each height and you get a bell: crowded in the
-            middle, sparse in the tails, roughly symmetric. That's a Gaussian in the wild.</p>
+            <p>Think of the heights of adults in a city. Most people are near the average, say
+            170&nbsp;cm. Fewer are 185&nbsp;cm, and even fewer 200&nbsp;cm. The same thinning happens toward
+            the short end. Plot how many people have each height and you get a bell: crowded in the middle,
+            sparse at the edges, roughly symmetric. That is a Gaussian in real life.</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>The Gaussian PDF is controlled by just two numbers — its mean <span style="white-space:nowrap">$\mu$</span> and its
-          standard deviation <span style="white-space:nowrap">$\sigma$</span>:</p>
+          <p>Two numbers control the Gaussian PDF: its mean $\mu$ and its standard deviation
+          $\sigma$:</p>
           $$ p(x) = \frac{1}{\sigma\sqrt{2\pi}}\,\exp\!\left(-\frac{(x-\mu)^2}{2\sigma^2}\right) $$
-          <p class="gloss"><b>In words:</b> <span style="white-space:nowrap">$\mu$</span> (mu) is the <em>centre</em> — where the peak
-          sits, the typical value. <span style="white-space:nowrap">$\sigma$</span> (sigma) is the <em>width</em> — how fat the
-          bell is, i.e. how much things spread around the centre. The heart of the formula is
-          <span style="white-space:nowrap">$-(x-\mu)^2$</span>: the further <span style="white-space:nowrap">$x$</span> is from the centre, the more negative that gets, and
-          <span style="white-space:nowrap">$\exp$</span> of a big negative number is tiny — so probability density falls off fast as you
-          move away from <span style="white-space:nowrap">$\mu$</span>. The <span style="white-space:nowrap">$\frac{1}{\sigma\sqrt{2\pi}}$</span> out front is just a scaling
-          factor that forces the total area to equal 1.</p>
+          <p class="gloss"><b>In words:</b> $\mu$ (mu) is the <em>center</em>: where the peak is, the
+          typical value. $\sigma$ (sigma) is the <em>width</em>: how far values spread around the center.
+          The main part of the formula is $-(x-\mu)^2$. The farther $x$ is from the center, the more
+          negative this gets, and $\exp$ of a large negative number is tiny. So the density falls quickly
+          as you move away from $\mu$. The factor $\frac{1}{\sigma\sqrt{2\pi}}$ in front makes the total
+          area equal 1. (We will not prove that area here; it needs a calculus trick with a double
+          integral.)</p>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> Why the Gaussian is everywhere</div>
-            <p>The deep reason is the <strong>Central Limit Theorem</strong>: when you add up (or
-            average) lots of small, independent random effects, the total tends toward a Gaussian —
-            almost regardless of the shape of the individual effects. A person's height is the sum of
-            countless small genetic and environmental nudges; measurement error is the sum of many
-            tiny disturbances. Because so much of the world is “many little random pushes added
-            together,” the bell curve appears again and again — and that's why ML so often assumes
-            noise is Gaussian, and models it that way.</p>
+            <p>The main reason is the <strong>central limit theorem</strong>. When you add up (or average)
+            many small, independent random effects, the total tends toward a Gaussian. This happens almost
+            regardless of the shape of each single effect. We will not prove it here. A person's height is
+            the sum of many small genetic and environmental effects. A measurement error is the sum of many
+            tiny disturbances. Many quantities in the world are “many small random pushes added together,”
+            so the bell curve appears again and again. That is why ML often assumes that noise is
+            Gaussian.</p>
           </div>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">sampling heights from a Gaussian</p>
           <pre><code class="language-python">import torch
+torch.manual_seed(0)
 
-# a Gaussian centred at mu=170 with spread sigma=10 (think: heights in cm)
+# a Gaussian centered at mu = 170 with spread sigma = 10 (heights in cm)
 normal = torch.distributions.Normal(loc=170.0, scale=10.0)
 
 samples = normal.sample((100_000,))
-print(samples.mean(), samples.std())   # ~170.0, ~10.0  -> recovers mu, sigma
+print(samples.mean(), samples.std())   # tensor(169.9756) tensor(10.0124)  close to mu, sigma
 
 # about 68% of a Gaussian lies within one sigma of the mean:
 within_1sigma = ((samples &gt; 160) &amp; (samples &lt; 180)).float().mean()
-print(within_1sigma)                   # ~0.68  the famous 68% rule</code></pre>
+print(within_1sigma)                   # tensor(0.6811)  the 68% rule</code></pre>
+          <p class="gloss"><b>In words:</b> the samples recover the two numbers we chose. The share of
+          samples between 160&nbsp;cm and 180&nbsp;cm is the shaded area in Figure 3.1. For any Gaussian,
+          the area within one $\sigma$ of the mean is about 0.683.</p>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">A Bernoulli has <code>p = 0.5</code> and another has <code>p = 0.9</code>. Which one is more uncertain — harder to predict on any single trial — and how does the variance <code>p(1−p)</code> confirm it?</span>
+                <span class="check__q">One Bernoulli has $p = 0.5$ and another has $p = 0.9$. If you always guess the more likely outcome, how often are you wrong for each? How does the variance $p(1-p)$ match that?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>The <code>p = 0.5</code> coin is more uncertain: it's a genuine coin flip, no way to
-                guess. The <code>p = 0.9</code> one is easy — just guess “1” and you're right 90% of
-                the time. The variance confirms it: <code>0.5 × 0.5 = 0.25</code> versus
-                <code>0.9 × 0.1 = 0.09</code>. Variance <code>p(1−p)</code> peaks exactly at
-                <code>p = 0.5</code> and shrinks toward the extremes, which matches the intuition that
-                a near-certain event carries little surprise.</p>
+                <p>For $p = 0.5$ there is no better guess, so you are wrong half the time. For $p = 0.9$
+                you guess “1” and are wrong only 10% of the time. The variance agrees:
+                $0.5 \times 0.5 = 0.25$ versus $0.9 \times 0.1 = 0.09$. The variance $p(1-p)$ is largest at
+                $p = 0.5$ and shrinks toward the ends. So the harder a single outcome is to predict, the
+                larger its variance. (<a href="04-information-theory.html">Section 4</a> measures this unpredictability in a different way, with
+                entropy.)</p>
               </div>
             </details>
           </div>
 
           <!-- ===================== CONDITIONAL & BAYES ===================== -->
-          <h2><span class="h-num">4</span>Conditional probability & Bayes' rule</h2>
+          <h2><span class="h-num">4</span>Conditional probability and Bayes' rule</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p><strong>Conditional probability</strong>, written <span style="white-space:nowrap">$P(A \mid B)$</span> and read “the
-          probability of A <em>given</em> B,” is how likely A is <em>once you already know B has
-          happened</em>. New information shrinks the world of possibilities, and the odds shift
-          accordingly. Learning that it's cloudy raises the chance of rain; the raw chance of rain
-          and the chance-of-rain-given-clouds are two different numbers.</p>
+          <p><strong>Conditional probability</strong>, written $P(A \mid B)$ and read “the probability of
+          A <em>given</em> B,” is how likely A is <em>when you already know that B happened</em>. New
+          information makes the set of possibilities smaller, and the chances change. If you learn that the
+          sky is cloudy, the chance of rain goes up. The plain chance of rain and the chance of rain given
+          clouds are two different numbers.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>The chance a stranger is over six feet tall is modest. But <em>given</em> that you're
-            told they play professional basketball, that chance rockets up. The fact didn't change
-            the person — it changed <em>your information</em>, and so it changed the probability you
-            should assign. That's all a conditional probability is: an updated belief in the light of
-            a known fact.</p>
+            <p>The chance that a stranger is over 190&nbsp;cm tall is small. But if you learn that they play
+            professional basketball, that chance rises sharply. The fact did not change the person. It
+            changed <em>your information</em>, and so it changed the probability you should give. That is
+            all a conditional probability is: a belief updated with a known fact.</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>Start from the <dfn>joint probability</dfn> — the chance that <em>both</em> A and B
-          happen, written <span style="white-space:nowrap">$P(A, B)$</span>. There are two equally valid ways to build that joint
-          up out of a condition, depending on which event you condition on:</p>
+          <p>Start from the <dfn>joint probability</dfn>: the chance that <em>both</em> A and B happen,
+          written $P(A, B)$. There are two equally valid ways to build it from a condition, depending on
+          which event you condition on:</p>
           $$ P(A, B) = P(A \mid B)\,P(B) = P(B \mid A)\,P(A) $$
           <p class="gloss"><b>In words:</b> the chance of both A and B is the chance of B, times the
-          chance of A once B is known — “B happens, and then A happens given B.” You could equally
-          tell the story the other way round (A first, then B given A). Both routes reach the same
-          joint, so the two products are equal.</p>
+          chance of A once B is known: “B happens, and then A happens given B.” You can also tell the
+          story the other way round (A first, then B given A). Both ways reach the same joint probability,
+          so the two products are equal.</p>
 
-          <p>Now set those two expressions for the same joint equal to each other and divide by
-          <span style="white-space:nowrap">$P(B)$</span>. That single step of algebra <em>is</em> <strong>Bayes' rule</strong>:</p>
+          <p>Now set those two expressions equal and divide by $P(B)$. That one step of algebra
+          <em>is</em> <strong>Bayes' rule</strong>:</p>
           $$
           \begin{aligned}
           P(A \mid B)\,P(B) &= P(B \mid A)\,P(A) \\[4pt]
           P(A \mid B) &= \frac{P(B \mid A)\,P(A)}{P(B)}
           \end{aligned}
           $$
-          <p class="gloss"><b>In words:</b> Bayes' rule lets you <em>flip</em> a conditional. If you
-          know how likely the evidence B is when A is true, plus how common A is to begin with, you
-          can work out how likely A is once you've seen B. It's the formula for updating a belief in
-          the light of evidence.</p>
+          <p class="gloss"><b>In words:</b> Bayes' rule lets you <em>reverse</em> a conditional. Suppose
+          you know how likely the evidence B is when A is true, and how common A is to begin with. Then
+          you can compute how likely A is once you have seen B. It is the formula for updating a belief
+          with evidence.</p>
 
           <div class="callout definition">
             <div class="callout__label">The three words of Bayes</div>
-            <p>The <dfn>prior</dfn> <span style="white-space:nowrap">$P(A)$</span> is your belief in A <em>before</em> the evidence.
-            The <dfn>likelihood</dfn> <span style="white-space:nowrap">$P(B \mid A)$</span> is how well A explains the evidence B —
-            how probable the evidence would be if A were true. The <dfn>posterior</dfn>
-            <span style="white-space:nowrap">$P(A \mid B)$</span> is your updated belief in A <em>after</em> seeing the evidence. Bayes
-            is the machine that turns prior + likelihood into posterior.</p>
+            <p>The <dfn>prior</dfn> $P(A)$ is your belief in A <em>before</em> the evidence. The
+            <dfn>likelihood</dfn> $P(B \mid A)$ is how probable the evidence B would be if A were true. The
+            <dfn>posterior</dfn> $P(A \mid B)$ is your updated belief in A <em>after</em> seeing the
+            evidence. Bayes' rule turns prior and likelihood into posterior.</p>
           </div>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>A <strong>medical test</strong> for a rare disease. You take it; it comes back
-            <em>positive</em>. Your gut screams “I'm sick.” But Bayes says: hold on — factor in how
-            rare the disease is to begin with (the prior), and how often the test cries wolf on
-            healthy people (false positives). The frightening number and the true number can be very
-            far apart. Let's put real figures on it.</p>
+            <p>Think of a <strong>medical test</strong> for a rare disease. You take it, and it comes back
+            <em>positive</em>. Your first thought is “I am sick.” But Bayes says: first consider how rare
+            the disease is (the prior). Then consider how often the test gives a false alarm for healthy
+            people (false positives). The number that feels right and the true number can be very far
+            apart. Let's put real numbers on it.</p>
           </div>
 
           <h3>A concrete number: the base-rate effect</h3>
-          <p>Suppose a disease affects <strong>1 in 1000</strong> people. A test is quite good: if you
-          <em>have</em> the disease it comes back positive 99% of the time (the likelihood), and if
-          you're <em>healthy</em> it wrongly comes back positive just 5% of the time (the false-positive
-          rate). You test positive. What's the real chance you're sick?</p>
+          <p>Suppose a disease affects <strong>1 in 1000</strong> people. The test is quite good. If you
+          <em>have</em> the disease, it is positive 99% of the time (the likelihood). If you are
+          <em>healthy</em>, it is wrongly positive only 5% of the time (the false-positive rate). You test
+          positive. What is the real chance that you are sick?</p>
 
-          <p>Let <span style="white-space:nowrap">$D$</span> = “has disease,” <span style="white-space:nowrap">$+$</span> = “tests positive.” We want the posterior
-          <span style="white-space:nowrap">$P(D \mid +)$</span>. Bayes needs the total chance of a positive result,
-          <span style="white-space:nowrap">$P(+)$</span>, which is positives from sick people <em>plus</em> positives from healthy
-          people:</p>
+          <p>Let $D$ = “has the disease” and $+$ = “tests positive.” We want the posterior
+          $P(D \mid +)$. Bayes' rule needs the total chance of a positive result, $P(+)$. That is the
+          positives from sick people <em>plus</em> the positives from healthy people:</p>
           $$
           \begin{aligned}
           P(+) &= \underbrace{P(+\mid D)\,P(D)}_{\text{true positives}}
@@ -441,15 +531,1031 @@ print(within_1sigma)                   # ~0.68  the famous 68% rule</code></pre>
                        \;\approx\; 0.0194
           \end{aligned}
           $$
-          <p class="gloss"><b>In words:</b> even after a positive result on a 99%-accurate test, your
-          chance of actually being sick is only about <strong>2%</strong>. Why so low? Because the
-          disease is rare (the prior <span style="white-space:nowrap">$P(D) = 0.001$</span> is tiny). Out of a positive pile, the vast
-          majority come from the huge healthy population's 5% false-positive rate, which swamps the
-          few true positives. This is the <strong>base-rate effect</strong>: ignore how rare
-          something is to begin with, and you'll wildly overreact to evidence. Bayes forces you to
-          keep the prior in the picture.</p>
+          <p class="gloss"><b>In words:</b> the test catches 99% of real cases. Even so, after a positive
+          result your chance of being sick is only about <strong>2%</strong>. The reason is that the
+          disease is rare: the prior $P(D) = 0.001$ is tiny. Most positive results come from the large
+          healthy group and its 5% false-positive rate. These far outnumber the few true positives. This
+          is the <strong>base-rate effect</strong>. If you ignore how rare something is, you will
+          overreact to evidence. Bayes' rule keeps the prior in the calculation.</p>
+
+<figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 500 400" role="img" aria-labelledby="fig-03-2-t">
+      <title id="fig-03-2-t">One thousand dots: one sick person who tests positive, about fifty healthy people who test positive, and the rest negative.</title>
+      <circle class="ln thin s-r f-p" cx="20" cy="20" r="7"/>
+      <circle class="f-r" cx="20" cy="20" r="4.2"/>
+      <circle class="f-a" cx="32" cy="20" r="4.2"/>
+      <circle class="f-a" cx="44" cy="20" r="4.2"/>
+      <circle class="f-a" cx="56" cy="20" r="4.2"/>
+      <circle class="f-a" cx="68" cy="20" r="4.2"/>
+      <circle class="f-a" cx="80" cy="20" r="4.2"/>
+      <circle class="f-a" cx="92" cy="20" r="4.2"/>
+      <circle class="f-a" cx="104" cy="20" r="4.2"/>
+      <circle class="f-a" cx="116" cy="20" r="4.2"/>
+      <circle class="f-a" cx="128" cy="20" r="4.2"/>
+      <circle class="f-a" cx="140" cy="20" r="4.2"/>
+      <circle class="f-a" cx="152" cy="20" r="4.2"/>
+      <circle class="f-a" cx="164" cy="20" r="4.2"/>
+      <circle class="f-a" cx="176" cy="20" r="4.2"/>
+      <circle class="f-a" cx="188" cy="20" r="4.2"/>
+      <circle class="f-a" cx="200" cy="20" r="4.2"/>
+      <circle class="f-a" cx="212" cy="20" r="4.2"/>
+      <circle class="f-a" cx="224" cy="20" r="4.2"/>
+      <circle class="f-a" cx="236" cy="20" r="4.2"/>
+      <circle class="f-a" cx="248" cy="20" r="4.2"/>
+      <circle class="f-a" cx="260" cy="20" r="4.2"/>
+      <circle class="f-a" cx="272" cy="20" r="4.2"/>
+      <circle class="f-a" cx="284" cy="20" r="4.2"/>
+      <circle class="f-a" cx="296" cy="20" r="4.2"/>
+      <circle class="f-a" cx="308" cy="20" r="4.2"/>
+      <circle class="f-a" cx="320" cy="20" r="4.2"/>
+      <circle class="f-a" cx="332" cy="20" r="4.2"/>
+      <circle class="f-a" cx="344" cy="20" r="4.2"/>
+      <circle class="f-a" cx="356" cy="20" r="4.2"/>
+      <circle class="f-a" cx="368" cy="20" r="4.2"/>
+      <circle class="f-a" cx="380" cy="20" r="4.2"/>
+      <circle class="f-a" cx="392" cy="20" r="4.2"/>
+      <circle class="f-a" cx="404" cy="20" r="4.2"/>
+      <circle class="f-a" cx="416" cy="20" r="4.2"/>
+      <circle class="f-a" cx="428" cy="20" r="4.2"/>
+      <circle class="f-a" cx="440" cy="20" r="4.2"/>
+      <circle class="f-a" cx="452" cy="20" r="4.2"/>
+      <circle class="f-a" cx="464" cy="20" r="4.2"/>
+      <circle class="f-a" cx="476" cy="20" r="4.2"/>
+      <circle class="f-a" cx="488" cy="20" r="4.2"/>
+      <circle class="f-a" cx="20" cy="32" r="4.2"/>
+      <circle class="f-a" cx="32" cy="32" r="4.2"/>
+      <circle class="f-a" cx="44" cy="32" r="4.2"/>
+      <circle class="f-a" cx="56" cy="32" r="4.2"/>
+      <circle class="f-a" cx="68" cy="32" r="4.2"/>
+      <circle class="f-a" cx="80" cy="32" r="4.2"/>
+      <circle class="f-a" cx="92" cy="32" r="4.2"/>
+      <circle class="f-a" cx="104" cy="32" r="4.2"/>
+      <circle class="f-a" cx="116" cy="32" r="4.2"/>
+      <circle class="f-a" cx="128" cy="32" r="4.2"/>
+      <circle class="f-a" cx="140" cy="32" r="4.2"/>
+      <circle class="f-f" cx="152" cy="32" r="3.2"/>
+      <circle class="f-f" cx="164" cy="32" r="3.2"/>
+      <circle class="f-f" cx="176" cy="32" r="3.2"/>
+      <circle class="f-f" cx="188" cy="32" r="3.2"/>
+      <circle class="f-f" cx="200" cy="32" r="3.2"/>
+      <circle class="f-f" cx="212" cy="32" r="3.2"/>
+      <circle class="f-f" cx="224" cy="32" r="3.2"/>
+      <circle class="f-f" cx="236" cy="32" r="3.2"/>
+      <circle class="f-f" cx="248" cy="32" r="3.2"/>
+      <circle class="f-f" cx="260" cy="32" r="3.2"/>
+      <circle class="f-f" cx="272" cy="32" r="3.2"/>
+      <circle class="f-f" cx="284" cy="32" r="3.2"/>
+      <circle class="f-f" cx="296" cy="32" r="3.2"/>
+      <circle class="f-f" cx="308" cy="32" r="3.2"/>
+      <circle class="f-f" cx="320" cy="32" r="3.2"/>
+      <circle class="f-f" cx="332" cy="32" r="3.2"/>
+      <circle class="f-f" cx="344" cy="32" r="3.2"/>
+      <circle class="f-f" cx="356" cy="32" r="3.2"/>
+      <circle class="f-f" cx="368" cy="32" r="3.2"/>
+      <circle class="f-f" cx="380" cy="32" r="3.2"/>
+      <circle class="f-f" cx="392" cy="32" r="3.2"/>
+      <circle class="f-f" cx="404" cy="32" r="3.2"/>
+      <circle class="f-f" cx="416" cy="32" r="3.2"/>
+      <circle class="f-f" cx="428" cy="32" r="3.2"/>
+      <circle class="f-f" cx="440" cy="32" r="3.2"/>
+      <circle class="f-f" cx="452" cy="32" r="3.2"/>
+      <circle class="f-f" cx="464" cy="32" r="3.2"/>
+      <circle class="f-f" cx="476" cy="32" r="3.2"/>
+      <circle class="f-f" cx="488" cy="32" r="3.2"/>
+      <circle class="f-f" cx="20" cy="44" r="3.2"/>
+      <circle class="f-f" cx="32" cy="44" r="3.2"/>
+      <circle class="f-f" cx="44" cy="44" r="3.2"/>
+      <circle class="f-f" cx="56" cy="44" r="3.2"/>
+      <circle class="f-f" cx="68" cy="44" r="3.2"/>
+      <circle class="f-f" cx="80" cy="44" r="3.2"/>
+      <circle class="f-f" cx="92" cy="44" r="3.2"/>
+      <circle class="f-f" cx="104" cy="44" r="3.2"/>
+      <circle class="f-f" cx="116" cy="44" r="3.2"/>
+      <circle class="f-f" cx="128" cy="44" r="3.2"/>
+      <circle class="f-f" cx="140" cy="44" r="3.2"/>
+      <circle class="f-f" cx="152" cy="44" r="3.2"/>
+      <circle class="f-f" cx="164" cy="44" r="3.2"/>
+      <circle class="f-f" cx="176" cy="44" r="3.2"/>
+      <circle class="f-f" cx="188" cy="44" r="3.2"/>
+      <circle class="f-f" cx="200" cy="44" r="3.2"/>
+      <circle class="f-f" cx="212" cy="44" r="3.2"/>
+      <circle class="f-f" cx="224" cy="44" r="3.2"/>
+      <circle class="f-f" cx="236" cy="44" r="3.2"/>
+      <circle class="f-f" cx="248" cy="44" r="3.2"/>
+      <circle class="f-f" cx="260" cy="44" r="3.2"/>
+      <circle class="f-f" cx="272" cy="44" r="3.2"/>
+      <circle class="f-f" cx="284" cy="44" r="3.2"/>
+      <circle class="f-f" cx="296" cy="44" r="3.2"/>
+      <circle class="f-f" cx="308" cy="44" r="3.2"/>
+      <circle class="f-f" cx="320" cy="44" r="3.2"/>
+      <circle class="f-f" cx="332" cy="44" r="3.2"/>
+      <circle class="f-f" cx="344" cy="44" r="3.2"/>
+      <circle class="f-f" cx="356" cy="44" r="3.2"/>
+      <circle class="f-f" cx="368" cy="44" r="3.2"/>
+      <circle class="f-f" cx="380" cy="44" r="3.2"/>
+      <circle class="f-f" cx="392" cy="44" r="3.2"/>
+      <circle class="f-f" cx="404" cy="44" r="3.2"/>
+      <circle class="f-f" cx="416" cy="44" r="3.2"/>
+      <circle class="f-f" cx="428" cy="44" r="3.2"/>
+      <circle class="f-f" cx="440" cy="44" r="3.2"/>
+      <circle class="f-f" cx="452" cy="44" r="3.2"/>
+      <circle class="f-f" cx="464" cy="44" r="3.2"/>
+      <circle class="f-f" cx="476" cy="44" r="3.2"/>
+      <circle class="f-f" cx="488" cy="44" r="3.2"/>
+      <circle class="f-f" cx="20" cy="56" r="3.2"/>
+      <circle class="f-f" cx="32" cy="56" r="3.2"/>
+      <circle class="f-f" cx="44" cy="56" r="3.2"/>
+      <circle class="f-f" cx="56" cy="56" r="3.2"/>
+      <circle class="f-f" cx="68" cy="56" r="3.2"/>
+      <circle class="f-f" cx="80" cy="56" r="3.2"/>
+      <circle class="f-f" cx="92" cy="56" r="3.2"/>
+      <circle class="f-f" cx="104" cy="56" r="3.2"/>
+      <circle class="f-f" cx="116" cy="56" r="3.2"/>
+      <circle class="f-f" cx="128" cy="56" r="3.2"/>
+      <circle class="f-f" cx="140" cy="56" r="3.2"/>
+      <circle class="f-f" cx="152" cy="56" r="3.2"/>
+      <circle class="f-f" cx="164" cy="56" r="3.2"/>
+      <circle class="f-f" cx="176" cy="56" r="3.2"/>
+      <circle class="f-f" cx="188" cy="56" r="3.2"/>
+      <circle class="f-f" cx="200" cy="56" r="3.2"/>
+      <circle class="f-f" cx="212" cy="56" r="3.2"/>
+      <circle class="f-f" cx="224" cy="56" r="3.2"/>
+      <circle class="f-f" cx="236" cy="56" r="3.2"/>
+      <circle class="f-f" cx="248" cy="56" r="3.2"/>
+      <circle class="f-f" cx="260" cy="56" r="3.2"/>
+      <circle class="f-f" cx="272" cy="56" r="3.2"/>
+      <circle class="f-f" cx="284" cy="56" r="3.2"/>
+      <circle class="f-f" cx="296" cy="56" r="3.2"/>
+      <circle class="f-f" cx="308" cy="56" r="3.2"/>
+      <circle class="f-f" cx="320" cy="56" r="3.2"/>
+      <circle class="f-f" cx="332" cy="56" r="3.2"/>
+      <circle class="f-f" cx="344" cy="56" r="3.2"/>
+      <circle class="f-f" cx="356" cy="56" r="3.2"/>
+      <circle class="f-f" cx="368" cy="56" r="3.2"/>
+      <circle class="f-f" cx="380" cy="56" r="3.2"/>
+      <circle class="f-f" cx="392" cy="56" r="3.2"/>
+      <circle class="f-f" cx="404" cy="56" r="3.2"/>
+      <circle class="f-f" cx="416" cy="56" r="3.2"/>
+      <circle class="f-f" cx="428" cy="56" r="3.2"/>
+      <circle class="f-f" cx="440" cy="56" r="3.2"/>
+      <circle class="f-f" cx="452" cy="56" r="3.2"/>
+      <circle class="f-f" cx="464" cy="56" r="3.2"/>
+      <circle class="f-f" cx="476" cy="56" r="3.2"/>
+      <circle class="f-f" cx="488" cy="56" r="3.2"/>
+      <circle class="f-f" cx="20" cy="68" r="3.2"/>
+      <circle class="f-f" cx="32" cy="68" r="3.2"/>
+      <circle class="f-f" cx="44" cy="68" r="3.2"/>
+      <circle class="f-f" cx="56" cy="68" r="3.2"/>
+      <circle class="f-f" cx="68" cy="68" r="3.2"/>
+      <circle class="f-f" cx="80" cy="68" r="3.2"/>
+      <circle class="f-f" cx="92" cy="68" r="3.2"/>
+      <circle class="f-f" cx="104" cy="68" r="3.2"/>
+      <circle class="f-f" cx="116" cy="68" r="3.2"/>
+      <circle class="f-f" cx="128" cy="68" r="3.2"/>
+      <circle class="f-f" cx="140" cy="68" r="3.2"/>
+      <circle class="f-f" cx="152" cy="68" r="3.2"/>
+      <circle class="f-f" cx="164" cy="68" r="3.2"/>
+      <circle class="f-f" cx="176" cy="68" r="3.2"/>
+      <circle class="f-f" cx="188" cy="68" r="3.2"/>
+      <circle class="f-f" cx="200" cy="68" r="3.2"/>
+      <circle class="f-f" cx="212" cy="68" r="3.2"/>
+      <circle class="f-f" cx="224" cy="68" r="3.2"/>
+      <circle class="f-f" cx="236" cy="68" r="3.2"/>
+      <circle class="f-f" cx="248" cy="68" r="3.2"/>
+      <circle class="f-f" cx="260" cy="68" r="3.2"/>
+      <circle class="f-f" cx="272" cy="68" r="3.2"/>
+      <circle class="f-f" cx="284" cy="68" r="3.2"/>
+      <circle class="f-f" cx="296" cy="68" r="3.2"/>
+      <circle class="f-f" cx="308" cy="68" r="3.2"/>
+      <circle class="f-f" cx="320" cy="68" r="3.2"/>
+      <circle class="f-f" cx="332" cy="68" r="3.2"/>
+      <circle class="f-f" cx="344" cy="68" r="3.2"/>
+      <circle class="f-f" cx="356" cy="68" r="3.2"/>
+      <circle class="f-f" cx="368" cy="68" r="3.2"/>
+      <circle class="f-f" cx="380" cy="68" r="3.2"/>
+      <circle class="f-f" cx="392" cy="68" r="3.2"/>
+      <circle class="f-f" cx="404" cy="68" r="3.2"/>
+      <circle class="f-f" cx="416" cy="68" r="3.2"/>
+      <circle class="f-f" cx="428" cy="68" r="3.2"/>
+      <circle class="f-f" cx="440" cy="68" r="3.2"/>
+      <circle class="f-f" cx="452" cy="68" r="3.2"/>
+      <circle class="f-f" cx="464" cy="68" r="3.2"/>
+      <circle class="f-f" cx="476" cy="68" r="3.2"/>
+      <circle class="f-f" cx="488" cy="68" r="3.2"/>
+      <circle class="f-f" cx="20" cy="80" r="3.2"/>
+      <circle class="f-f" cx="32" cy="80" r="3.2"/>
+      <circle class="f-f" cx="44" cy="80" r="3.2"/>
+      <circle class="f-f" cx="56" cy="80" r="3.2"/>
+      <circle class="f-f" cx="68" cy="80" r="3.2"/>
+      <circle class="f-f" cx="80" cy="80" r="3.2"/>
+      <circle class="f-f" cx="92" cy="80" r="3.2"/>
+      <circle class="f-f" cx="104" cy="80" r="3.2"/>
+      <circle class="f-f" cx="116" cy="80" r="3.2"/>
+      <circle class="f-f" cx="128" cy="80" r="3.2"/>
+      <circle class="f-f" cx="140" cy="80" r="3.2"/>
+      <circle class="f-f" cx="152" cy="80" r="3.2"/>
+      <circle class="f-f" cx="164" cy="80" r="3.2"/>
+      <circle class="f-f" cx="176" cy="80" r="3.2"/>
+      <circle class="f-f" cx="188" cy="80" r="3.2"/>
+      <circle class="f-f" cx="200" cy="80" r="3.2"/>
+      <circle class="f-f" cx="212" cy="80" r="3.2"/>
+      <circle class="f-f" cx="224" cy="80" r="3.2"/>
+      <circle class="f-f" cx="236" cy="80" r="3.2"/>
+      <circle class="f-f" cx="248" cy="80" r="3.2"/>
+      <circle class="f-f" cx="260" cy="80" r="3.2"/>
+      <circle class="f-f" cx="272" cy="80" r="3.2"/>
+      <circle class="f-f" cx="284" cy="80" r="3.2"/>
+      <circle class="f-f" cx="296" cy="80" r="3.2"/>
+      <circle class="f-f" cx="308" cy="80" r="3.2"/>
+      <circle class="f-f" cx="320" cy="80" r="3.2"/>
+      <circle class="f-f" cx="332" cy="80" r="3.2"/>
+      <circle class="f-f" cx="344" cy="80" r="3.2"/>
+      <circle class="f-f" cx="356" cy="80" r="3.2"/>
+      <circle class="f-f" cx="368" cy="80" r="3.2"/>
+      <circle class="f-f" cx="380" cy="80" r="3.2"/>
+      <circle class="f-f" cx="392" cy="80" r="3.2"/>
+      <circle class="f-f" cx="404" cy="80" r="3.2"/>
+      <circle class="f-f" cx="416" cy="80" r="3.2"/>
+      <circle class="f-f" cx="428" cy="80" r="3.2"/>
+      <circle class="f-f" cx="440" cy="80" r="3.2"/>
+      <circle class="f-f" cx="452" cy="80" r="3.2"/>
+      <circle class="f-f" cx="464" cy="80" r="3.2"/>
+      <circle class="f-f" cx="476" cy="80" r="3.2"/>
+      <circle class="f-f" cx="488" cy="80" r="3.2"/>
+      <circle class="f-f" cx="20" cy="92" r="3.2"/>
+      <circle class="f-f" cx="32" cy="92" r="3.2"/>
+      <circle class="f-f" cx="44" cy="92" r="3.2"/>
+      <circle class="f-f" cx="56" cy="92" r="3.2"/>
+      <circle class="f-f" cx="68" cy="92" r="3.2"/>
+      <circle class="f-f" cx="80" cy="92" r="3.2"/>
+      <circle class="f-f" cx="92" cy="92" r="3.2"/>
+      <circle class="f-f" cx="104" cy="92" r="3.2"/>
+      <circle class="f-f" cx="116" cy="92" r="3.2"/>
+      <circle class="f-f" cx="128" cy="92" r="3.2"/>
+      <circle class="f-f" cx="140" cy="92" r="3.2"/>
+      <circle class="f-f" cx="152" cy="92" r="3.2"/>
+      <circle class="f-f" cx="164" cy="92" r="3.2"/>
+      <circle class="f-f" cx="176" cy="92" r="3.2"/>
+      <circle class="f-f" cx="188" cy="92" r="3.2"/>
+      <circle class="f-f" cx="200" cy="92" r="3.2"/>
+      <circle class="f-f" cx="212" cy="92" r="3.2"/>
+      <circle class="f-f" cx="224" cy="92" r="3.2"/>
+      <circle class="f-f" cx="236" cy="92" r="3.2"/>
+      <circle class="f-f" cx="248" cy="92" r="3.2"/>
+      <circle class="f-f" cx="260" cy="92" r="3.2"/>
+      <circle class="f-f" cx="272" cy="92" r="3.2"/>
+      <circle class="f-f" cx="284" cy="92" r="3.2"/>
+      <circle class="f-f" cx="296" cy="92" r="3.2"/>
+      <circle class="f-f" cx="308" cy="92" r="3.2"/>
+      <circle class="f-f" cx="320" cy="92" r="3.2"/>
+      <circle class="f-f" cx="332" cy="92" r="3.2"/>
+      <circle class="f-f" cx="344" cy="92" r="3.2"/>
+      <circle class="f-f" cx="356" cy="92" r="3.2"/>
+      <circle class="f-f" cx="368" cy="92" r="3.2"/>
+      <circle class="f-f" cx="380" cy="92" r="3.2"/>
+      <circle class="f-f" cx="392" cy="92" r="3.2"/>
+      <circle class="f-f" cx="404" cy="92" r="3.2"/>
+      <circle class="f-f" cx="416" cy="92" r="3.2"/>
+      <circle class="f-f" cx="428" cy="92" r="3.2"/>
+      <circle class="f-f" cx="440" cy="92" r="3.2"/>
+      <circle class="f-f" cx="452" cy="92" r="3.2"/>
+      <circle class="f-f" cx="464" cy="92" r="3.2"/>
+      <circle class="f-f" cx="476" cy="92" r="3.2"/>
+      <circle class="f-f" cx="488" cy="92" r="3.2"/>
+      <circle class="f-f" cx="20" cy="104" r="3.2"/>
+      <circle class="f-f" cx="32" cy="104" r="3.2"/>
+      <circle class="f-f" cx="44" cy="104" r="3.2"/>
+      <circle class="f-f" cx="56" cy="104" r="3.2"/>
+      <circle class="f-f" cx="68" cy="104" r="3.2"/>
+      <circle class="f-f" cx="80" cy="104" r="3.2"/>
+      <circle class="f-f" cx="92" cy="104" r="3.2"/>
+      <circle class="f-f" cx="104" cy="104" r="3.2"/>
+      <circle class="f-f" cx="116" cy="104" r="3.2"/>
+      <circle class="f-f" cx="128" cy="104" r="3.2"/>
+      <circle class="f-f" cx="140" cy="104" r="3.2"/>
+      <circle class="f-f" cx="152" cy="104" r="3.2"/>
+      <circle class="f-f" cx="164" cy="104" r="3.2"/>
+      <circle class="f-f" cx="176" cy="104" r="3.2"/>
+      <circle class="f-f" cx="188" cy="104" r="3.2"/>
+      <circle class="f-f" cx="200" cy="104" r="3.2"/>
+      <circle class="f-f" cx="212" cy="104" r="3.2"/>
+      <circle class="f-f" cx="224" cy="104" r="3.2"/>
+      <circle class="f-f" cx="236" cy="104" r="3.2"/>
+      <circle class="f-f" cx="248" cy="104" r="3.2"/>
+      <circle class="f-f" cx="260" cy="104" r="3.2"/>
+      <circle class="f-f" cx="272" cy="104" r="3.2"/>
+      <circle class="f-f" cx="284" cy="104" r="3.2"/>
+      <circle class="f-f" cx="296" cy="104" r="3.2"/>
+      <circle class="f-f" cx="308" cy="104" r="3.2"/>
+      <circle class="f-f" cx="320" cy="104" r="3.2"/>
+      <circle class="f-f" cx="332" cy="104" r="3.2"/>
+      <circle class="f-f" cx="344" cy="104" r="3.2"/>
+      <circle class="f-f" cx="356" cy="104" r="3.2"/>
+      <circle class="f-f" cx="368" cy="104" r="3.2"/>
+      <circle class="f-f" cx="380" cy="104" r="3.2"/>
+      <circle class="f-f" cx="392" cy="104" r="3.2"/>
+      <circle class="f-f" cx="404" cy="104" r="3.2"/>
+      <circle class="f-f" cx="416" cy="104" r="3.2"/>
+      <circle class="f-f" cx="428" cy="104" r="3.2"/>
+      <circle class="f-f" cx="440" cy="104" r="3.2"/>
+      <circle class="f-f" cx="452" cy="104" r="3.2"/>
+      <circle class="f-f" cx="464" cy="104" r="3.2"/>
+      <circle class="f-f" cx="476" cy="104" r="3.2"/>
+      <circle class="f-f" cx="488" cy="104" r="3.2"/>
+      <circle class="f-f" cx="20" cy="116" r="3.2"/>
+      <circle class="f-f" cx="32" cy="116" r="3.2"/>
+      <circle class="f-f" cx="44" cy="116" r="3.2"/>
+      <circle class="f-f" cx="56" cy="116" r="3.2"/>
+      <circle class="f-f" cx="68" cy="116" r="3.2"/>
+      <circle class="f-f" cx="80" cy="116" r="3.2"/>
+      <circle class="f-f" cx="92" cy="116" r="3.2"/>
+      <circle class="f-f" cx="104" cy="116" r="3.2"/>
+      <circle class="f-f" cx="116" cy="116" r="3.2"/>
+      <circle class="f-f" cx="128" cy="116" r="3.2"/>
+      <circle class="f-f" cx="140" cy="116" r="3.2"/>
+      <circle class="f-f" cx="152" cy="116" r="3.2"/>
+      <circle class="f-f" cx="164" cy="116" r="3.2"/>
+      <circle class="f-f" cx="176" cy="116" r="3.2"/>
+      <circle class="f-f" cx="188" cy="116" r="3.2"/>
+      <circle class="f-f" cx="200" cy="116" r="3.2"/>
+      <circle class="f-f" cx="212" cy="116" r="3.2"/>
+      <circle class="f-f" cx="224" cy="116" r="3.2"/>
+      <circle class="f-f" cx="236" cy="116" r="3.2"/>
+      <circle class="f-f" cx="248" cy="116" r="3.2"/>
+      <circle class="f-f" cx="260" cy="116" r="3.2"/>
+      <circle class="f-f" cx="272" cy="116" r="3.2"/>
+      <circle class="f-f" cx="284" cy="116" r="3.2"/>
+      <circle class="f-f" cx="296" cy="116" r="3.2"/>
+      <circle class="f-f" cx="308" cy="116" r="3.2"/>
+      <circle class="f-f" cx="320" cy="116" r="3.2"/>
+      <circle class="f-f" cx="332" cy="116" r="3.2"/>
+      <circle class="f-f" cx="344" cy="116" r="3.2"/>
+      <circle class="f-f" cx="356" cy="116" r="3.2"/>
+      <circle class="f-f" cx="368" cy="116" r="3.2"/>
+      <circle class="f-f" cx="380" cy="116" r="3.2"/>
+      <circle class="f-f" cx="392" cy="116" r="3.2"/>
+      <circle class="f-f" cx="404" cy="116" r="3.2"/>
+      <circle class="f-f" cx="416" cy="116" r="3.2"/>
+      <circle class="f-f" cx="428" cy="116" r="3.2"/>
+      <circle class="f-f" cx="440" cy="116" r="3.2"/>
+      <circle class="f-f" cx="452" cy="116" r="3.2"/>
+      <circle class="f-f" cx="464" cy="116" r="3.2"/>
+      <circle class="f-f" cx="476" cy="116" r="3.2"/>
+      <circle class="f-f" cx="488" cy="116" r="3.2"/>
+      <circle class="f-f" cx="20" cy="128" r="3.2"/>
+      <circle class="f-f" cx="32" cy="128" r="3.2"/>
+      <circle class="f-f" cx="44" cy="128" r="3.2"/>
+      <circle class="f-f" cx="56" cy="128" r="3.2"/>
+      <circle class="f-f" cx="68" cy="128" r="3.2"/>
+      <circle class="f-f" cx="80" cy="128" r="3.2"/>
+      <circle class="f-f" cx="92" cy="128" r="3.2"/>
+      <circle class="f-f" cx="104" cy="128" r="3.2"/>
+      <circle class="f-f" cx="116" cy="128" r="3.2"/>
+      <circle class="f-f" cx="128" cy="128" r="3.2"/>
+      <circle class="f-f" cx="140" cy="128" r="3.2"/>
+      <circle class="f-f" cx="152" cy="128" r="3.2"/>
+      <circle class="f-f" cx="164" cy="128" r="3.2"/>
+      <circle class="f-f" cx="176" cy="128" r="3.2"/>
+      <circle class="f-f" cx="188" cy="128" r="3.2"/>
+      <circle class="f-f" cx="200" cy="128" r="3.2"/>
+      <circle class="f-f" cx="212" cy="128" r="3.2"/>
+      <circle class="f-f" cx="224" cy="128" r="3.2"/>
+      <circle class="f-f" cx="236" cy="128" r="3.2"/>
+      <circle class="f-f" cx="248" cy="128" r="3.2"/>
+      <circle class="f-f" cx="260" cy="128" r="3.2"/>
+      <circle class="f-f" cx="272" cy="128" r="3.2"/>
+      <circle class="f-f" cx="284" cy="128" r="3.2"/>
+      <circle class="f-f" cx="296" cy="128" r="3.2"/>
+      <circle class="f-f" cx="308" cy="128" r="3.2"/>
+      <circle class="f-f" cx="320" cy="128" r="3.2"/>
+      <circle class="f-f" cx="332" cy="128" r="3.2"/>
+      <circle class="f-f" cx="344" cy="128" r="3.2"/>
+      <circle class="f-f" cx="356" cy="128" r="3.2"/>
+      <circle class="f-f" cx="368" cy="128" r="3.2"/>
+      <circle class="f-f" cx="380" cy="128" r="3.2"/>
+      <circle class="f-f" cx="392" cy="128" r="3.2"/>
+      <circle class="f-f" cx="404" cy="128" r="3.2"/>
+      <circle class="f-f" cx="416" cy="128" r="3.2"/>
+      <circle class="f-f" cx="428" cy="128" r="3.2"/>
+      <circle class="f-f" cx="440" cy="128" r="3.2"/>
+      <circle class="f-f" cx="452" cy="128" r="3.2"/>
+      <circle class="f-f" cx="464" cy="128" r="3.2"/>
+      <circle class="f-f" cx="476" cy="128" r="3.2"/>
+      <circle class="f-f" cx="488" cy="128" r="3.2"/>
+      <circle class="f-f" cx="20" cy="140" r="3.2"/>
+      <circle class="f-f" cx="32" cy="140" r="3.2"/>
+      <circle class="f-f" cx="44" cy="140" r="3.2"/>
+      <circle class="f-f" cx="56" cy="140" r="3.2"/>
+      <circle class="f-f" cx="68" cy="140" r="3.2"/>
+      <circle class="f-f" cx="80" cy="140" r="3.2"/>
+      <circle class="f-f" cx="92" cy="140" r="3.2"/>
+      <circle class="f-f" cx="104" cy="140" r="3.2"/>
+      <circle class="f-f" cx="116" cy="140" r="3.2"/>
+      <circle class="f-f" cx="128" cy="140" r="3.2"/>
+      <circle class="f-f" cx="140" cy="140" r="3.2"/>
+      <circle class="f-f" cx="152" cy="140" r="3.2"/>
+      <circle class="f-f" cx="164" cy="140" r="3.2"/>
+      <circle class="f-f" cx="176" cy="140" r="3.2"/>
+      <circle class="f-f" cx="188" cy="140" r="3.2"/>
+      <circle class="f-f" cx="200" cy="140" r="3.2"/>
+      <circle class="f-f" cx="212" cy="140" r="3.2"/>
+      <circle class="f-f" cx="224" cy="140" r="3.2"/>
+      <circle class="f-f" cx="236" cy="140" r="3.2"/>
+      <circle class="f-f" cx="248" cy="140" r="3.2"/>
+      <circle class="f-f" cx="260" cy="140" r="3.2"/>
+      <circle class="f-f" cx="272" cy="140" r="3.2"/>
+      <circle class="f-f" cx="284" cy="140" r="3.2"/>
+      <circle class="f-f" cx="296" cy="140" r="3.2"/>
+      <circle class="f-f" cx="308" cy="140" r="3.2"/>
+      <circle class="f-f" cx="320" cy="140" r="3.2"/>
+      <circle class="f-f" cx="332" cy="140" r="3.2"/>
+      <circle class="f-f" cx="344" cy="140" r="3.2"/>
+      <circle class="f-f" cx="356" cy="140" r="3.2"/>
+      <circle class="f-f" cx="368" cy="140" r="3.2"/>
+      <circle class="f-f" cx="380" cy="140" r="3.2"/>
+      <circle class="f-f" cx="392" cy="140" r="3.2"/>
+      <circle class="f-f" cx="404" cy="140" r="3.2"/>
+      <circle class="f-f" cx="416" cy="140" r="3.2"/>
+      <circle class="f-f" cx="428" cy="140" r="3.2"/>
+      <circle class="f-f" cx="440" cy="140" r="3.2"/>
+      <circle class="f-f" cx="452" cy="140" r="3.2"/>
+      <circle class="f-f" cx="464" cy="140" r="3.2"/>
+      <circle class="f-f" cx="476" cy="140" r="3.2"/>
+      <circle class="f-f" cx="488" cy="140" r="3.2"/>
+      <circle class="f-f" cx="20" cy="152" r="3.2"/>
+      <circle class="f-f" cx="32" cy="152" r="3.2"/>
+      <circle class="f-f" cx="44" cy="152" r="3.2"/>
+      <circle class="f-f" cx="56" cy="152" r="3.2"/>
+      <circle class="f-f" cx="68" cy="152" r="3.2"/>
+      <circle class="f-f" cx="80" cy="152" r="3.2"/>
+      <circle class="f-f" cx="92" cy="152" r="3.2"/>
+      <circle class="f-f" cx="104" cy="152" r="3.2"/>
+      <circle class="f-f" cx="116" cy="152" r="3.2"/>
+      <circle class="f-f" cx="128" cy="152" r="3.2"/>
+      <circle class="f-f" cx="140" cy="152" r="3.2"/>
+      <circle class="f-f" cx="152" cy="152" r="3.2"/>
+      <circle class="f-f" cx="164" cy="152" r="3.2"/>
+      <circle class="f-f" cx="176" cy="152" r="3.2"/>
+      <circle class="f-f" cx="188" cy="152" r="3.2"/>
+      <circle class="f-f" cx="200" cy="152" r="3.2"/>
+      <circle class="f-f" cx="212" cy="152" r="3.2"/>
+      <circle class="f-f" cx="224" cy="152" r="3.2"/>
+      <circle class="f-f" cx="236" cy="152" r="3.2"/>
+      <circle class="f-f" cx="248" cy="152" r="3.2"/>
+      <circle class="f-f" cx="260" cy="152" r="3.2"/>
+      <circle class="f-f" cx="272" cy="152" r="3.2"/>
+      <circle class="f-f" cx="284" cy="152" r="3.2"/>
+      <circle class="f-f" cx="296" cy="152" r="3.2"/>
+      <circle class="f-f" cx="308" cy="152" r="3.2"/>
+      <circle class="f-f" cx="320" cy="152" r="3.2"/>
+      <circle class="f-f" cx="332" cy="152" r="3.2"/>
+      <circle class="f-f" cx="344" cy="152" r="3.2"/>
+      <circle class="f-f" cx="356" cy="152" r="3.2"/>
+      <circle class="f-f" cx="368" cy="152" r="3.2"/>
+      <circle class="f-f" cx="380" cy="152" r="3.2"/>
+      <circle class="f-f" cx="392" cy="152" r="3.2"/>
+      <circle class="f-f" cx="404" cy="152" r="3.2"/>
+      <circle class="f-f" cx="416" cy="152" r="3.2"/>
+      <circle class="f-f" cx="428" cy="152" r="3.2"/>
+      <circle class="f-f" cx="440" cy="152" r="3.2"/>
+      <circle class="f-f" cx="452" cy="152" r="3.2"/>
+      <circle class="f-f" cx="464" cy="152" r="3.2"/>
+      <circle class="f-f" cx="476" cy="152" r="3.2"/>
+      <circle class="f-f" cx="488" cy="152" r="3.2"/>
+      <circle class="f-f" cx="20" cy="164" r="3.2"/>
+      <circle class="f-f" cx="32" cy="164" r="3.2"/>
+      <circle class="f-f" cx="44" cy="164" r="3.2"/>
+      <circle class="f-f" cx="56" cy="164" r="3.2"/>
+      <circle class="f-f" cx="68" cy="164" r="3.2"/>
+      <circle class="f-f" cx="80" cy="164" r="3.2"/>
+      <circle class="f-f" cx="92" cy="164" r="3.2"/>
+      <circle class="f-f" cx="104" cy="164" r="3.2"/>
+      <circle class="f-f" cx="116" cy="164" r="3.2"/>
+      <circle class="f-f" cx="128" cy="164" r="3.2"/>
+      <circle class="f-f" cx="140" cy="164" r="3.2"/>
+      <circle class="f-f" cx="152" cy="164" r="3.2"/>
+      <circle class="f-f" cx="164" cy="164" r="3.2"/>
+      <circle class="f-f" cx="176" cy="164" r="3.2"/>
+      <circle class="f-f" cx="188" cy="164" r="3.2"/>
+      <circle class="f-f" cx="200" cy="164" r="3.2"/>
+      <circle class="f-f" cx="212" cy="164" r="3.2"/>
+      <circle class="f-f" cx="224" cy="164" r="3.2"/>
+      <circle class="f-f" cx="236" cy="164" r="3.2"/>
+      <circle class="f-f" cx="248" cy="164" r="3.2"/>
+      <circle class="f-f" cx="260" cy="164" r="3.2"/>
+      <circle class="f-f" cx="272" cy="164" r="3.2"/>
+      <circle class="f-f" cx="284" cy="164" r="3.2"/>
+      <circle class="f-f" cx="296" cy="164" r="3.2"/>
+      <circle class="f-f" cx="308" cy="164" r="3.2"/>
+      <circle class="f-f" cx="320" cy="164" r="3.2"/>
+      <circle class="f-f" cx="332" cy="164" r="3.2"/>
+      <circle class="f-f" cx="344" cy="164" r="3.2"/>
+      <circle class="f-f" cx="356" cy="164" r="3.2"/>
+      <circle class="f-f" cx="368" cy="164" r="3.2"/>
+      <circle class="f-f" cx="380" cy="164" r="3.2"/>
+      <circle class="f-f" cx="392" cy="164" r="3.2"/>
+      <circle class="f-f" cx="404" cy="164" r="3.2"/>
+      <circle class="f-f" cx="416" cy="164" r="3.2"/>
+      <circle class="f-f" cx="428" cy="164" r="3.2"/>
+      <circle class="f-f" cx="440" cy="164" r="3.2"/>
+      <circle class="f-f" cx="452" cy="164" r="3.2"/>
+      <circle class="f-f" cx="464" cy="164" r="3.2"/>
+      <circle class="f-f" cx="476" cy="164" r="3.2"/>
+      <circle class="f-f" cx="488" cy="164" r="3.2"/>
+      <circle class="f-f" cx="20" cy="176" r="3.2"/>
+      <circle class="f-f" cx="32" cy="176" r="3.2"/>
+      <circle class="f-f" cx="44" cy="176" r="3.2"/>
+      <circle class="f-f" cx="56" cy="176" r="3.2"/>
+      <circle class="f-f" cx="68" cy="176" r="3.2"/>
+      <circle class="f-f" cx="80" cy="176" r="3.2"/>
+      <circle class="f-f" cx="92" cy="176" r="3.2"/>
+      <circle class="f-f" cx="104" cy="176" r="3.2"/>
+      <circle class="f-f" cx="116" cy="176" r="3.2"/>
+      <circle class="f-f" cx="128" cy="176" r="3.2"/>
+      <circle class="f-f" cx="140" cy="176" r="3.2"/>
+      <circle class="f-f" cx="152" cy="176" r="3.2"/>
+      <circle class="f-f" cx="164" cy="176" r="3.2"/>
+      <circle class="f-f" cx="176" cy="176" r="3.2"/>
+      <circle class="f-f" cx="188" cy="176" r="3.2"/>
+      <circle class="f-f" cx="200" cy="176" r="3.2"/>
+      <circle class="f-f" cx="212" cy="176" r="3.2"/>
+      <circle class="f-f" cx="224" cy="176" r="3.2"/>
+      <circle class="f-f" cx="236" cy="176" r="3.2"/>
+      <circle class="f-f" cx="248" cy="176" r="3.2"/>
+      <circle class="f-f" cx="260" cy="176" r="3.2"/>
+      <circle class="f-f" cx="272" cy="176" r="3.2"/>
+      <circle class="f-f" cx="284" cy="176" r="3.2"/>
+      <circle class="f-f" cx="296" cy="176" r="3.2"/>
+      <circle class="f-f" cx="308" cy="176" r="3.2"/>
+      <circle class="f-f" cx="320" cy="176" r="3.2"/>
+      <circle class="f-f" cx="332" cy="176" r="3.2"/>
+      <circle class="f-f" cx="344" cy="176" r="3.2"/>
+      <circle class="f-f" cx="356" cy="176" r="3.2"/>
+      <circle class="f-f" cx="368" cy="176" r="3.2"/>
+      <circle class="f-f" cx="380" cy="176" r="3.2"/>
+      <circle class="f-f" cx="392" cy="176" r="3.2"/>
+      <circle class="f-f" cx="404" cy="176" r="3.2"/>
+      <circle class="f-f" cx="416" cy="176" r="3.2"/>
+      <circle class="f-f" cx="428" cy="176" r="3.2"/>
+      <circle class="f-f" cx="440" cy="176" r="3.2"/>
+      <circle class="f-f" cx="452" cy="176" r="3.2"/>
+      <circle class="f-f" cx="464" cy="176" r="3.2"/>
+      <circle class="f-f" cx="476" cy="176" r="3.2"/>
+      <circle class="f-f" cx="488" cy="176" r="3.2"/>
+      <circle class="f-f" cx="20" cy="188" r="3.2"/>
+      <circle class="f-f" cx="32" cy="188" r="3.2"/>
+      <circle class="f-f" cx="44" cy="188" r="3.2"/>
+      <circle class="f-f" cx="56" cy="188" r="3.2"/>
+      <circle class="f-f" cx="68" cy="188" r="3.2"/>
+      <circle class="f-f" cx="80" cy="188" r="3.2"/>
+      <circle class="f-f" cx="92" cy="188" r="3.2"/>
+      <circle class="f-f" cx="104" cy="188" r="3.2"/>
+      <circle class="f-f" cx="116" cy="188" r="3.2"/>
+      <circle class="f-f" cx="128" cy="188" r="3.2"/>
+      <circle class="f-f" cx="140" cy="188" r="3.2"/>
+      <circle class="f-f" cx="152" cy="188" r="3.2"/>
+      <circle class="f-f" cx="164" cy="188" r="3.2"/>
+      <circle class="f-f" cx="176" cy="188" r="3.2"/>
+      <circle class="f-f" cx="188" cy="188" r="3.2"/>
+      <circle class="f-f" cx="200" cy="188" r="3.2"/>
+      <circle class="f-f" cx="212" cy="188" r="3.2"/>
+      <circle class="f-f" cx="224" cy="188" r="3.2"/>
+      <circle class="f-f" cx="236" cy="188" r="3.2"/>
+      <circle class="f-f" cx="248" cy="188" r="3.2"/>
+      <circle class="f-f" cx="260" cy="188" r="3.2"/>
+      <circle class="f-f" cx="272" cy="188" r="3.2"/>
+      <circle class="f-f" cx="284" cy="188" r="3.2"/>
+      <circle class="f-f" cx="296" cy="188" r="3.2"/>
+      <circle class="f-f" cx="308" cy="188" r="3.2"/>
+      <circle class="f-f" cx="320" cy="188" r="3.2"/>
+      <circle class="f-f" cx="332" cy="188" r="3.2"/>
+      <circle class="f-f" cx="344" cy="188" r="3.2"/>
+      <circle class="f-f" cx="356" cy="188" r="3.2"/>
+      <circle class="f-f" cx="368" cy="188" r="3.2"/>
+      <circle class="f-f" cx="380" cy="188" r="3.2"/>
+      <circle class="f-f" cx="392" cy="188" r="3.2"/>
+      <circle class="f-f" cx="404" cy="188" r="3.2"/>
+      <circle class="f-f" cx="416" cy="188" r="3.2"/>
+      <circle class="f-f" cx="428" cy="188" r="3.2"/>
+      <circle class="f-f" cx="440" cy="188" r="3.2"/>
+      <circle class="f-f" cx="452" cy="188" r="3.2"/>
+      <circle class="f-f" cx="464" cy="188" r="3.2"/>
+      <circle class="f-f" cx="476" cy="188" r="3.2"/>
+      <circle class="f-f" cx="488" cy="188" r="3.2"/>
+      <circle class="f-f" cx="20" cy="200" r="3.2"/>
+      <circle class="f-f" cx="32" cy="200" r="3.2"/>
+      <circle class="f-f" cx="44" cy="200" r="3.2"/>
+      <circle class="f-f" cx="56" cy="200" r="3.2"/>
+      <circle class="f-f" cx="68" cy="200" r="3.2"/>
+      <circle class="f-f" cx="80" cy="200" r="3.2"/>
+      <circle class="f-f" cx="92" cy="200" r="3.2"/>
+      <circle class="f-f" cx="104" cy="200" r="3.2"/>
+      <circle class="f-f" cx="116" cy="200" r="3.2"/>
+      <circle class="f-f" cx="128" cy="200" r="3.2"/>
+      <circle class="f-f" cx="140" cy="200" r="3.2"/>
+      <circle class="f-f" cx="152" cy="200" r="3.2"/>
+      <circle class="f-f" cx="164" cy="200" r="3.2"/>
+      <circle class="f-f" cx="176" cy="200" r="3.2"/>
+      <circle class="f-f" cx="188" cy="200" r="3.2"/>
+      <circle class="f-f" cx="200" cy="200" r="3.2"/>
+      <circle class="f-f" cx="212" cy="200" r="3.2"/>
+      <circle class="f-f" cx="224" cy="200" r="3.2"/>
+      <circle class="f-f" cx="236" cy="200" r="3.2"/>
+      <circle class="f-f" cx="248" cy="200" r="3.2"/>
+      <circle class="f-f" cx="260" cy="200" r="3.2"/>
+      <circle class="f-f" cx="272" cy="200" r="3.2"/>
+      <circle class="f-f" cx="284" cy="200" r="3.2"/>
+      <circle class="f-f" cx="296" cy="200" r="3.2"/>
+      <circle class="f-f" cx="308" cy="200" r="3.2"/>
+      <circle class="f-f" cx="320" cy="200" r="3.2"/>
+      <circle class="f-f" cx="332" cy="200" r="3.2"/>
+      <circle class="f-f" cx="344" cy="200" r="3.2"/>
+      <circle class="f-f" cx="356" cy="200" r="3.2"/>
+      <circle class="f-f" cx="368" cy="200" r="3.2"/>
+      <circle class="f-f" cx="380" cy="200" r="3.2"/>
+      <circle class="f-f" cx="392" cy="200" r="3.2"/>
+      <circle class="f-f" cx="404" cy="200" r="3.2"/>
+      <circle class="f-f" cx="416" cy="200" r="3.2"/>
+      <circle class="f-f" cx="428" cy="200" r="3.2"/>
+      <circle class="f-f" cx="440" cy="200" r="3.2"/>
+      <circle class="f-f" cx="452" cy="200" r="3.2"/>
+      <circle class="f-f" cx="464" cy="200" r="3.2"/>
+      <circle class="f-f" cx="476" cy="200" r="3.2"/>
+      <circle class="f-f" cx="488" cy="200" r="3.2"/>
+      <circle class="f-f" cx="20" cy="212" r="3.2"/>
+      <circle class="f-f" cx="32" cy="212" r="3.2"/>
+      <circle class="f-f" cx="44" cy="212" r="3.2"/>
+      <circle class="f-f" cx="56" cy="212" r="3.2"/>
+      <circle class="f-f" cx="68" cy="212" r="3.2"/>
+      <circle class="f-f" cx="80" cy="212" r="3.2"/>
+      <circle class="f-f" cx="92" cy="212" r="3.2"/>
+      <circle class="f-f" cx="104" cy="212" r="3.2"/>
+      <circle class="f-f" cx="116" cy="212" r="3.2"/>
+      <circle class="f-f" cx="128" cy="212" r="3.2"/>
+      <circle class="f-f" cx="140" cy="212" r="3.2"/>
+      <circle class="f-f" cx="152" cy="212" r="3.2"/>
+      <circle class="f-f" cx="164" cy="212" r="3.2"/>
+      <circle class="f-f" cx="176" cy="212" r="3.2"/>
+      <circle class="f-f" cx="188" cy="212" r="3.2"/>
+      <circle class="f-f" cx="200" cy="212" r="3.2"/>
+      <circle class="f-f" cx="212" cy="212" r="3.2"/>
+      <circle class="f-f" cx="224" cy="212" r="3.2"/>
+      <circle class="f-f" cx="236" cy="212" r="3.2"/>
+      <circle class="f-f" cx="248" cy="212" r="3.2"/>
+      <circle class="f-f" cx="260" cy="212" r="3.2"/>
+      <circle class="f-f" cx="272" cy="212" r="3.2"/>
+      <circle class="f-f" cx="284" cy="212" r="3.2"/>
+      <circle class="f-f" cx="296" cy="212" r="3.2"/>
+      <circle class="f-f" cx="308" cy="212" r="3.2"/>
+      <circle class="f-f" cx="320" cy="212" r="3.2"/>
+      <circle class="f-f" cx="332" cy="212" r="3.2"/>
+      <circle class="f-f" cx="344" cy="212" r="3.2"/>
+      <circle class="f-f" cx="356" cy="212" r="3.2"/>
+      <circle class="f-f" cx="368" cy="212" r="3.2"/>
+      <circle class="f-f" cx="380" cy="212" r="3.2"/>
+      <circle class="f-f" cx="392" cy="212" r="3.2"/>
+      <circle class="f-f" cx="404" cy="212" r="3.2"/>
+      <circle class="f-f" cx="416" cy="212" r="3.2"/>
+      <circle class="f-f" cx="428" cy="212" r="3.2"/>
+      <circle class="f-f" cx="440" cy="212" r="3.2"/>
+      <circle class="f-f" cx="452" cy="212" r="3.2"/>
+      <circle class="f-f" cx="464" cy="212" r="3.2"/>
+      <circle class="f-f" cx="476" cy="212" r="3.2"/>
+      <circle class="f-f" cx="488" cy="212" r="3.2"/>
+      <circle class="f-f" cx="20" cy="224" r="3.2"/>
+      <circle class="f-f" cx="32" cy="224" r="3.2"/>
+      <circle class="f-f" cx="44" cy="224" r="3.2"/>
+      <circle class="f-f" cx="56" cy="224" r="3.2"/>
+      <circle class="f-f" cx="68" cy="224" r="3.2"/>
+      <circle class="f-f" cx="80" cy="224" r="3.2"/>
+      <circle class="f-f" cx="92" cy="224" r="3.2"/>
+      <circle class="f-f" cx="104" cy="224" r="3.2"/>
+      <circle class="f-f" cx="116" cy="224" r="3.2"/>
+      <circle class="f-f" cx="128" cy="224" r="3.2"/>
+      <circle class="f-f" cx="140" cy="224" r="3.2"/>
+      <circle class="f-f" cx="152" cy="224" r="3.2"/>
+      <circle class="f-f" cx="164" cy="224" r="3.2"/>
+      <circle class="f-f" cx="176" cy="224" r="3.2"/>
+      <circle class="f-f" cx="188" cy="224" r="3.2"/>
+      <circle class="f-f" cx="200" cy="224" r="3.2"/>
+      <circle class="f-f" cx="212" cy="224" r="3.2"/>
+      <circle class="f-f" cx="224" cy="224" r="3.2"/>
+      <circle class="f-f" cx="236" cy="224" r="3.2"/>
+      <circle class="f-f" cx="248" cy="224" r="3.2"/>
+      <circle class="f-f" cx="260" cy="224" r="3.2"/>
+      <circle class="f-f" cx="272" cy="224" r="3.2"/>
+      <circle class="f-f" cx="284" cy="224" r="3.2"/>
+      <circle class="f-f" cx="296" cy="224" r="3.2"/>
+      <circle class="f-f" cx="308" cy="224" r="3.2"/>
+      <circle class="f-f" cx="320" cy="224" r="3.2"/>
+      <circle class="f-f" cx="332" cy="224" r="3.2"/>
+      <circle class="f-f" cx="344" cy="224" r="3.2"/>
+      <circle class="f-f" cx="356" cy="224" r="3.2"/>
+      <circle class="f-f" cx="368" cy="224" r="3.2"/>
+      <circle class="f-f" cx="380" cy="224" r="3.2"/>
+      <circle class="f-f" cx="392" cy="224" r="3.2"/>
+      <circle class="f-f" cx="404" cy="224" r="3.2"/>
+      <circle class="f-f" cx="416" cy="224" r="3.2"/>
+      <circle class="f-f" cx="428" cy="224" r="3.2"/>
+      <circle class="f-f" cx="440" cy="224" r="3.2"/>
+      <circle class="f-f" cx="452" cy="224" r="3.2"/>
+      <circle class="f-f" cx="464" cy="224" r="3.2"/>
+      <circle class="f-f" cx="476" cy="224" r="3.2"/>
+      <circle class="f-f" cx="488" cy="224" r="3.2"/>
+      <circle class="f-f" cx="20" cy="236" r="3.2"/>
+      <circle class="f-f" cx="32" cy="236" r="3.2"/>
+      <circle class="f-f" cx="44" cy="236" r="3.2"/>
+      <circle class="f-f" cx="56" cy="236" r="3.2"/>
+      <circle class="f-f" cx="68" cy="236" r="3.2"/>
+      <circle class="f-f" cx="80" cy="236" r="3.2"/>
+      <circle class="f-f" cx="92" cy="236" r="3.2"/>
+      <circle class="f-f" cx="104" cy="236" r="3.2"/>
+      <circle class="f-f" cx="116" cy="236" r="3.2"/>
+      <circle class="f-f" cx="128" cy="236" r="3.2"/>
+      <circle class="f-f" cx="140" cy="236" r="3.2"/>
+      <circle class="f-f" cx="152" cy="236" r="3.2"/>
+      <circle class="f-f" cx="164" cy="236" r="3.2"/>
+      <circle class="f-f" cx="176" cy="236" r="3.2"/>
+      <circle class="f-f" cx="188" cy="236" r="3.2"/>
+      <circle class="f-f" cx="200" cy="236" r="3.2"/>
+      <circle class="f-f" cx="212" cy="236" r="3.2"/>
+      <circle class="f-f" cx="224" cy="236" r="3.2"/>
+      <circle class="f-f" cx="236" cy="236" r="3.2"/>
+      <circle class="f-f" cx="248" cy="236" r="3.2"/>
+      <circle class="f-f" cx="260" cy="236" r="3.2"/>
+      <circle class="f-f" cx="272" cy="236" r="3.2"/>
+      <circle class="f-f" cx="284" cy="236" r="3.2"/>
+      <circle class="f-f" cx="296" cy="236" r="3.2"/>
+      <circle class="f-f" cx="308" cy="236" r="3.2"/>
+      <circle class="f-f" cx="320" cy="236" r="3.2"/>
+      <circle class="f-f" cx="332" cy="236" r="3.2"/>
+      <circle class="f-f" cx="344" cy="236" r="3.2"/>
+      <circle class="f-f" cx="356" cy="236" r="3.2"/>
+      <circle class="f-f" cx="368" cy="236" r="3.2"/>
+      <circle class="f-f" cx="380" cy="236" r="3.2"/>
+      <circle class="f-f" cx="392" cy="236" r="3.2"/>
+      <circle class="f-f" cx="404" cy="236" r="3.2"/>
+      <circle class="f-f" cx="416" cy="236" r="3.2"/>
+      <circle class="f-f" cx="428" cy="236" r="3.2"/>
+      <circle class="f-f" cx="440" cy="236" r="3.2"/>
+      <circle class="f-f" cx="452" cy="236" r="3.2"/>
+      <circle class="f-f" cx="464" cy="236" r="3.2"/>
+      <circle class="f-f" cx="476" cy="236" r="3.2"/>
+      <circle class="f-f" cx="488" cy="236" r="3.2"/>
+      <circle class="f-f" cx="20" cy="248" r="3.2"/>
+      <circle class="f-f" cx="32" cy="248" r="3.2"/>
+      <circle class="f-f" cx="44" cy="248" r="3.2"/>
+      <circle class="f-f" cx="56" cy="248" r="3.2"/>
+      <circle class="f-f" cx="68" cy="248" r="3.2"/>
+      <circle class="f-f" cx="80" cy="248" r="3.2"/>
+      <circle class="f-f" cx="92" cy="248" r="3.2"/>
+      <circle class="f-f" cx="104" cy="248" r="3.2"/>
+      <circle class="f-f" cx="116" cy="248" r="3.2"/>
+      <circle class="f-f" cx="128" cy="248" r="3.2"/>
+      <circle class="f-f" cx="140" cy="248" r="3.2"/>
+      <circle class="f-f" cx="152" cy="248" r="3.2"/>
+      <circle class="f-f" cx="164" cy="248" r="3.2"/>
+      <circle class="f-f" cx="176" cy="248" r="3.2"/>
+      <circle class="f-f" cx="188" cy="248" r="3.2"/>
+      <circle class="f-f" cx="200" cy="248" r="3.2"/>
+      <circle class="f-f" cx="212" cy="248" r="3.2"/>
+      <circle class="f-f" cx="224" cy="248" r="3.2"/>
+      <circle class="f-f" cx="236" cy="248" r="3.2"/>
+      <circle class="f-f" cx="248" cy="248" r="3.2"/>
+      <circle class="f-f" cx="260" cy="248" r="3.2"/>
+      <circle class="f-f" cx="272" cy="248" r="3.2"/>
+      <circle class="f-f" cx="284" cy="248" r="3.2"/>
+      <circle class="f-f" cx="296" cy="248" r="3.2"/>
+      <circle class="f-f" cx="308" cy="248" r="3.2"/>
+      <circle class="f-f" cx="320" cy="248" r="3.2"/>
+      <circle class="f-f" cx="332" cy="248" r="3.2"/>
+      <circle class="f-f" cx="344" cy="248" r="3.2"/>
+      <circle class="f-f" cx="356" cy="248" r="3.2"/>
+      <circle class="f-f" cx="368" cy="248" r="3.2"/>
+      <circle class="f-f" cx="380" cy="248" r="3.2"/>
+      <circle class="f-f" cx="392" cy="248" r="3.2"/>
+      <circle class="f-f" cx="404" cy="248" r="3.2"/>
+      <circle class="f-f" cx="416" cy="248" r="3.2"/>
+      <circle class="f-f" cx="428" cy="248" r="3.2"/>
+      <circle class="f-f" cx="440" cy="248" r="3.2"/>
+      <circle class="f-f" cx="452" cy="248" r="3.2"/>
+      <circle class="f-f" cx="464" cy="248" r="3.2"/>
+      <circle class="f-f" cx="476" cy="248" r="3.2"/>
+      <circle class="f-f" cx="488" cy="248" r="3.2"/>
+      <circle class="f-f" cx="20" cy="260" r="3.2"/>
+      <circle class="f-f" cx="32" cy="260" r="3.2"/>
+      <circle class="f-f" cx="44" cy="260" r="3.2"/>
+      <circle class="f-f" cx="56" cy="260" r="3.2"/>
+      <circle class="f-f" cx="68" cy="260" r="3.2"/>
+      <circle class="f-f" cx="80" cy="260" r="3.2"/>
+      <circle class="f-f" cx="92" cy="260" r="3.2"/>
+      <circle class="f-f" cx="104" cy="260" r="3.2"/>
+      <circle class="f-f" cx="116" cy="260" r="3.2"/>
+      <circle class="f-f" cx="128" cy="260" r="3.2"/>
+      <circle class="f-f" cx="140" cy="260" r="3.2"/>
+      <circle class="f-f" cx="152" cy="260" r="3.2"/>
+      <circle class="f-f" cx="164" cy="260" r="3.2"/>
+      <circle class="f-f" cx="176" cy="260" r="3.2"/>
+      <circle class="f-f" cx="188" cy="260" r="3.2"/>
+      <circle class="f-f" cx="200" cy="260" r="3.2"/>
+      <circle class="f-f" cx="212" cy="260" r="3.2"/>
+      <circle class="f-f" cx="224" cy="260" r="3.2"/>
+      <circle class="f-f" cx="236" cy="260" r="3.2"/>
+      <circle class="f-f" cx="248" cy="260" r="3.2"/>
+      <circle class="f-f" cx="260" cy="260" r="3.2"/>
+      <circle class="f-f" cx="272" cy="260" r="3.2"/>
+      <circle class="f-f" cx="284" cy="260" r="3.2"/>
+      <circle class="f-f" cx="296" cy="260" r="3.2"/>
+      <circle class="f-f" cx="308" cy="260" r="3.2"/>
+      <circle class="f-f" cx="320" cy="260" r="3.2"/>
+      <circle class="f-f" cx="332" cy="260" r="3.2"/>
+      <circle class="f-f" cx="344" cy="260" r="3.2"/>
+      <circle class="f-f" cx="356" cy="260" r="3.2"/>
+      <circle class="f-f" cx="368" cy="260" r="3.2"/>
+      <circle class="f-f" cx="380" cy="260" r="3.2"/>
+      <circle class="f-f" cx="392" cy="260" r="3.2"/>
+      <circle class="f-f" cx="404" cy="260" r="3.2"/>
+      <circle class="f-f" cx="416" cy="260" r="3.2"/>
+      <circle class="f-f" cx="428" cy="260" r="3.2"/>
+      <circle class="f-f" cx="440" cy="260" r="3.2"/>
+      <circle class="f-f" cx="452" cy="260" r="3.2"/>
+      <circle class="f-f" cx="464" cy="260" r="3.2"/>
+      <circle class="f-f" cx="476" cy="260" r="3.2"/>
+      <circle class="f-f" cx="488" cy="260" r="3.2"/>
+      <circle class="f-f" cx="20" cy="272" r="3.2"/>
+      <circle class="f-f" cx="32" cy="272" r="3.2"/>
+      <circle class="f-f" cx="44" cy="272" r="3.2"/>
+      <circle class="f-f" cx="56" cy="272" r="3.2"/>
+      <circle class="f-f" cx="68" cy="272" r="3.2"/>
+      <circle class="f-f" cx="80" cy="272" r="3.2"/>
+      <circle class="f-f" cx="92" cy="272" r="3.2"/>
+      <circle class="f-f" cx="104" cy="272" r="3.2"/>
+      <circle class="f-f" cx="116" cy="272" r="3.2"/>
+      <circle class="f-f" cx="128" cy="272" r="3.2"/>
+      <circle class="f-f" cx="140" cy="272" r="3.2"/>
+      <circle class="f-f" cx="152" cy="272" r="3.2"/>
+      <circle class="f-f" cx="164" cy="272" r="3.2"/>
+      <circle class="f-f" cx="176" cy="272" r="3.2"/>
+      <circle class="f-f" cx="188" cy="272" r="3.2"/>
+      <circle class="f-f" cx="200" cy="272" r="3.2"/>
+      <circle class="f-f" cx="212" cy="272" r="3.2"/>
+      <circle class="f-f" cx="224" cy="272" r="3.2"/>
+      <circle class="f-f" cx="236" cy="272" r="3.2"/>
+      <circle class="f-f" cx="248" cy="272" r="3.2"/>
+      <circle class="f-f" cx="260" cy="272" r="3.2"/>
+      <circle class="f-f" cx="272" cy="272" r="3.2"/>
+      <circle class="f-f" cx="284" cy="272" r="3.2"/>
+      <circle class="f-f" cx="296" cy="272" r="3.2"/>
+      <circle class="f-f" cx="308" cy="272" r="3.2"/>
+      <circle class="f-f" cx="320" cy="272" r="3.2"/>
+      <circle class="f-f" cx="332" cy="272" r="3.2"/>
+      <circle class="f-f" cx="344" cy="272" r="3.2"/>
+      <circle class="f-f" cx="356" cy="272" r="3.2"/>
+      <circle class="f-f" cx="368" cy="272" r="3.2"/>
+      <circle class="f-f" cx="380" cy="272" r="3.2"/>
+      <circle class="f-f" cx="392" cy="272" r="3.2"/>
+      <circle class="f-f" cx="404" cy="272" r="3.2"/>
+      <circle class="f-f" cx="416" cy="272" r="3.2"/>
+      <circle class="f-f" cx="428" cy="272" r="3.2"/>
+      <circle class="f-f" cx="440" cy="272" r="3.2"/>
+      <circle class="f-f" cx="452" cy="272" r="3.2"/>
+      <circle class="f-f" cx="464" cy="272" r="3.2"/>
+      <circle class="f-f" cx="476" cy="272" r="3.2"/>
+      <circle class="f-f" cx="488" cy="272" r="3.2"/>
+      <circle class="f-f" cx="20" cy="284" r="3.2"/>
+      <circle class="f-f" cx="32" cy="284" r="3.2"/>
+      <circle class="f-f" cx="44" cy="284" r="3.2"/>
+      <circle class="f-f" cx="56" cy="284" r="3.2"/>
+      <circle class="f-f" cx="68" cy="284" r="3.2"/>
+      <circle class="f-f" cx="80" cy="284" r="3.2"/>
+      <circle class="f-f" cx="92" cy="284" r="3.2"/>
+      <circle class="f-f" cx="104" cy="284" r="3.2"/>
+      <circle class="f-f" cx="116" cy="284" r="3.2"/>
+      <circle class="f-f" cx="128" cy="284" r="3.2"/>
+      <circle class="f-f" cx="140" cy="284" r="3.2"/>
+      <circle class="f-f" cx="152" cy="284" r="3.2"/>
+      <circle class="f-f" cx="164" cy="284" r="3.2"/>
+      <circle class="f-f" cx="176" cy="284" r="3.2"/>
+      <circle class="f-f" cx="188" cy="284" r="3.2"/>
+      <circle class="f-f" cx="200" cy="284" r="3.2"/>
+      <circle class="f-f" cx="212" cy="284" r="3.2"/>
+      <circle class="f-f" cx="224" cy="284" r="3.2"/>
+      <circle class="f-f" cx="236" cy="284" r="3.2"/>
+      <circle class="f-f" cx="248" cy="284" r="3.2"/>
+      <circle class="f-f" cx="260" cy="284" r="3.2"/>
+      <circle class="f-f" cx="272" cy="284" r="3.2"/>
+      <circle class="f-f" cx="284" cy="284" r="3.2"/>
+      <circle class="f-f" cx="296" cy="284" r="3.2"/>
+      <circle class="f-f" cx="308" cy="284" r="3.2"/>
+      <circle class="f-f" cx="320" cy="284" r="3.2"/>
+      <circle class="f-f" cx="332" cy="284" r="3.2"/>
+      <circle class="f-f" cx="344" cy="284" r="3.2"/>
+      <circle class="f-f" cx="356" cy="284" r="3.2"/>
+      <circle class="f-f" cx="368" cy="284" r="3.2"/>
+      <circle class="f-f" cx="380" cy="284" r="3.2"/>
+      <circle class="f-f" cx="392" cy="284" r="3.2"/>
+      <circle class="f-f" cx="404" cy="284" r="3.2"/>
+      <circle class="f-f" cx="416" cy="284" r="3.2"/>
+      <circle class="f-f" cx="428" cy="284" r="3.2"/>
+      <circle class="f-f" cx="440" cy="284" r="3.2"/>
+      <circle class="f-f" cx="452" cy="284" r="3.2"/>
+      <circle class="f-f" cx="464" cy="284" r="3.2"/>
+      <circle class="f-f" cx="476" cy="284" r="3.2"/>
+      <circle class="f-f" cx="488" cy="284" r="3.2"/>
+      <circle class="f-f" cx="20" cy="296" r="3.2"/>
+      <circle class="f-f" cx="32" cy="296" r="3.2"/>
+      <circle class="f-f" cx="44" cy="296" r="3.2"/>
+      <circle class="f-f" cx="56" cy="296" r="3.2"/>
+      <circle class="f-f" cx="68" cy="296" r="3.2"/>
+      <circle class="f-f" cx="80" cy="296" r="3.2"/>
+      <circle class="f-f" cx="92" cy="296" r="3.2"/>
+      <circle class="f-f" cx="104" cy="296" r="3.2"/>
+      <circle class="f-f" cx="116" cy="296" r="3.2"/>
+      <circle class="f-f" cx="128" cy="296" r="3.2"/>
+      <circle class="f-f" cx="140" cy="296" r="3.2"/>
+      <circle class="f-f" cx="152" cy="296" r="3.2"/>
+      <circle class="f-f" cx="164" cy="296" r="3.2"/>
+      <circle class="f-f" cx="176" cy="296" r="3.2"/>
+      <circle class="f-f" cx="188" cy="296" r="3.2"/>
+      <circle class="f-f" cx="200" cy="296" r="3.2"/>
+      <circle class="f-f" cx="212" cy="296" r="3.2"/>
+      <circle class="f-f" cx="224" cy="296" r="3.2"/>
+      <circle class="f-f" cx="236" cy="296" r="3.2"/>
+      <circle class="f-f" cx="248" cy="296" r="3.2"/>
+      <circle class="f-f" cx="260" cy="296" r="3.2"/>
+      <circle class="f-f" cx="272" cy="296" r="3.2"/>
+      <circle class="f-f" cx="284" cy="296" r="3.2"/>
+      <circle class="f-f" cx="296" cy="296" r="3.2"/>
+      <circle class="f-f" cx="308" cy="296" r="3.2"/>
+      <circle class="f-f" cx="320" cy="296" r="3.2"/>
+      <circle class="f-f" cx="332" cy="296" r="3.2"/>
+      <circle class="f-f" cx="344" cy="296" r="3.2"/>
+      <circle class="f-f" cx="356" cy="296" r="3.2"/>
+      <circle class="f-f" cx="368" cy="296" r="3.2"/>
+      <circle class="f-f" cx="380" cy="296" r="3.2"/>
+      <circle class="f-f" cx="392" cy="296" r="3.2"/>
+      <circle class="f-f" cx="404" cy="296" r="3.2"/>
+      <circle class="f-f" cx="416" cy="296" r="3.2"/>
+      <circle class="f-f" cx="428" cy="296" r="3.2"/>
+      <circle class="f-f" cx="440" cy="296" r="3.2"/>
+      <circle class="f-f" cx="452" cy="296" r="3.2"/>
+      <circle class="f-f" cx="464" cy="296" r="3.2"/>
+      <circle class="f-f" cx="476" cy="296" r="3.2"/>
+      <circle class="f-f" cx="488" cy="296" r="3.2"/>
+      <circle class="f-f" cx="20" cy="308" r="3.2"/>
+      <circle class="f-f" cx="32" cy="308" r="3.2"/>
+      <circle class="f-f" cx="44" cy="308" r="3.2"/>
+      <circle class="f-f" cx="56" cy="308" r="3.2"/>
+      <circle class="f-f" cx="68" cy="308" r="3.2"/>
+      <circle class="f-f" cx="80" cy="308" r="3.2"/>
+      <circle class="f-f" cx="92" cy="308" r="3.2"/>
+      <circle class="f-f" cx="104" cy="308" r="3.2"/>
+      <circle class="f-f" cx="116" cy="308" r="3.2"/>
+      <circle class="f-f" cx="128" cy="308" r="3.2"/>
+      <circle class="f-f" cx="140" cy="308" r="3.2"/>
+      <circle class="f-f" cx="152" cy="308" r="3.2"/>
+      <circle class="f-f" cx="164" cy="308" r="3.2"/>
+      <circle class="f-f" cx="176" cy="308" r="3.2"/>
+      <circle class="f-f" cx="188" cy="308" r="3.2"/>
+      <circle class="f-f" cx="200" cy="308" r="3.2"/>
+      <circle class="f-f" cx="212" cy="308" r="3.2"/>
+      <circle class="f-f" cx="224" cy="308" r="3.2"/>
+      <circle class="f-f" cx="236" cy="308" r="3.2"/>
+      <circle class="f-f" cx="248" cy="308" r="3.2"/>
+      <circle class="f-f" cx="260" cy="308" r="3.2"/>
+      <circle class="f-f" cx="272" cy="308" r="3.2"/>
+      <circle class="f-f" cx="284" cy="308" r="3.2"/>
+      <circle class="f-f" cx="296" cy="308" r="3.2"/>
+      <circle class="f-f" cx="308" cy="308" r="3.2"/>
+      <circle class="f-f" cx="320" cy="308" r="3.2"/>
+      <circle class="f-f" cx="332" cy="308" r="3.2"/>
+      <circle class="f-f" cx="344" cy="308" r="3.2"/>
+      <circle class="f-f" cx="356" cy="308" r="3.2"/>
+      <circle class="f-f" cx="368" cy="308" r="3.2"/>
+      <circle class="f-f" cx="380" cy="308" r="3.2"/>
+      <circle class="f-f" cx="392" cy="308" r="3.2"/>
+      <circle class="f-f" cx="404" cy="308" r="3.2"/>
+      <circle class="f-f" cx="416" cy="308" r="3.2"/>
+      <circle class="f-f" cx="428" cy="308" r="3.2"/>
+      <circle class="f-f" cx="440" cy="308" r="3.2"/>
+      <circle class="f-f" cx="452" cy="308" r="3.2"/>
+      <circle class="f-f" cx="464" cy="308" r="3.2"/>
+      <circle class="f-f" cx="476" cy="308" r="3.2"/>
+      <circle class="f-f" cx="488" cy="308" r="3.2"/>
+      <circle class="f-r" cx="26" cy="334" r="5"/>
+      <text x="38" y="339" class="lg">1 sick person, tests positive</text>
+      <circle class="f-a" cx="26" cy="358" r="5"/>
+      <text x="38" y="363" class="lg">≈ 50 healthy people, test positive by mistake</text>
+      <circle class="f-f" cx="26" cy="382" r="4"/>
+      <text x="38" y="387" class="lg">≈ 949 healthy people, test negative</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 3.2</b> 1000 people, one dot each. About 51 of them test positive, and only 1 of those 51 is sick. So a positive result means a chance of about 1 in 51, or 2%, that you are sick.</figcaption>
+          </figure>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">Bayes' rule for the medical test</p>
           <pre><code class="language-python">import torch
 
 p_disease   = torch.tensor(0.001)   # prior: 1 in 1000
@@ -460,23 +1566,23 @@ p_pos_well  = torch.tensor(0.05)    # false-positive rate
 p_pos = p_pos_sick * p_disease + p_pos_well * (1 - p_disease)
 
 posterior = (p_pos_sick * p_disease) / p_pos
-print(posterior)     # tensor(0.0194)  -> ~2%, not 99%</code></pre>
+print(posterior)     # tensor(0.0194)  -> about 2%, not 99%</code></pre>
+          <p class="gloss"><b>In words:</b> the code follows the calculation line by line. First the
+          total chance of a positive result, then the share of it that comes from sick people.</p>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">If the disease were far more common — say 1 in 10 people (prior 0.1) instead of 1 in 1000 — would a positive test make you more or less confident you're sick? Roughly what happens to the posterior?</span>
+                <span class="check__q">Suppose the disease is much more common: 1 in 10 people (prior 0.1) instead of 1 in 1000. Predict: does a positive test now make you more or less sure that you are sick? Then compute the posterior.</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>Much more confident. Redo the sum with <code>P(D) = 0.1</code>:
-                <code>P(+) = (0.99)(0.1) + (0.05)(0.9) = 0.099 + 0.045 = 0.144</code>, so
-                <code>P(D | +) = 0.099 / 0.144 ≈ 0.69</code> — about <strong>69%</strong>, versus 2%
-                before. The test never changed; only the prior did. When the base rate is high, the
-                true positives no longer get drowned out by false positives. This is exactly why
-                context matters: the same evidence means very different things depending on how common
-                the thing was to begin with.</p>
+                <p>Much more sure. With $P(D) = 0.1$: $P(+) = (0.99)(0.1) + (0.05)(0.9) = 0.099 + 0.045 =
+                0.144$. So $P(D \mid +) = 0.099 / 0.144 \approx 0.69$, about <strong>69%</strong>, compared
+                with 2% before. The test did not change; only the prior did. When the base rate is high,
+                the false positives no longer outnumber the true positives. The same evidence means very
+                different things depending on how common the condition was to begin with.</p>
               </div>
             </details>
           </div>
@@ -485,47 +1591,82 @@ print(posterior)     # tensor(0.0194)  -> ~2%, not 99%</code></pre>
           <h2><span class="h-num">5</span>Maximum likelihood: fitting a distribution to data</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>So far the distributions came with their numbers already filled in. But in real ML you
-          have <em>data</em> and you need to find the numbers yourself. <strong>Maximum Likelihood
-          Estimation</strong> (MLE) is the workhorse method for that, and its idea is beautifully
-          simple: <strong>pick the parameters that make the data you actually observed as probable as
-          possible.</strong> Of all the coins that <em>could</em> have produced your flips, MLE picks
-          the one that would produce them most readily.</p>
+          <p>So far the distributions came with their numbers already known. In real ML you have
+          <em>data</em>, and you must find the numbers yourself. <strong>Maximum likelihood
+          estimation</strong> (MLE) is the standard method for that. Its idea is simple:
+          <strong>choose the parameters that make the observed data as probable as possible.</strong> Of
+          all the coins that <em>could</em> have produced your flips, MLE chooses the one under which those
+          flips were most likely.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>You hear a muffled band playing through a wall and try to guess the song. You run
-            through candidates and pick the one that would most naturally produce the notes you're
-            hearing — the song under which “these notes” are least surprising. MLE does the same with
-            numbers: it scans the possible parameter values and keeps the one under which your
-            observed data is least surprising, i.e. most probable.</p>
+            <p>Someone rolled one of three dice: a fair die, a die loaded toward 6 (a 6 half the time), or a
+            die loaded toward 1. You see the rolls 6, 6, 3, 6, 5, 6. Which die best explains them? For each
+            die, compute the probability of these exact rolls. The fair die gives $(1/6)^6 \approx 0.00002$.
+            The 6-loaded die gives $0.5^4 \times 0.1^2 = 0.000625$, about 29 times more. The 1-loaded die
+            gives $0.1^6$, far less. MLE picks the 6-loaded die. With a coin, the “dice” are all the values
+            of $p$ between 0 and 1.</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>Let's derive it fully for a coin. You flip a coin with unknown heads-probability
-          <span style="white-space:nowrap">$p$</span> and observe <span style="white-space:nowrap">$H$</span> heads out of <span style="white-space:nowrap">$N$</span> flips. Each flip is a Bernoulli, and
-          because the flips are independent, the probability of the whole sequence is the product of
-          the individual probabilities. That product, viewed as a function of the unknown
-          <span style="white-space:nowrap">$p$</span>, is the <dfn>likelihood</dfn>:</p>
-          $$ L(p) = p^{\,H}\,(1-p)^{\,N-H} $$
-          <p class="gloss"><b>In words:</b> to get exactly this data you need <span style="white-space:nowrap">$H$</span> heads (each
-          contributing a factor of <span style="white-space:nowrap">$p$</span>) and <span style="white-space:nowrap">$N - H$</span> tails (each contributing
-          <span style="white-space:nowrap">$1 - p$</span>). Multiply them all together and you get the chance of the observed sequence
-          for a given <span style="white-space:nowrap">$p$</span>. We want the <span style="white-space:nowrap">$p$</span> that makes this as large as possible.</p>
+          <p>Let's derive it fully for a coin. You flip a coin with unknown heads probability $p$ and
+          observe $H$ heads in $N$ flips. Each flip is a Bernoulli. The flips are independent, so the
+          probability of the whole sequence is the product of the single probabilities. That product,
+          viewed as a function of the unknown $p$, is the <dfn>likelihood</dfn>. We write it
+          $\mathcal{L}(p)$, with a curly L, because plain $L$ means the loss in this book:</p>
+          $$ \mathcal{L}(p) = p^{\,H}\,(1-p)^{\,N-H} $$
+          <p class="gloss"><b>In words:</b> to get exactly this data, you need $H$ heads (each contributes
+          a factor $p$) and $N - H$ tails (each contributes a factor $1 - p$). Multiply them all, and you
+          get the chance of the observed sequence for a given $p$. We want the $p$ that makes this as large
+          as possible.</p>
 
-          <p>Multiplying many probabilities gives a tiny, awkward number, and products are painful to
-          differentiate. So we take the <strong>logarithm</strong> first. Two reasons the log is a
-          free win: it turns products into sums (much easier calculus), and because <span style="white-space:nowrap">$\log$</span> is a
-          steadily increasing function, <em>the <span style="white-space:nowrap">$p$</span> that maximizes <span style="white-space:nowrap">$\log L$</span> is the exact
-          same <span style="white-space:nowrap">$p$</span> that maximizes <span style="white-space:nowrap">$L$</span></em> — we lose nothing by working with the log.</p>
-          $$ \ell(p) = \log L(p) = H \log p + (N - H)\log(1 - p) $$
-          <p class="gloss"><b>In words:</b> the <span style="white-space:nowrap">$\log$</span> pulled the exponents down into multipliers
-          and turned the product into a sum. This <span style="white-space:nowrap">$\ell(p)$</span> is the <dfn>log-likelihood</dfn>,
-          and it's what we'll actually maximize.</p>
+          <p>A product of many probabilities is a tiny number, and products are hard to differentiate. So
+          we take the <strong>logarithm</strong> first. This helps in two ways. First, it turns products
+          into sums, which makes the calculus easier. Second, $\log$ is an increasing function. So
+          <em>the $p$ that maximizes $\log \mathcal{L}$ is the same $p$ that maximizes $\mathcal{L}$</em>.
+          We lose nothing by working with the log. (In this book, $\log$ means the natural log.)</p>
+          $$ \ell(p) = \log \mathcal{L}(p) = H \log p + (N - H)\log(1 - p) $$
+          <p class="gloss"><b>In words:</b> the $\log$ brought the exponents down as multipliers and
+          turned the product into a sum. This $\ell(p)$ is the <dfn>log-likelihood</dfn>, and it is what we
+          maximize.</p>
 
-          <p>To find the maximum, use calculus from <a href="02-calculus.html">Section&nbsp;2</a>:
-          take the derivative with respect to <span style="white-space:nowrap">$p$</span>, set it to zero (the slope is flat at a
-          peak), and solve. Recall <span style="white-space:nowrap">$\frac{d}{dp}\log p = \frac{1}{p}$</span>:</p>
+<figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 480 255" role="img" aria-labelledby="fig-03-3-t">
+      <title id="fig-03-3-t">The log-likelihood curve for 70 heads in 100 flips, rising to a single peak at p equals 0.7 and falling on both sides.</title>
+      <line class="ax" x1="60" y1="210" x2="460" y2="210"/>
+      <line class="ax" x1="60" y1="210" x2="60" y2="20"/>
+      <text x="60" y="226" class="sm" text-anchor="middle">0.3</text>
+      <text x="121.5" y="226" class="sm" text-anchor="middle">0.4</text>
+      <text x="183.1" y="226" class="sm" text-anchor="middle">0.5</text>
+      <text x="244.6" y="226" class="sm" text-anchor="middle">0.6</text>
+      <text x="306.2" y="226" class="sm" text-anchor="middle">0.7</text>
+      <text x="367.7" y="226" class="sm" text-anchor="middle">0.8</text>
+      <text x="429.2" y="226" class="sm" text-anchor="middle">0.9</text>
+      <text x="54" y="214" class="sm" text-anchor="end">−100</text>
+      <line class="grid" x1="60" y1="210" x2="460" y2="210"/>
+      <text x="54" y="168.8" class="sm" text-anchor="end">−90</text>
+      <line class="grid" x1="60" y1="164.8" x2="460" y2="164.8"/>
+      <text x="54" y="123.5" class="sm" text-anchor="end">−80</text>
+      <line class="grid" x1="60" y1="119.5" x2="460" y2="119.5"/>
+      <text x="54" y="78.3" class="sm" text-anchor="end">−70</text>
+      <line class="grid" x1="60" y1="74.3" x2="460" y2="74.3"/>
+      <text x="54" y="33" class="sm" text-anchor="end">−60</text>
+      <line class="grid" x1="60" y1="29" x2="460" y2="29"/>
+      <line class="ln thin dash s-a" x1="306.2" y1="210" x2="306.2" y2="34"/>
+      <path class="ln s-v" d="M60,187.3 L63.1,183 L66.2,178.9 L69.2,174.8 L72.3,170.8 L75.4,166.9 L78.5,163 L81.5,159.3 L84.6,155.6 L87.7,152 L90.8,148.5 L93.8,145.1 L96.9,141.7 L100,138.4 L103.1,135.2 L106.2,132 L109.2,128.9 L112.3,125.9 L115.4,122.9 L118.5,120 L121.5,117.1 L124.6,114.3 L127.7,111.6 L130.8,108.9 L133.8,106.3 L136.9,103.7 L140,101.2 L143.1,98.7 L146.2,96.3 L149.2,93.9 L152.3,91.6 L155.4,89.4 L158.5,87.1 L161.5,85 L164.6,82.9 L167.7,80.8 L170.8,78.8 L173.8,76.8 L176.9,74.9 L180,73 L183.1,71.2 L186.2,69.4 L189.2,67.7 L192.3,66 L195.4,64.3 L198.5,62.7 L201.5,61.1 L204.6,59.6 L207.7,58.1 L210.8,56.7 L213.8,55.3 L216.9,54 L220,52.6 L223.1,51.4 L226.2,50.2 L229.2,49 L232.3,47.8 L235.4,46.8 L238.5,45.7 L241.5,44.7 L244.6,43.7 L247.7,42.8 L250.8,41.9 L253.8,41.1 L256.9,40.3 L260,39.6 L263.1,38.9 L266.2,38.2 L269.2,37.6 L272.3,37 L275.4,36.5 L278.5,36 L281.5,35.6 L284.6,35.2 L287.7,34.9 L290.8,34.6 L293.8,34.4 L296.9,34.2 L300,34.1 L303.1,34 L306.2,34 L309.2,34 L312.3,34.1 L315.4,34.2 L318.5,34.4 L321.5,34.7 L324.6,35 L327.7,35.3 L330.8,35.8 L333.8,36.3 L336.9,36.9 L340,37.5 L343.1,38.2 L346.2,39 L349.2,39.8 L352.3,40.8 L355.4,41.8 L358.5,42.9 L361.5,44.1 L364.6,45.3 L367.7,46.7 L370.8,48.2 L373.8,49.7 L376.9,51.4 L380,53.2 L383.1,55.1 L386.2,57.1 L389.2,59.3 L392.3,61.5 L395.4,64 L398.5,66.5 L401.5,69.3 L404.6,72.2 L407.7,75.3 L410.8,78.6 L413.8,82.1 L416.9,85.8 L420,89.8 L423.1,94.1 L426.2,98.6 L429.2,103.5 L432.3,108.7 L435.4,114.3 L438.5,120.3 L441.5,126.8 L444.6,133.8 L447.7,141.5 L450.8,149.9 L453.8,159 L456.9,169.2 L460,180.4"/>
+      <circle class="f-a" cx="306.2" cy="34" r="5"/>
+      <text x="306.2" y="22" class="ta lg b" text-anchor="middle">peak at p = 0.7, ℓ ≈ −61.1</text>
+      <text x="260" y="246" class="sm" text-anchor="middle">p (heads probability of the coin)</text>
+      <text x="78.5" y="56.2" class="m tv">ℓ(p)</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 3.3</b> The log-likelihood $\ell(p)=70\ln p+30\ln(1-p)$ for 70 heads in 100 flips. It has one peak, at $p=0.7$. There the slope is zero, which is the condition we solve below.</figcaption>
+          </figure>
+
+          <p>To find the maximum, use calculus from <a href="02-calculus.html">Section&nbsp;2</a>. Take the
+          derivative with respect to $p$, set it to zero (the slope is flat at a peak), and solve. Recall
+          that $\frac{d}{dp}\log p = \frac{1}{p}$:</p>
           $$
           \begin{aligned}
           \frac{d\ell}{dp} &= \frac{H}{p} - \frac{N - H}{1 - p} = 0 \\[6pt]
@@ -536,15 +1677,15 @@ print(posterior)     # tensor(0.0194)  -> ~2%, not 99%</code></pre>
           \hat{p} &= \frac{H}{N}
           \end{aligned}
           $$
-          <p class="gloss"><b>In words:</b> the best estimate is <span style="white-space:nowrap">$\hat{p} = H/N$</span> — the fraction of
-          flips that came up heads. Flip 100 times, see 70 heads, and MLE says the most likely coin
-          is one with <span style="white-space:nowrap">$p = 0.7$</span>. The little hat on <span style="white-space:nowrap">$\hat{p}$</span> marks it as an
-          <em>estimate from data</em>, not the true hidden value. What feels like plain common sense —
-          “just count the heads” — turns out to be exactly what the maximum-likelihood principle
-          prescribes. That's reassuring: the fancy method agrees with your intuition on the easy case,
-          which is why you can trust it on the hard ones.</p>
+          <p class="gloss"><b>In words:</b> the best estimate is $\hat{p} = H/N$, the fraction of flips
+          that came up heads. Flip 100 times, see 70 heads, and MLE says the most likely coin has
+          $p = 0.7$. The hat on $\hat{p}$ marks it as an <em>estimate from data</em>, not the true hidden
+          value. Common sense says “count the heads,” and the maximum-likelihood principle gives the same
+          answer. (The slope $H/p - (N-H)/(1-p)$ is positive left of $H/N$ and negative right of it, so
+          this flat point is a peak, as Figure 3.3 shows.)</p>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">finding p by gradient ascent on the log-likelihood</p>
           <pre><code class="language-python">import torch
 
 # 100 flips, 70 heads: recover p by maximizing the log-likelihood with gradient ascent
@@ -555,41 +1696,42 @@ for _ in range(500):
     log_lik = H * torch.log(p) + (N - H) * torch.log(1 - p)
     log_lik.backward()                       # d(log_lik)/dp, from Section 2
     with torch.no_grad():
-        p += 0.001 * p.grad                  # step UP-hill (maximize)
+        p += 0.001 * p.grad                  # step UPHILL (maximize)
         p.grad.zero_()
 
-print(p)          # tensor(0.70...)  -> matches the closed-form p_hat = H/N = 0.7</code></pre>
+print(p)          # tensor(0.7000, requires_grad=True)  -> matches p_hat = H/N = 0.7</code></pre>
+          <p class="gloss"><b>In words:</b> this is gradient descent from Section 2 with the sign flipped.
+          We <em>add</em> the gradient because we want to go up the log-likelihood, not down. After 500
+          small steps, $p$ reaches the peak at 0.7.</p>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> Where loss functions come from</div>
-            <p>Notice what we maximized: a log-likelihood. Now flip the sign. Maximizing
-            <span style="white-space:nowrap">$\log L$</span> is the same as <em>minimizing</em> <span style="white-space:nowrap">$-\log L$</span>, and that quantity,
-            <strong>negative log-likelihood</strong>, is precisely the loss function most classifiers
-            are trained on — you'll meet it as <em>cross-entropy</em> in
-            <a href="04-information-theory.html">Section&nbsp;4</a>. The Gaussian version, where you
-            do this same derivation for a Normal instead of a Bernoulli, collapses into the
+            <p>Look at what we maximized: a log-likelihood. Now flip the sign. Maximizing $\log \mathcal{L}$
+            is the same as <em>minimizing</em> $-\log \mathcal{L}$. That quantity, the <strong>negative
+            log-likelihood</strong>, is the loss function most classifiers are trained on. You will meet it
+            as <em>cross-entropy</em> in <a href="04-information-theory.html">Section&nbsp;4</a>. Do the
+            same derivation for a Gaussian instead of a Bernoulli, and you get the
             <em>mean-squared-error</em> loss behind
-            <a href="05-linear-regression.html">Section&nbsp;5</a>'s linear regression. Training a
-            model is maximum likelihood in disguise: “find the parameters that make the data most
-            probable” is the same sentence as “find the parameters that minimize the loss.”</p>
+            <a href="05-linear-regression.html">Section&nbsp;5</a>'s linear regression. So training a model
+            is maximum likelihood in another form. “Find the parameters that make the data most probable”
+            means the same as “find the parameters that minimize the loss.”</p>
           </div>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">You flip a coin 10 times and get 10 heads. MLE says <code>p̂ = 10/10 = 1.0</code> — a coin that <em>never</em> lands tails. Why is that suspicious, and what does it hint about the limits of pure MLE?</span>
+                <span class="check__q">You flip a coin 10 times and get 10 heads. What does MLE give for $\hat{p}$? Why is that suspicious, and what does it tell you about the limits of pure MLE?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>MLE only listens to the data in front of it, and with a small sample that data can
-                be misleading. Ten heads in a row is perfectly plausible from a fair coin (about a
-                0.1% chance), yet MLE confidently declares <code>p = 1.0</code>, meaning it now assigns
-                probability <em>zero</em> to ever seeing a tail — a reckless certainty from ten flips.
-                The fix is to fold in a <strong>prior</strong> belief (“coins are usually roughly
-                fair”) and use Bayes, which pulls the estimate back toward 0.5 until enough data
-                overwhelms it. This tug-of-war between what the data says and what you believed
-                beforehand is the bridge from maximum likelihood to full Bayesian learning.</p>
+                <p>$\hat{p} = 10/10 = 1.0$: a coin that <em>never</em> lands tails. MLE uses only the data
+                in front of it, and a small sample can mislead. Ten heads in a row from a fair coin is
+                unlikely (about 1 in 1000), but possible. Yet MLE now gives probability <em>zero</em> to
+                ever seeing a tail, after only ten flips. The fix is to include a <strong>prior</strong>
+                belief (“coins are usually close to fair”) and use Bayes' rule. That pulls the estimate
+                back toward 0.5 until there is enough data to outweigh the prior. This balance between
+                the data and the prior belief leads from maximum likelihood to Bayesian learning.</p>
               </div>
             </details>
           </div>
@@ -598,25 +1740,26 @@ print(p)          # tensor(0.70...)  -> matches the closed-form p_hat = H/N = 0.
 
           <h2><span class="h-num">6</span>What to carry forward</h2>
           <ul>
-            <li>A model outputs a <strong>distribution</strong> — belief spread over outcomes.
-            Discrete ones use a <strong>PMF</strong> (mass on each value); continuous ones use a
+            <li>A model outputs a <strong>distribution</strong>: belief spread over outcomes. Discrete
+            variables use a <strong>PMF</strong> (a mass on each value). Continuous variables use a
             <strong>PDF</strong> (area under a curve gives probability).</li>
-            <li><strong>Expectation</strong> <span style="white-space:nowrap">$\mathbb{E}[X]$</span> is the probability-weighted average —
-            where the distribution balances. <strong>Variance</strong> <span style="white-space:nowrap">$\mathbb{E}[(X-\mu)^2]$</span> is
-            its spread — reliable versus streaky.</li>
-            <li>The <strong>Bernoulli</strong> models one yes/no event via a single <span style="white-space:nowrap">$p$</span>; the
-            <strong>Gaussian</strong> is the bell curve set by mean <span style="white-space:nowrap">$\mu$</span> and spread
-            <span style="white-space:nowrap">$\sigma$</span>, and it appears everywhere because sums of many small random effects tend
-            toward it.</li>
-            <li><strong>Bayes' rule</strong> <span style="white-space:nowrap">$P(A\mid B)=\frac{P(B\mid A)P(A)}{P(B)}$</span> updates a
-            <em>prior</em> belief with <em>likelihood</em> into a <em>posterior</em>. Never ignore the
+            <li><strong>Expectation</strong> $\mathbb{E}[X]$ is the probability-weighted average, the
+            balance point. <strong>Variance</strong> $\mathbb{E}[(X-\mu)^2] = \mathbb{E}[X^2]-\mu^2$ is the
+            spread: reliable versus streaky.</li>
+            <li>The <strong>Bernoulli</strong> models one yes/no event with a single $p$ (mean $p$,
+            variance $p(1-p)$). The <strong>Gaussian</strong> is the bell curve with mean $\mu$ and standard
+            deviation $\sigma$. It appears everywhere because sums of many small random effects tend toward
+            it.</li>
+            <li><strong>Bayes' rule</strong> $P(A\mid B)=\frac{P(B\mid A)P(A)}{P(B)}$ updates a
+            <em>prior</em> belief with a <em>likelihood</em> into a <em>posterior</em>. Never ignore the
             base rate.</li>
-            <li><strong>MLE</strong> picks the parameters that make the observed data most probable;
-            for a coin it gives the plain count <span style="white-space:nowrap">$\hat{p} = H/N$</span>. Minimizing negative
-            log-likelihood <em>is</em> where loss functions come from.</li>
+            <li><strong>MLE</strong> chooses the parameters that make the observed data most probable. For
+            a coin it gives the plain count $\hat{p} = H/N$. Minimizing the negative log-likelihood
+            <em>is</em> where loss functions come from.</li>
           </ul>
-          <p>Next we turn probability into a way to <em>measure information and surprise</em> — which
-          leads straight to entropy, cross-entropy, and the loss functions we just previewed.</p>
+          <p>Next, <a href="04-information-theory.html">Section 4</a> looks at the same probabilities from
+          another angle: how much <em>surprise</em> each outcome carries. That view leads straight to the
+          cross-entropy loss.</p>
 
           <div class="complete-bar" data-complete>
             <span class="complete-bar__text">Finished this section? Mark it done to fill your progress bar.</span>

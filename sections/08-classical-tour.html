@@ -38,70 +38,158 @@
         <header class="lesson-head">
           <p class="lesson-eyebrow">Part 2 · Classical ML <span class="dot"></span> Section 8</p>
           <h1 class="lesson-title">A Tour of Classical Models</h1>
-          <p class="lesson-standfirst">Before neural networks, machine learning already worked — meet the four ideas that still quietly win on everyday tabular data.</p>
+          <p class="lesson-standfirst">Machine learning worked well before neural networks. Meet four ideas that are still the best choice for many everyday table-shaped datasets.</p>
           <div class="lesson-meta">
-            <span><b>16 min</b> read</span>
-            <span><b>You'll learn:</b> k-nearest neighbors · decision trees · ensembles · SVM intuition</span>
+            <span><b>30 min</b> read</span>
+          </div>
+          <div class="objectives">
+            <div class="objectives__label">You'll learn</div>
+            <ul>
+              <li>k-nearest neighbors</li>
+              <li>decision trees</li>
+              <li>ensembles</li>
+              <li>SVM intuition</li>
+            </ul>
           </div>
         </header>
 
         <div class="prose">
-          <p class="lead">This section is a fast tour, on purpose. No derivations — just one solid intuition and
-          one everyday parallel per model, so you know what each one is doing and when to reach for it. We'll go
-          deep on neural networks for the rest of the course; these classical models are still the right choice
-          for a huge share of real, structured (tabular) data problems.</p>
+          <p class="lead">This section is a fast tour, on purpose. For each model you get one clear intuition,
+          one everyday parallel, and at most one or two small formulas. That is enough to know what each model
+          does and when to use it. The rest of the course goes deep on neural networks. Still, these classical models remain the right choice for many problems with <dfn>tabular</dfn> data. Tabular data fits in a table: one row per example, one column per feature.</p>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> The one idea to hold onto</div>
-            <p>Each model below makes a different bet about how to turn "examples I've seen" into "a prediction for
-            something new." Knowing the bet each one makes is enough to know when to use it — you don't need to
-            derive it to use it well.</p>
+            <p>Each model below makes a different assumption about how to turn “examples I have seen” into “a
+            prediction for something new”. If you know the assumption, you know when the model will work
+            well.</p>
           </div>
 
           <!-- ===================== KNN ===================== -->
           <h2><span class="h-num">1</span>k-Nearest Neighbors: ask the closest examples</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p><strong>k-Nearest Neighbors (kNN)</strong> has almost no "training" step at all — it just remembers
-          every labeled example. To predict on something new, it finds the <b>k</b> stored examples closest to it
-          (measured by ordinary distance — the L2 norm from <a href="01-linear-algebra.html">Section 1</a>) and
-          takes a majority vote of their labels.</p>
+          <p><strong>k-Nearest Neighbors (kNN)</strong> has almost no training step. It stores every labeled
+          example. To predict for a new point, it finds the $k$ stored examples closest to it and takes a
+          majority vote of their labels. “Closest” usually means ordinary distance: the L2 norm from
+          <a href="01-linear-algebra.html">Section 1</a>.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>You've just moved to a new neighborhood and want a restaurant recommendation. You don't consult a
-            general-purpose critic — you ask the few neighbors who live <em>closest</em> to you, on the theory
-            that people nearby tend to have similar taste and know the same local spots. Whatever most of them
-            recommend is your answer. That's kNN: no theory about restaurants in general, just "ask the nearest
-            ones and go with the majority."</p>
+            <p>You want to know whether you will like a new film. You find the 5 people whose past film ratings
+            are most similar to yours. If most of them liked the new film, you predict that you will like it
+            too. That is kNN. Each person is a stored example, “similar ratings” is the distance, and the
+            majority of the 5 is the prediction.</p>
           </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>For a new point $\mathbf{x}$, compute its distance to each stored point $\mathbf{x}_i$:</p>
+          $$ d_i = \lVert \mathbf{x} - \mathbf{x}_i \rVert_2 $$
+          <p>Let $\mathcal{N}_k(\mathbf{x})$ be the set of the $k$ stored points with the smallest $d_i$.
+          The prediction is the most common label among them:</p>
+          $$ \hat y = \arg\max_{c}\; \big|\{\, i \in \mathcal{N}_k(\mathbf{x}) : y_i = c \,\}\big| $$
+          <p class="gloss"><b>In words:</b> for each class $c$, count how many of the $k$ nearest neighbors
+          have label $c$. Predict the class with the largest count. The vertical bars $|\cdot|$ mean “the
+          number of elements in”.</p>
+
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 470 350" role="img" aria-labelledby="fig-08-1-t">
+                <title id="fig-08-1-t">Points of two classes, a new point marked with a cross, and a circle around it that contains its five nearest neighbors: three of class 1 and two of class 0</title>
+                <rect class="f-k" x="30" y="20" width="309.6" height="309.6" rx="4"/>
+                <circle class="f-as s-a ln thin" cx="156.0" cy="167.6" r="39.9" fill-opacity="0.5"/>
+                <rect class="f-r" x="85.3" y="213.1" width="8.0" height="8.0"/>
+                <rect class="f-r" x="168.7" y="183.1" width="8.0" height="8.0"/>
+                <rect class="f-r" x="49.7" y="207.0" width="8.0" height="8.0"/>
+                <rect class="f-r" x="86.4" y="201.4" width="8.0" height="8.0"/>
+                <rect class="f-r" x="50.9" y="198.1" width="8.0" height="8.0"/>
+                <rect class="f-r" x="117.3" y="150.1" width="8.0" height="8.0"/>
+                <rect class="f-r" x="120.2" y="188.4" width="8.0" height="8.0"/>
+                <rect class="f-r" x="55.0" y="125.7" width="8.0" height="8.0"/>
+                <rect class="f-r" x="39.8" y="167.1" width="8.0" height="8.0"/>
+                <rect class="f-r" x="96.9" y="238.5" width="8.0" height="8.0"/>
+                <rect class="f-r" x="85.2" y="231.0" width="8.0" height="8.0"/>
+                <rect class="f-r" x="122.5" y="210.8" width="8.0" height="8.0"/>
+                <rect class="f-r" x="162.2" y="272.7" width="8.0" height="8.0"/>
+                <rect class="f-r" x="108.7" y="238.9" width="8.0" height="8.0"/>
+                <rect class="f-r" x="136.7" y="283.1" width="8.0" height="8.0"/>
+                <circle class="f-v" cx="208.4" cy="131.2" r="4.5"/>
+                <circle class="f-v" cx="167.4" cy="103.3" r="4.5"/>
+                <circle class="f-v" cx="227.2" cy="102.6" r="4.5"/>
+                <circle class="f-v" cx="255.3" cy="174.1" r="4.5"/>
+                <circle class="f-v" cx="192.1" cy="146.1" r="4.5"/>
+                <circle class="f-v" cx="247.7" cy="108.2" r="4.5"/>
+                <circle class="f-v" cx="195.3" cy="160.7" r="4.5"/>
+                <circle class="f-v" cx="192.1" cy="159.8" r="4.5"/>
+                <circle class="f-v" cx="212.2" cy="143.5" r="4.5"/>
+                <circle class="f-v" cx="294.9" cy="157.0" r="4.5"/>
+                <circle class="f-v" cx="210.4" cy="122.3" r="4.5"/>
+                <circle class="f-v" cx="186.5" cy="152.1" r="4.5"/>
+                <circle class="f-v" cx="221.3" cy="110.9" r="4.5"/>
+                <circle class="f-v" cx="173.4" cy="89.4" r="4.5"/>
+                <circle class="f-v" cx="208.1" cy="132.7" r="4.5"/>
+                <circle class="ln thin s-i" cx="172.7" cy="187.1" r="8"/>
+                <circle class="ln thin s-i" cx="186.5" cy="152.1" r="8"/>
+                <circle class="ln thin s-i" cx="192.1" cy="159.8" r="8"/>
+                <circle class="ln thin s-i" cx="121.3" cy="154.1" r="8"/>
+                <circle class="ln thin s-i" cx="195.3" cy="160.7" r="8"/>
+                <path class="ln s-i" d="M150.0,161.6 L162.0,173.6 M150.0,173.6 L162.0,161.6"/>
+                <circle class="f-v" cx="369.6" cy="50" r="4.5"/><text x="381.6" y="54">class 1</text>
+                <rect class="f-r" x="365.6" y="71" width="8" height="8"/><text x="381.6" y="79">class 0</text>
+                <path class="ln s-i" d="M364.6,99 L374.6,109 M364.6,109 L374.6,99"/><text x="381.6" y="108">new point</text>
+                <circle class="ln thin s-i" cx="369.6" cy="130" r="8"/><text x="381.6" y="134">5 nearest</text>
+                <text x="365.6" y="164">vote: 3 × class 1,</text><text x="365.6" y="180">2 × class 0</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 8.1</b> kNN with $k = 5$ on the data from the code below. The circle is
+            centered on the new point and reaches its fifth-nearest neighbor. Inside are three class-1
+            points and two class-0 points, so the prediction is class 1.</figcaption>
+          </figure>
 
           <div class="callout pitfall">
-            <div class="callout__label"><span class="ic">▲</span> Watch out: the curse of dimensionality</div>
-            <p>With very many features, almost every pair of points ends up roughly the same distance apart, so
-            "closest" stops meaning much — kNN quietly degrades as dimensions pile up.</p>
+            <div class="callout__label"><span class="ic">▲</span> Watch out: feature scale and the curse of dimensionality</div>
+            <p>Distance adds up all features, so a feature measured in large units (income in dollars)
+            outweighs one in small units (age in years). Normalize the features first
+            (<a href="05-linear-regression.html">Section 5</a>). Also, with very many features, almost all
+            pairs of points are about the same distance apart. Then “closest” means little, and kNN gets
+            worse as the number of dimensions grows.</p>
           </div>
 
-          <p class="beat beat--code">The same thing in code</p>
-          <pre><code class="language-python">from sklearn.neighbors import KNeighborsClassifier
+          <p class="beat beat--code">The same thing in NumPy</p>
+          <p class="codecap">kNN prediction from scratch</p>
+          <pre><code class="language-python">import numpy as np
 
-model = KNeighborsClassifier(n_neighbors=5)
-model.fit(X_train, y_train)          # "fit" just stores the data -- no real learning happens
-pred = model.predict(X_new)          # for each new point: find its 5 closest neighbors, vote</code></pre>
+rng = np.random.default_rng(4)
+X_train = np.vstack([rng.normal([2, 2], 1.0, size=(15, 2)),    # class 0
+                     rng.normal([5, 4], 1.0, size=(15, 2))])   # class 1
+y_train = np.array([0] * 15 + [1] * 15)
 
-          <div class="check">
+def knn_predict(X_train, y_train, x_new, k=5):
+    dists = np.linalg.norm(X_train - x_new, axis=1)    # distance to every stored point
+    nearest = np.argsort(dists)[:k]                     # indices of the k closest
+    votes = np.bincount(y_train[nearest], minlength=2)  # count the labels among them
+    return votes.argmax(), votes
+
+label, votes = knn_predict(X_train, y_train, np.array([3.2, 3.2]))
+print(label, votes)   # 1 [2 3]</code></pre>
+          <p>With scikit-learn, the same model is <code>KNeighborsClassifier(n_neighbors=5)</code>. Its
+          <code>fit</code> method only stores the data (and may build a search structure, see the check
+          below).</p>
+
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">Why does kNN get slower at prediction time as your training set grows, unlike a trained decision tree or SVM?</span>
+                <span class="check__q">The code above computes the distance to every stored point. What happens to prediction time when the training set grows 100 times larger? How can libraries reduce this?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>Because kNN has no real training phase — all the "work" is deferred to prediction time. Every
-                single prediction requires measuring the distance from the new point to <em>every</em> stored
-                training example to find the closest <b>k</b>. A decision tree or SVM instead spends effort once,
-                up front, to build a compact rule (a tree of splits, or a boundary defined by a few support
-                vectors), so predicting afterward is fast regardless of how large the original training set was.</p>
+                <p>With this brute-force search, each prediction becomes about 100 times slower, because kNN
+                does its work at prediction time, not at training time. Libraries reduce this with search
+                structures such as KD-trees and ball trees. They split space into regions, so the search can
+                skip regions that are far away. This works well with few features. With many features
+                (the curse of dimensionality again), the structures help less, and approximate
+                nearest-neighbor methods are used instead.</p>
               </div>
             </details>
           </div>
@@ -111,42 +199,121 @@ pred = model.predict(X_new)          # for each new point: find its 5 closest ne
 
           <p class="beat beat--intuition">Intuition first</p>
           <p>A <strong>decision tree</strong> predicts by asking a series of simple yes/no questions about the
-          features ("is age &gt; 30?", "is income &gt; 50k?"), branching on the answer, and repeating until it
-          reaches a leaf that holds the prediction. Training a tree just means choosing, at each branch, the
+          features (“is age &gt; 30?”, “is income &gt; 50,000?”). It follows the answers down the branches until
+          it reaches a leaf, which holds the prediction. Training a tree means choosing, at each branch, the
           question that best separates the classes.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>It's the game of <strong>20 Questions</strong>. "Is it alive?" "Is it bigger than a breadbox?" Each
-            answer cuts the space of possibilities roughly in half, and a handful of well-chosen questions
-            narrows a huge range of options down to one guess. A decision tree is exactly this game played
-            automatically, with the questions chosen from the training data.</p>
+            <p>It is the game of <strong>20 Questions</strong>. “Is it alive?” “Is it larger than a
+            chair?” Each answer removes many possibilities. A few good questions narrow a huge range of options down to one guess. A decision tree plays this game automatically. It chooses its
+            questions from the training data.</p>
           </div>
 
-          <p>Trees are wonderfully <strong>interpretable</strong> — you can print the whole flowchart and read off
-          exactly why it made a prediction. But left alone, they <strong>overfit easily</strong>: given enough
-          questions, a tree can carve out a tiny leaf for every single training example, memorizing the data
-          instead of learning the pattern (exactly the failure mode from <a href="07-overfitting.html">Section 7</a>).</p>
+          <p class="beat beat--math">Now the math</p>
+          <p>How does a tree measure “best separates”? A common choice is <dfn>Gini impurity</dfn>. If a
+          group of examples has a fraction $p_c$ of class $c$, its impurity is:</p>
+          $$ G = 1 - \sum_c p_c^2 $$
+          <p class="gloss"><b>In words:</b> $G$ is 0 when the group is pure (one class only). For two
+          classes it is largest, $0.5$, when they are mixed half and half. A candidate question splits a
+          group into two smaller groups. The tree picks the question whose two groups have the lowest
+          impurity on average, weighted by group size. (Another common measure is the entropy from
+          <a href="04-information-theory.html">Section 4</a>.)</p>
 
-          <p class="beat beat--code">The same thing in code</p>
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 560 290" role="img" aria-labelledby="fig-08-2-t">
+                <title id="fig-08-2-t">A two-level decision tree next to the same data, where each question becomes a vertical or horizontal cut that splits the plane into rectangles</title>
+                <rect class="f-p s-i ln thin" x="60" y="30" width="110" height="34" rx="6"/>
+                <text class="b lg" x="115.0" y="51.0" text-anchor="middle">x₁ &lt; 3.5 ?</text>
+                <line class="ln thin s-i" x1="90" y1="64" x2="55" y2="120"/>
+                <text class="sm" x="60" y="95" text-anchor="middle">yes</text>
+                <line class="ln thin s-i" x1="140" y1="64" x2="175" y2="120"/>
+                <text class="sm" x="172" y="95" text-anchor="middle">no</text>
+                <rect class="f-rs s-i ln thin" x="10" y="120" width="90" height="34" rx="6"/>
+                <text class="tr b lg" x="55.0" y="141.0" text-anchor="middle">class 0</text>
+                <rect class="f-p s-i ln thin" x="125" y="120" width="110" height="34" rx="6"/>
+                <text class="b lg" x="180.0" y="141.0" text-anchor="middle">x₂ &lt; 2.8 ?</text>
+                <line class="ln thin s-i" x1="155" y1="154" x2="130" y2="210"/>
+                <text class="sm" x="132" y="185" text-anchor="middle">yes</text>
+                <line class="ln thin s-i" x1="205" y1="154" x2="225" y2="210"/>
+                <text class="sm" x="228" y="185" text-anchor="middle">no</text>
+                <rect class="f-rs s-i ln thin" x="85" y="210" width="90" height="34" rx="6"/>
+                <text class="tr b lg" x="130.0" y="231.0" text-anchor="middle">class 0</text>
+                <rect class="f-vs s-i ln thin" x="185" y="210" width="90" height="34" rx="6"/>
+                <text class="tv b lg" x="230.0" y="231.0" text-anchor="middle">class 1</text>
+                <rect class="f-rs" x="300.0" y="20.0" width="98.0" height="224.0"/>
+                <rect class="f-rs" x="398.0" y="151.6" width="126.0" height="92.4"/>
+                <rect class="f-vs" x="398.0" y="20.0" width="126.0" height="131.6"/>
+                <line class="ln s-i" x1="398.0" x2="398.0" y1="20.0" y2="244.0"/>
+                <line class="ln s-i dash" x1="398.0" x2="524.0" y1="151.6" y2="151.6"/>
+                <rect class="f-r" x="334.2" y="175.4" width="7" height="7"/>
+                <rect class="f-r" x="399.1" y="152.0" width="7" height="7"/>
+                <rect class="f-r" x="306.5" y="170.6" width="7" height="7"/>
+                <rect class="f-r" x="335.0" y="166.3" width="7" height="7"/>
+                <rect class="f-r" x="307.5" y="163.7" width="7" height="7"/>
+                <rect class="f-r" x="359.1" y="126.4" width="7" height="7"/>
+                <rect class="f-r" x="361.4" y="156.2" width="7" height="7"/>
+                <rect class="f-r" x="310.7" y="107.4" width="7" height="7"/>
+                <rect class="f-r" x="298.9" y="139.6" width="7" height="7"/>
+                <rect class="f-r" x="343.3" y="195.2" width="7" height="7"/>
+                <rect class="f-r" x="334.1" y="189.3" width="7" height="7"/>
+                <rect class="f-r" x="363.1" y="173.6" width="7" height="7"/>
+                <rect class="f-r" x="394.0" y="221.7" width="7" height="7"/>
+                <rect class="f-r" x="352.4" y="195.5" width="7" height="7"/>
+                <rect class="f-r" x="374.2" y="229.8" width="7" height="7"/>
+                <circle class="f-v" cx="430.4" cy="112.1" r="4"/>
+                <circle class="f-v" cx="398.4" cy="90.4" r="4"/>
+                <circle class="f-v" cx="445.0" cy="89.8" r="4"/>
+                <circle class="f-v" cx="466.9" cy="145.4" r="4"/>
+                <circle class="f-v" cx="417.7" cy="123.7" r="4"/>
+                <circle class="f-v" cx="460.9" cy="94.2" r="4"/>
+                <circle class="f-v" cx="420.1" cy="135.0" r="4"/>
+                <circle class="f-v" cx="417.7" cy="134.4" r="4"/>
+                <circle class="f-v" cx="433.3" cy="121.7" r="4"/>
+                <circle class="f-v" cx="497.6" cy="132.2" r="4"/>
+                <circle class="f-v" cx="431.9" cy="105.2" r="4"/>
+                <circle class="f-v" cx="413.3" cy="128.3" r="4"/>
+                <circle class="f-v" cx="440.4" cy="96.3" r="4"/>
+                <circle class="f-v" cx="403.2" cy="79.6" r="4"/>
+                <circle class="f-v" cx="430.1" cy="113.3" r="4"/>
+                <rect class="ax" x="300" y="20" width="224" height="224"/>
+                <text class="m" x="468" y="264" text-anchor="middle">x₁</text><text class="m" x="294" y="132" text-anchor="end">x₂</text>
+                <text class="sm" x="398.0" y="258" text-anchor="middle">3.5</text><text class="sm" x="528.0" y="155.6">2.8</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 8.2</b> A depth-2 tree chosen by Gini impurity on the kNN data. The root
+            question $x_1 &lt; 3.5$ lowers the weighted impurity from 0.5 to about 0.06. Each question is a
+            vertical or horizontal cut, so a tree always divides the plane into rectangles.</figcaption>
+          </figure>
+
+          <p>Trees are very <strong>interpretable</strong>: you can print the whole flowchart and read why
+          it made a prediction. But on their own they <strong>overfit easily</strong>. With enough questions,
+          a tree can make a tiny leaf for every training example. It then memorizes the data instead of
+          learning the pattern: the failure from <a href="07-overfitting.html">Section 7</a>.</p>
+
+          <p>In practice you train these models with a library such as scikit-learn, not by hand. The
+          remaining snippets use it and assume <code>X_train</code> and <code>y_train</code> hold your data.</p>
+          <p class="codecap">a depth-limited tree in scikit-learn</p>
           <pre><code class="language-python">from sklearn.tree import DecisionTreeClassifier
 
-model = DecisionTreeClassifier(max_depth=4)   # cap the depth so it can't ask endless questions
+# X_train, y_train: your data, e.g. from the kNN example above
+model = DecisionTreeClassifier(max_depth=4)   # cap the depth: at most 4 questions per path
 model.fit(X_train, y_train)</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">Why does limiting <code>max_depth</code> help a decision tree generalize better?</span>
+                <span class="check__q">A group has 8 examples of class A and 2 of class B. What is its Gini impurity? Would splitting it into (4 A, 0 B) and (4 A, 2 B) help?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>Depth controls the tree's capacity: an unlimited tree can keep splitting until every leaf holds
-                a single training example, which means it has memorized the training set's noise along with its
-                pattern (high variance). Capping the depth forces the tree to stop asking questions early, keeping
-                only the splits that separate large, meaningful groups — trading a bit of training accuracy for a
-                model that holds up on new data.</p>
+                <p>$G = 1 - 0.8^2 - 0.2^2 = 0.32$. After the split, the first group is pure ($G = 0$). The
+                second has $G = 1 - (4/6)^2 - (2/6)^2 \approx 0.444$. The weighted average is
+                $\tfrac{4}{10}\cdot 0 + \tfrac{6}{10}\cdot 0.444 \approx 0.267$. That is lower than 0.32,
+                so the split helps a little. A split that put both B examples alone in one group would reach
+                0.</p>
               </div>
             </details>
           </div>
@@ -155,44 +322,54 @@ model.fit(X_train, y_train)</code></pre>
           <h2><span class="h-num">3</span>Ensembles: combine many weak models</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>A single tree is unstable and prone to overfitting. <strong>Ensembles</strong> fix this by combining
-          many models instead of trusting one, in two different ways.</p>
+          <p>A single tree is unstable and overfits easily. <strong>Ensembles</strong> fix this by combining
+          many models instead of trusting one. There are two main ways to do it.</p>
+          <p><strong>Bagging</strong> (short for “bootstrap aggregating”) trains many trees. Each tree sees a <dfn>bootstrap sample</dfn> of the data: a random sample of the same size, drawn with replacement.
+          Then it averages their votes. A <strong>random forest</strong> is bagging with one more trick: at
+          each split, each tree may only look at a random subset of the features.</p>
+          <p><strong>Boosting</strong> trains models one after another. Each new model is trained to
+          correct the errors that the ensemble so far still makes. The models are added together, not
+          averaged.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p><strong>Bagging</strong> (used in <strong>random forests</strong>) is the wisdom-of-the-crowd fact
-            that a county fair uses to guess an ox's weight: ask one person and they might be way off, but average
-            hundreds of independent guesses and the errors cancel out, leaving a surprisingly accurate number. A
-            random forest trains many trees, each on a random subset of the data and features, then averages
-            their votes. <strong>Boosting</strong> is different: it's like a series of tutors, where each new
-            tutor looks specifically at the mistakes the previous tutors' combined advice got wrong, and focuses
-            entirely on fixing those. Each new model is trained to correct the ensemble's current errors, and the
-            models are added together rather than simply averaged.</p>
+            <p><strong>Bagging</strong> is like asking many people to guess the number of beans in a jar and
+            averaging the guesses. One guess can be far off, but averaging many guesses cancels part of the
+            error. It cancels more when the people guess independently. If they all talked to each other
+            first, they would make similar mistakes, and averaging would help less.
+            <strong>Boosting</strong> is like a series of tutors. Each new tutor looks at the questions the
+            student still gets wrong after all earlier tutoring, and works on those.</p>
           </div>
 
-          <p class="beat beat--code">The same thing in code</p>
+          <p>This is why random forests sample features. Trees trained on bootstrap samples of the same data
+          are still similar, so their errors are <em>correlated</em>, and averaging cancels only part of
+          them. Restricting each split to random features makes the trees more different from each other,
+          so averaging cancels more.</p>
+
+          <p class="codecap">bagging and boosting in scikit-learn</p>
           <pre><code class="language-python">from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 
-forest = RandomForestClassifier(n_estimators=200)   # bagging: many trees, average their votes
+# X_train, y_train: your data
+forest = RandomForestClassifier(n_estimators=200)       # bagging: 200 trees on bootstrap samples, vote
 forest.fit(X_train, y_train)
 
-boosted = GradientBoostingClassifier(n_estimators=200)  # boosting: each tree fixes the last one's errors
+boosted = GradientBoostingClassifier(n_estimators=200)  # boosting: each tree corrects the ensemble's current errors
 boosted.fit(X_train, y_train)</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">A random forest and a gradient boosting model both use decision trees underneath. What's the key structural difference in how they combine those trees?</span>
+                <span class="check__q">You build a “forest” of 200 trees, but every tree is trained on the full dataset with all features and no randomness. How much better is it than one tree?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>A random forest trains its trees <strong>independently and in parallel</strong>, each on a
-                random subset of data and features, then averages their votes — the trees don't know about each
-                other. Gradient boosting trains its trees <strong>sequentially</strong>: each new tree is trained
-                specifically to correct the errors the ensemble-so-far is still making, then gets added on top.
-                Bagging mainly reduces variance (averaging cancels noise); boosting mainly reduces bias (each step
-                directly attacks remaining errors).</p>
+                <p>Not better at all. With the same data, the same features, and no randomness, the tree
+                algorithm builds the same tree 200 times. All their errors are identical, so averaging
+                cancels nothing. Averaging helps only when the models make <em>different</em> errors. That
+                is why random forests add two sources of randomness: bootstrap samples and random feature
+                subsets. (In the terms of <a href="07-overfitting.html">Section 7</a>: bagging reduces
+                variance, and only when the trees vary.)</p>
               </div>
             </details>
           </div>
@@ -201,49 +378,118 @@ boosted.fit(X_train, y_train)</code></pre>
           <h2><span class="h-num">4</span>SVM intuition: the widest street between classes</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>A <strong>support vector machine (SVM)</strong> for classification looks for the line (or, in higher
-          dimensions, the flat boundary called a <dfn>hyperplane</dfn>) that separates the two classes with the
-          <strong>widest possible margin</strong> — the biggest empty gap on either side before you hit a
-          training point.</p>
+          <p>A <strong>support vector machine (SVM)</strong> for classification looks for the line that
+          separates the two classes with the <strong>widest possible margin</strong>. In higher dimensions the line becomes a flat boundary called a <dfn>hyperplane</dfn>. The margin is the empty gap on
+          either side of the line before you reach a training point.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>Imagine drawing the widest possible straight road between two neighborhoods, without the road
-            touching a single house on either side. Many roads would separate the neighborhoods, but the widest
-            one gives you the most buffer if a new house is built close to the boundary later. An SVM finds
-            exactly that widest street; the houses closest to its edges — the ones that would get clipped first if
-            the road narrowed — are called the <dfn>support vectors</dfn>, and they're the only points that
-            actually determine where the road goes.</p>
+            <p>Imagine building the widest possible straight road between two neighborhoods, without the
+            road touching any house. Many roads would separate the neighborhoods. The widest one leaves the
+            most space if a new house is built near the edge later. An SVM finds that widest road. The
+            houses touching its edges are the <dfn>support vectors</dfn>. They are the only houses that
+            decide where the road goes.</p>
           </div>
 
-          <p>Real data is rarely neatly separable by a straight line. The <strong>kernel trick</strong> handles
-          this in one clean move: it lifts the data into a higher-dimensional space (for example, adding each
-          point's squared distance from the center as a new feature) where a straight boundary in that higher
-          space can separate classes that were tangled together in the original space — then that boundary maps
-          back down to a curved one in the space you started with. Crucially, the kernel trick computes the
-          effect of this lift without ever explicitly building the higher-dimensional points, which is what
-          keeps it fast.</p>
+          <p class="beat beat--math">Now the math</p>
+          <p>Write the boundary as $\mathbf{w}^\top\mathbf{x} + b = 0$. The distance from a point
+          $\mathbf{x}$ to this boundary is $|\mathbf{w}^\top\mathbf{x} + b| / \lVert\mathbf{w}\rVert$. We can
+          multiply $\mathbf{w}$ and $b$ by any positive number without moving the boundary. So choose the
+          scale where the closest points on each side have $\mathbf{w}^\top\mathbf{x} + b = \pm 1$. Then each
+          edge of the street is at distance $1/\lVert\mathbf{w}\rVert$ from the boundary, and:</p>
+          $$ \text{margin} = \frac{2}{\lVert\mathbf{w}\rVert} $$
+          <p class="gloss"><b>In words:</b> a wide street means a small $\lVert\mathbf{w}\rVert$. So the SVM minimizes $\lVert\mathbf{w}\rVert^2$. At the same time, it requires every training point to be on the correct side, with $|\mathbf{w}^\top\mathbf{x} + b| \ge 1$.</p>
 
-          <p class="beat beat--code">The same thing in code</p>
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 440 340" role="img" aria-labelledby="fig-08-3-t">
+                <title id="fig-08-3-t">Two separable classes with the widest street between them shaded, the boundary line in the middle, and the two support vectors on the street edges circled</title>
+                <rect class="f-k" x="30" y="20" width="300" height="300" rx="4"/>
+                <path class="f-as" d="M330.0,320.0 L211.6,320.0 L43.3,20.0 L161.8,20.0 L330.0,319.9Z"/>
+                <path class="ln thin s-a dash" d="M43.3,20.0 L211.6,320.0"/>
+                <path class="ln thin s-a dash" d="M161.8,20.0 L330.0,319.9"/>
+                <path class="ln s-i" d="M102.5,20.0 L270.8,320.0"/>
+                <rect class="f-r" x="139.5" y="236.9" width="8.0" height="8.0"/>
+                <rect class="f-r" x="129.3" y="280.8" width="8.0" height="8.0"/>
+                <rect class="f-r" x="122.6" y="284.5" width="8.0" height="8.0"/>
+                <rect class="f-r" x="141.6" y="198.4" width="8.0" height="8.0"/>
+                <rect class="f-r" x="121.2" y="270.8" width="8.0" height="8.0"/>
+                <rect class="f-r" x="157.5" y="234.7" width="8.0" height="8.0"/>
+                <rect class="f-r" x="143.3" y="282.2" width="8.0" height="8.0"/>
+                <rect class="f-r" x="138.3" y="222.2" width="8.0" height="8.0"/>
+                <rect class="f-r" x="89.8" y="264.8" width="8.0" height="8.0"/>
+                <rect class="f-r" x="69.2" y="295.5" width="8.0" height="8.0"/>
+                <rect class="f-r" x="71.4" y="256.6" width="8.0" height="8.0"/>
+                <rect class="f-r" x="92.6" y="237.9" width="8.0" height="8.0"/>
+                <rect class="f-r" x="145.2" y="254.8" width="8.0" height="8.0"/>
+                <rect class="f-r" x="46.5" y="267.8" width="8.0" height="8.0"/>
+                <circle class="f-v" cx="250.6" cy="140.1" r="4.5"/>
+                <circle class="f-v" cx="279.5" cy="133.3" r="4.5"/>
+                <circle class="f-v" cx="259.2" cy="170.0" r="4.5"/>
+                <circle class="f-v" cx="266.0" cy="145.2" r="4.5"/>
+                <circle class="f-v" cx="309.5" cy="104.7" r="4.5"/>
+                <circle class="f-v" cx="265.6" cy="104.2" r="4.5"/>
+                <circle class="f-v" cx="253.9" cy="90.0" r="4.5"/>
+                <circle class="f-v" cx="266.2" cy="107.3" r="4.5"/>
+                <circle class="f-v" cx="218.8" cy="116.1" r="4.5"/>
+                <circle class="f-v" cx="255.2" cy="162.1" r="4.5"/>
+                <circle class="f-v" cx="272.5" cy="46.0" r="4.5"/>
+                <circle class="f-v" cx="235.7" cy="151.9" r="4.5"/>
+                <circle class="f-v" cx="274.0" cy="110.7" r="4.5"/>
+                <circle class="f-v" cx="259.9" cy="136.5" r="4.5"/>
+                <circle class="ln thin s-i" cx="145.6" cy="202.4" r="9"/>
+                <circle class="ln thin s-i" cx="235.7" cy="151.9" r="9"/>
+                <defs><marker id="ar08" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="f-i" d="M0,0 L10,5 L0,10Z"/></marker></defs>
+                <line class="ln thin s-i" x1="205.6" y1="309.4" x2="295.8" y2="258.9" marker-start="url(#ar08)" marker-end="url(#ar08)"/>
+                <text x="345" y="60">margin</text><text x="345" y="76" class="m">2 / ‖w‖</text>
+                <circle class="ln thin s-i" cx="352" cy="110" r="9"/><text x="367" y="114">support</text><text x="367" y="130">vector</text>
+                <line class="ln s-i" x1="342" x2="362" y1="160" y2="160"/><text x="367" y="164">boundary</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 8.3</b> The widest street between two separable classes, found by searching
+            over all directions. The solid line is the boundary. The dashed lines are the street edges. Only
+            the two circled points touch the edges. They are the support vectors: moving any other point
+            (without entering the street) does not change the answer.</figcaption>
+          </figure>
+
+          <p>Real data is rarely separable by a straight line. The <strong>kernel trick</strong> helps. First,
+          imagine lifting the data into a space with more dimensions, for example by adding products of
+          features as new features. In that space, a straight boundary may separate classes that were mixed
+          in the original space. Seen back in the original space, that boundary is curved.</p>
+          <p>The trick is that the SVM only needs dot products between points, never the points themselves.
+          For some lifts, you can compute the dot product in the big space directly from the original points.
+          Here is a small example in 2-D. Define the lift
+          $\phi(\mathbf{x}) = (x_1^2,\ \sqrt2\,x_1x_2,\ x_2^2)$. Then:</p>
+          $$
+          \begin{aligned}
+          \phi(\mathbf{x})\cdot\phi(\mathbf{z}) &= x_1^2z_1^2 + 2x_1x_2z_1z_2 + x_2^2z_2^2 \\
+          &= (x_1z_1 + x_2z_2)^2 = (\mathbf{x}\cdot\mathbf{z})^2
+          \end{aligned}
+          $$
+          <p class="gloss"><b>In words:</b> the dot product in the 3-D space equals the square of the
+          ordinary 2-D dot product. For $\mathbf{x} = (1, 2)$ and $\mathbf{z} = (3, 1)$: $\mathbf{x}\cdot\mathbf{z}
+          = 5$, so both sides equal 25. We never had to build the 3-D points. The “rbf” kernel below does the
+          same for a lift with infinitely many dimensions.</p>
+
+          <p class="codecap">an SVM with the rbf kernel in scikit-learn</p>
           <pre><code class="language-python">from sklearn.svm import SVC
 
-model = SVC(kernel="rbf")     # "rbf" kernel = the lift-into-higher-dimensions trick
+# X_train, y_train: your data (normalize the features first)
+model = SVC(kernel="rbf")     # "rbf" kernel: a curved boundary through the kernel trick
 model.fit(X_train, y_train)</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">Why are only the "support vectors" — and not every training point — needed to describe the final SVM boundary?</span>
+                <span class="check__q">After training an SVM, you delete one training point that is far from the street. Does the boundary change? What if you delete a support vector?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>The boundary is defined purely by finding the widest possible margin, and the width of that
-                margin is limited only by whichever points sit closest to it on each side. Move a point that's
-                already far from the boundary and the widest street doesn't change at all — it was never
-                constraining the margin. Move one of the closest points and the street's position and width shift
-                immediately. So only those closest points (the support vectors) matter for describing the
-                boundary; the rest could be deleted after training with no effect on the model.</p>
+                <p>Deleting a far point changes nothing. It never limited the width of the street, so the
+                widest street stays the same. Deleting a support vector usually does change the boundary. That point was holding an edge of the street in place. Without it, the street can become wider and may shift or turn. This is why a trained SVM only needs to keep its support vectors. It
+                is also why its prediction cost grows with the number of support vectors, not with the size
+                of the whole training set.</p>
               </div>
             </details>
           </div>
@@ -257,57 +503,77 @@ model.fit(X_train, y_train)</code></pre>
                   <th>Model</th>
                   <th>Strength</th>
                   <th>Weakness</th>
-                  <th>When to reach for it</th>
+                  <th>When to use it</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
                   <td>k-Nearest Neighbors</td>
-                  <td>Simple, no training step, adapts to any shape of boundary</td>
-                  <td>Slow at prediction time on large data; degrades in high dimensions</td>
+                  <td>Simple, no training step, can follow any boundary shape</td>
+                  <td>Slow predictions on large data; needs feature scaling; weak in high dimensions</td>
                   <td>Quick baseline on small, low-dimensional datasets</td>
                 </tr>
                 <tr>
                   <td>Decision tree</td>
-                  <td>Interpretable, handles mixed feature types, no feature scaling needed</td>
+                  <td>Interpretable; no feature scaling needed; handles numeric and categorical features (some libraries, such as scikit-learn, need categories encoded as numbers first)</td>
                   <td>Overfits easily; unstable (small data changes → different tree)</td>
                   <td>When you (or a regulator) need to read the exact rule</td>
                 </tr>
                 <tr>
                   <td>Random forest (bagging)</td>
                   <td>Much more stable and accurate than a single tree; resists overfitting</td>
-                  <td>Less interpretable; slower and heavier than one tree</td>
+                  <td>Less interpretable; slower and larger than one tree</td>
                   <td>Strong, low-effort default for tabular data</td>
                 </tr>
                 <tr>
                   <td>Gradient boosting</td>
-                  <td>Usually the most accurate classical model on tabular data</td>
-                  <td>More hyperparameters to tune; trains sequentially (slower to fit); can overfit if pushed too far</td>
-                  <td>Squeezing out the best possible accuracy on structured data</td>
+                  <td>Often the most accurate classical model on tabular data</td>
+                  <td>More hyperparameters to tune; trains sequentially (slower to fit); can overfit if trained too long</td>
+                  <td>Getting the best possible accuracy on structured data</td>
                 </tr>
                 <tr>
                   <td>SVM</td>
-                  <td>Strong with a clear margin; kernel trick handles non-linear boundaries; works with few samples relative to features</td>
-                  <td>Doesn't scale well to huge datasets; needs feature scaling</td>
-                  <td>Small-to-medium datasets, especially with a clean or kernel-recoverable margin</td>
+                  <td>Strong with a clear margin; kernel trick handles curved boundaries; works with few samples relative to features</td>
+                  <td>Training does not scale well to huge datasets; needs feature scaling</td>
+                  <td>Small-to-medium datasets, especially with a clear margin (possibly after a kernel)</td>
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          <div class="check-wrap">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">You have 50,000 rows of customer data with 30 mixed numeric features, and you want good accuracy with little tuning. Which model from the table do you try first, and why not kNN?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>A random forest is a good first try. It is a strong default for tabular data, needs no feature scaling, and has few settings that matter. Gradient boosting may then add some
+                accuracy with more tuning. kNN would need careful feature scaling. With 30 features and 50,000 rows, its predictions are also slow and its distances less meaningful.</p>
+              </div>
+            </details>
           </div>
 
           <hr />
 
           <h2><span class="h-num">6</span>What to carry forward</h2>
           <ul>
-            <li><strong>kNN</strong> predicts by majority vote among the closest stored examples — no real training.</li>
-            <li><strong>Decision trees</strong> are readable yes/no flowcharts that overfit easily on their own.</li>
-            <li><strong>Ensembles</strong> fix that: bagging/random forests average many independent trees (wisdom of the crowd); boosting chains models that each fix the last one's mistakes.</li>
-            <li><strong>SVMs</strong> find the widest-margin boundary, and the kernel trick lets that boundary be curved by lifting data into a higher dimension first.</li>
-            <li>None of this required deep math — the same intuitions (closeness, splitting, voting, margins) carry a long way in practice.</li>
+            <li><strong>kNN</strong> predicts by majority vote among the closest stored examples. It has no
+            real training step and needs scaled features.</li>
+            <li><strong>Decision trees</strong> are readable yes/no flowcharts, chosen with a measure such as
+            Gini impurity. On their own they overfit easily.</li>
+            <li><strong>Ensembles</strong> fix that. Bagging and random forests average many trees, and
+            randomness keeps the trees different so their errors partly cancel. Boosting adds models that
+            each correct the ensemble’s current errors.</li>
+            <li><strong>SVMs</strong> find the boundary with the widest margin, $2/\lVert\mathbf{w}\rVert$.
+            The kernel trick makes that boundary curved by working with dot products in a lifted space.</li>
+            <li>A few intuitions (closeness, splitting, voting, margins) take you a long way in
+            practice.</li>
           </ul>
 
-          <p>Next we leave the classical toolkit behind and build the <strong>neuron</strong> — the single
-          unit every deep network is made of — in <a href="09-neurons.html">Section 9</a>.</p>
+          <p>Next we leave the classical toolkit and build the <strong>neuron</strong>, the unit that every
+          deep network is made of, in <a href="09-neurons.html">Section 9</a>.</p>
 
           <div class="complete-bar" data-complete>
             <span class="complete-bar__text">Finished this section? Mark it done to fill your progress bar.</span>

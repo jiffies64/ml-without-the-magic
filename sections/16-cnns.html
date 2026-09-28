@@ -38,27 +38,35 @@
         <header class="lesson-head">
           <p class="lesson-eyebrow">Part 5 · Deep Learning Architectures <span class="dot"></span> Section 16</p>
           <h1 class="lesson-title">Convolutional Networks</h1>
-          <p class="lesson-standfirst">A convolution is a dot product wearing a sliding-window costume — see that clearly, and you can derive the shape of every layer in a CNN by hand.</p>
+          <p class="lesson-standfirst">A convolution is a dot product that slides across an image. When you see it that way, you can derive the shape of every layer in a CNN by hand.</p>
           <div class="lesson-meta">
-            <span><b>30 min</b> read</span>
-            <span><b>You'll learn:</b> convolution as an operation · output-shape math · pooling · ResNets &amp; skip connections</span>
+            <span><b>36 min</b> read</span>
+          </div>
+          <div class="objectives">
+            <div class="objectives__label">You'll learn</div>
+            <ul>
+              <li>convolution as an operation</li>
+              <li>output-shape math</li>
+              <li>pooling</li>
+              <li>ResNets &amp; skip connections</li>
+            </ul>
           </div>
         </header>
 
         <div class="prose">
-          <p class="lead">Every image is a grid of numbers, so in principle you could feed it into the
-          fully-connected layers from <a href="01-linear-algebra.html">Section 1</a> — flatten the
-          grid into one long vector and multiply by a big matrix. In practice this is a bad idea, for
-          reasons that turn out to be exactly the reasons convolutional networks exist. Once you see
-          why fully-connected layers struggle with images, the convolution operation stops looking like
-          a new trick and starts looking like the obvious fix.</p>
+          <p class="lead">Every image is a grid of numbers. So in principle you could feed it into the
+          fully-connected layers from <a href="01-linear-algebra.html">Section 1</a>: flatten the grid
+          into one long vector and multiply by a big matrix. In practice this is a bad idea. The reasons
+          why are the same reasons convolutional networks exist. Once you see why fully-connected layers
+          struggle with images, the convolution stops looking like a new trick. It becomes the obvious
+          fix.</p>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> The one idea to hold onto</div>
-            <p>A convolution takes one small, reusable pattern-detector (a <strong>kernel</strong>) and
-            slides it over every position in the input, asking the same question everywhere: <em>“how
-            much of my pattern is here?”</em> Reusing the same detector everywhere is what makes CNNs
-            both cheap (few parameters) and smart about images (a cat is a cat wherever it appears).</p>
+            <p>A convolution takes one small, reusable pattern detector (a <strong>kernel</strong>). It
+            slides the kernel over every position in the input and asks the same question everywhere:
+            <em>“how much of my pattern is here?”</em> Because the same detector is used everywhere, CNNs
+            need few parameters, and they find a cat wherever it appears in the photo.</p>
           </div>
 
           <!-- ===================== WHY NOT FC ===================== -->
@@ -66,51 +74,51 @@
 
           <p class="beat beat--intuition">Intuition first</p>
           <p>A fully-connected layer gives every input pixel its own private weight, for every output
-          neuron. That has two consequences, and both are bad for images. First, images have a lot of
-          pixels, so the weight matrix becomes enormous. Second — and this is the subtler problem — the
-          layer has no idea that “a cat's ear near the top of the photo” and “a cat's ear near the
-          bottom of the photo” are the <em>same feature</em>. It learns them as two unrelated facts,
-          because they land on two different input slots with two different weights.</p>
+          neuron. This has two bad results for images. First, images have many pixels, so the weight
+          matrix becomes enormous. Second, and less obvious: the layer does not know that “a cat's ear
+          near the top of the photo” and “a cat's ear near the bottom” are the <em>same feature</em>.
+          The two ears land on different input slots with different weights. So the layer learns them
+          as two unrelated facts.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>Imagine teaching someone to spot a stop sign by pointing at one photo and saying “the
-            stop sign is the red octagon in the upper-left corner of <em>this exact photo</em>.” Show
-            them a second photo where the sign has moved to the bottom-right, and they're lost — they
-            never learned “stop sign,” they learned “red shape at one specific pixel location.” A
-            fully-connected layer learns the same way: a separate weight per position, with nothing
-            forcing it to reuse what it learned about a shape when that shape shows up somewhere else.</p>
+            <p>Imagine you teach someone to spot a stop sign with one photo. You say: “the stop sign is
+            the red octagon in the upper-left corner of <em>this exact photo</em>.” Now show them a
+            second photo where the sign is in the bottom-right. They are lost. They never learned “stop
+            sign.” They learned “red shape at one pixel location.” A fully-connected layer learns in the
+            same way. It has a separate weight for each position. Nothing makes it reuse what it
+            learned about a shape at one place when the shape appears at another.</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>Take a small colour image: 224×224 pixels, 3 colour channels (red, green, blue). Flattened
-          into a vector, that's:</p>
+          <p>Take a small color image: 224×224 pixels with 3 color channels (red, green, blue).
+          Flattened into a vector, that is:</p>
           $$ 224 \times 224 \times 3 = 150{,}528 \text{ numbers} $$
-          <p class="gloss"><b>In words:</b> one single image is already a vector with over 150,000
-          entries. Connect that vector to a modestly sized hidden layer of just 1,000 neurons with a
-          fully-connected layer, and the weight matrix <b>W</b> needs shape (150,528 × 1,000) — over
-          <b>150 million</b> numbers to learn, for one layer, before the network has looked at a single
-          example. And every one of those weights is tied to one exact pixel position.</p>
+          <p class="gloss"><b>In words:</b> one image is already a vector with over 150,000 entries.
+          Connect it to a hidden layer of only 1,000 neurons. The weight matrix $\mathbf{W}$ then has
+          shape (1,000 × 150,528), which is over <b>150 million</b> numbers to learn. That is for one
+          layer, before the network has seen a single example. And each of those weights is tied to one
+          exact pixel position.</p>
 
-          <p>Convolution fixes both problems with one move: instead of a giant matrix that touches every
-          pixel once, use a <em>tiny</em> matrix (the kernel) that touches every pixel <em>many times</em>,
-          once per position it slides to. The next section makes that precise.</p>
+          <p>Convolution fixes both problems with one move. A fully-connected layer uses a giant matrix
+          that touches every pixel once. A convolution uses a <em>tiny</em> matrix (the kernel) that
+          touches every pixel <em>many times</em>, once per position it slides to. The next section
+          makes that precise.</p>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">Why does a fully-connected layer need to learn "cat ear near top" and "cat ear near bottom" as two separate things, when a human clearly doesn't?</span>
+                <span class="check__q">A fully-connected layer from a 64×64 grayscale image to 500 neurons: how many weights does it have? What happens to that number if the image becomes 128×128?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>Because a fully-connected layer's weights are indexed by input position: the weight
-                connecting "pixel (10, 10)" to a given output neuron is a completely different number
-                from the weight connecting "pixel (200, 200)" to that same neuron. Nothing in the layer
-                says these two weights should be related, so the network must independently discover
-                the "ear" pattern at every position it might appear — wasting both parameters and
-                training data. A mechanism that reuses the same small detector at every position (a
-                convolution) sidesteps this entirely.</p>
+                <p>$64 \times 64 \times 500 = 2{,}048{,}000$ weights (plus 500 biases). Doubling the
+                width and height gives four times as many pixels, so the count grows four times, to
+                8,192,000. The size of a fully-connected layer grows with the image. Each of those
+                weights also belongs to one fixed pixel. So a pattern learned at one place teaches the
+                layer nothing about the same pattern at another place. A convolution, as you will see
+                next, has the same number of weights for any image size.</p>
               </div>
             </details>
           </div>
@@ -120,95 +128,195 @@
 
           <p class="beat beat--intuition">Intuition first</p>
           <p>A <strong>kernel</strong> (also called a <strong>filter</strong>) is a small grid of
-          numbers — say 3×3. To apply it, you place it in the top-left corner of the input, multiply it
-          elementwise against the patch of input underneath it, and add up the products into a single
-          number. That's exactly a <a href="01-linear-algebra.html">dot product</a> (Section 1), just
-          computed on a 2D patch instead of a flat list. Then you slide the kernel one step over and
-          repeat, and again, until you've swept the whole input. The result is a new grid — one number
-          per position — telling you how strongly that pattern showed up there.</p>
+          numbers, for example 3×3. To apply it, place it in the top-left corner of the input. Multiply
+          it element by element with the patch of input under it, and add up the products into one
+          number. That is a <a href="01-linear-algebra.html">dot product</a> (Section 1), computed on a
+          2D patch instead of a flat list. Then slide the kernel one step and repeat, until you have
+          covered the whole input. The result is a new grid with one number per position. Each number
+          tells you how strongly the pattern showed up there.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>Picture searching a photo by sliding a small stencil or rubber stamp over it, checking at
-            every position how well the stamp's shape lines up with what's underneath. Move the stencil
-            one inch right, check again. Slide it down a row, check the whole row again. You never
-            redraw the stencil — it's the same small shape, reused at every spot — you're just asking
-            “does this pattern match <em>here</em>?” over and over across the whole page.</p>
+            <p>Imagine you search a page by sliding a small stencil over it. At each position you check
+            how well the stencil's shape lines up with the drawing under it. Move the stencil one step
+            right and check again. At the end of the row, move down and do the next row. You never
+            redraw the stencil. It is the same small shape at every spot, and at each spot you ask
+            “does this pattern match <em>here</em>?”</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
           <p>Three numbers control how a convolution slides:</p>
           <div class="callout definition">
             <div class="callout__label">Definitions</div>
-            <p>The <dfn>kernel size</dfn> <b>K</b> is the width (and height) of the small sliding grid
-            of weights. The <dfn>stride</dfn> <b>S</b> is how many pixels the kernel jumps between
-            positions (stride 1 = check every pixel; stride 2 = skip every other one). <dfn>Padding</dfn>
-            <b>P</b> is a border of zeros added around the input so the kernel can also center itself
-            near the edges, and so you can control how much the output shrinks.</p>
+            <p>The <dfn>kernel size</dfn> $K$ is the width (and height) of the small grid of weights.
+            The <dfn>stride</dfn> $S$ is how many pixels the kernel moves between positions (stride 1
+            checks every position; stride 2 skips every other one). <dfn>Padding</dfn> $P$ is a border
+            of zeros added around the input. It lets the kernel center itself near the edges, and it
+            controls how much the output shrinks.</p>
           </div>
 
-          <p>Let's derive how large the output grid comes out, for an input of width <b>W</b> (assume a
-          square input and kernel for simplicity — the same formula applies to height). First, padding
-          adds <b>P</b> zeros on each side, so the effective width becomes <b>W + 2P</b>. The kernel's
-          left edge can start at position 0, then <b>S</b>, then <b>2S</b>, and so on — the last legal
-          starting position is the largest one where the kernel still fits inside the (padded) input:</p>
+          <p>First, the operation itself. Write the input as $x[c, r, s]$: channel $c$, row $r$,
+          column $s$. (Channels are the separate grids of an image, such as red, green and blue; more
+          on them below.) The kernel has weights $w[c, u, v]$ for every input channel $c$ and every
+          offset $u, v$ from $0$ to $K-1$, plus one bias $b$. The output at row $i$, column $j$ is:</p>
+          $$ \begin{aligned}
+             y[i, j] &= \sum_{c} \sum_{u} \sum_{v} w[c, u, v] \\
+                     &\qquad \times x[c,\, iS{+}u,\, jS{+}v] \;+\; b
+             \end{aligned} $$
+          <p class="gloss"><b>In words:</b> the sums run over every input channel $c$ (from 1 to
+          $C_{\text{in}}$) and every offset $u$ and $v$ (from 0 to $K-1$). Put the kernel's top-left
+          corner at input row $iS$ and
+          column $jS$. Multiply each kernel weight by the input value under it, in every channel. Add
+          all $C_{\text{in}} K^2$ products and the bias. The same $w$ and $b$ are used for every
+          output position $(i, j)$; only the patch of $x$ changes. (Here $x$ is the input after
+          padding.)</p>
+
+          <div class="callout pitfall">
+            <div class="callout__label"><span class="ic">▲</span> Watch out</div>
+            <p>In mathematics, a “convolution” flips the kernel before sliding it ($x[i-u]$ instead of
+            $x[i+u]$). The formula above does not flip. Its proper name is
+            <dfn>cross-correlation</dfn>. Deep learning libraries, including PyTorch's
+            <code>nn.Conv2d</code>, compute cross-correlation and call it convolution. For learning
+            this makes no difference: the network learns the weights, so a flipped kernel is still a
+            kernel.</p>
+          </div>
+
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 440 240" role="img" aria-labelledby="fig-cnn-1-t">
+                <title id="fig-cnn-1-t">A 3 by 3 kernel slides over a 7 by 7 input with stride 2 and lands at columns 0, 2 and 4 of each row, giving a 3 by 3 output.</title>
+                <defs>
+                  <marker id="ah16a" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9" orient="auto"><path class="f-i" d="M0,0L10,5L0,10z"/></marker>
+                </defs>
+                <g transform="translate(16,30)">
+                  <rect class="f-vs" x="0" y="0" width="66" height="66"/>
+                  <path class="grid" d="M0,0H154M0,22H154M0,44H154M0,66H154M0,88H154M0,110H154M0,132H154M0,154H154M0,0V154M22,0V154M44,0V154M66,0V154M88,0V154M110,0V154M132,0V154M154,0V154"/>
+                  <rect class="ln s-v" x="0" y="0" width="66" height="66"/>
+                  <rect class="ln s-a thin dash" x="44" y="0" width="66" height="66"/>
+                  <rect class="ln s-g thin dash" x="88" y="0" width="66" height="66"/>
+                  <text x="11" y="-7" text-anchor="middle" class="sm">0</text><text x="33" y="-7" text-anchor="middle" class="sm">1</text><text x="55" y="-7" text-anchor="middle" class="sm">2</text><text x="77" y="-7" text-anchor="middle" class="sm">3</text><text x="99" y="-7" text-anchor="middle" class="sm">4</text><text x="121" y="-7" text-anchor="middle" class="sm">5</text><text x="143" y="-7" text-anchor="middle" class="sm">6</text>
+                  <text class="lg" x="77" y="176" text-anchor="middle">input 7 × 7, no padding</text>
+                </g>
+                <path class="ln s-i thin" d="M184,107H258" marker-end="url(#ah16a)"/>
+                <text class="lg" x="221" y="96" text-anchor="middle">K = 3, S = 2</text>
+                <g transform="translate(290,74)">
+                  <rect class="f-vs" x="0" y="0" width="22" height="22"/>
+                  <rect class="f-as" x="22" y="0" width="22" height="22"/>
+                  <rect class="f-gs" x="44" y="0" width="22" height="22"/>
+                  <path class="ax" d="M0,0H66M0,22H66M0,44H66M0,66H66M0,0V66M22,0V66M44,0V66M66,0V66"/>
+                  <text class="lg" x="33" y="88" text-anchor="middle">output 3 × 3</text>
+                </g>
+                <text x="290" y="186" class="sm">kernel starts at column</text>
+                <text x="290" y="203" class="tv lg">0 (solid)</text>
+                <text x="290" y="219" class="ta lg">2 (dashed)</text>
+                <text x="364" y="219" class="tg lg">4 (dashed)</text>
+                <text x="364" y="203" class="sm">6: past the edge</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 16.1</b> The kernel (violet) starts at column 0, then jumps 2 columns
+            to start at 2 (amber), then at 4 (green). A start at column 6 would run past the edge. So the
+            first output row has 3 values, one per position. Rows work the same way, giving a 3×3
+            output.</figcaption>
+          </figure>
+
+          <p>Now let's derive the size of the output grid for an input of width $W$. (Assume a square
+          input and kernel; the same formula gives the height.) Padding adds $P$ zeros on each side, so
+          the padded width is $W + 2P$. The kernel's left edge can start at position 0, then $S$, then
+          $2S$, and so on. The last start is the largest one where the kernel still fits inside the
+          padded input:</p>
           $$ \begin{aligned}
             \text{start} + K &\le W + 2P \\
             \text{start} &\le W + 2P - K
           \end{aligned} $$
-          <p class="gloss"><b>In words:</b> the kernel's starting position, plus its own width <b>K</b>,
-          can't run past the padded edge. That caps how far right the kernel is allowed to start.</p>
+          <p class="gloss"><b>In words:</b> the kernel's start position plus its width $K$ cannot run
+          past the padded edge. That limits how far right the kernel can start.</p>
 
-          <p>The starting positions are <b>0, S, 2S, …</b> up to that cap, so the <em>count</em> of valid
-          positions — which is exactly the output size — is that cap divided by the stride, plus one for
-          the starting position itself:</p>
+          <p>The start positions are $0, S, 2S, \dots$ up to that limit. The <em>number</em> of start
+          positions is the output size. It is the limit divided by the stride, rounded down, plus one
+          for the start at 0:</p>
           $$ \text{out} = \left\lfloor \frac{W - K + 2P}{S} \right\rfloor + 1 $$
-          <p class="gloss"><b>In words:</b> take the input width, subtract the kernel width, add back
-          twice the padding, divide by the stride, round down (⌊⌋ means “round down” — you can't have a
-          fractional position), then add 1 to count the first position. This one formula tells you the
-          exact output shape of any convolution before you run it.</p>
+          <p class="gloss"><b>In words:</b> take the input width, subtract the kernel width, add twice
+          the padding, and divide by the stride. Round down ($\lfloor\cdot\rfloor$ means “round down”,
+          because a position cannot be a fraction). Then add 1 to count the first position. This one
+          formula gives the output shape of any convolution before you run it.</p>
 
-          <p class="codecap">Worked example</p>
-          <p>An input of width <b>W = 7</b>, kernel <b>K = 3</b>, stride <b>S = 2</b>, no padding
-          (<b>P = 0</b>):</p>
+          <p class="codecap">worked example</p>
+          <p>An input of width $W = 7$, kernel $K = 3$, stride $S = 2$, no padding ($P = 0$), as in
+          Figure 16.1:</p>
           $$ \text{out} = \left\lfloor \frac{7 - 3 + 0}{2} \right\rfloor + 1 = \lfloor 2 \rfloor + 1 = 3 $$
-          <p class="gloss"><b>In words:</b> the kernel fits at starting positions 0, 2, and 4 (covering
-          pixels 0–2, 2–4, and 4–6) — three positions, three output values, matching the formula.</p>
+          <p class="gloss"><b>In words:</b> the kernel fits at start positions 0, 2 and 4. It covers
+          pixels 0–2, 2–4 and 4–6. That is three positions and three output values, as the formula
+          says.</p>
 
-          <p>A second, very common case: keeping the output the <em>same size</em> as the input
-          (“same” padding), with <b>W = 5</b>, <b>K = 3</b>, <b>S = 1</b>, <b>P = 1</b>:</p>
+          <p>A second, very common case keeps the output the <em>same size</em> as the input (“same”
+          padding). Take $W = 5$, $K = 3$, $S = 1$, $P = 1$:</p>
           $$ \text{out} = \left\lfloor \frac{5 - 3 + 2}{1} \right\rfloor + 1 = 4 + 1 = 5 $$
-          <p class="gloss"><b>In words:</b> with a 3×3 kernel, padding of 1 on each side exactly cancels
-          the 2-pixel shrinkage a 3-wide kernel would otherwise cause, so the output stays 5×5. This is
-          why you'll so often see “kernel 3, padding 1” paired together in real architectures.</p>
+          <p class="gloss"><b>In words:</b> a 3-wide kernel would shrink the output by 2 pixels.
+          Padding of 1 on each side adds those 2 pixels back, so the output stays 5×5. This is why
+          “kernel 3, padding 1” appears together so often in real architectures.</p>
 
           <h3>Channels, feature maps, and parameter sharing</h3>
-          <p>A colour image doesn't have one grid of numbers — it has three (red, green, blue), called
-          <dfn>channels</dfn>. A kernel for such an input isn't 3×3, it's 3×3×3: it spans the full depth
-          of the input and produces one number per position by summing over all three channels at once.
-          One kernel produces one output grid, called a <dfn>feature map</dfn> — a map of “how much did
-          my pattern fire, at every position.” A convolutional layer normally learns many kernels in
-          parallel (say, 64 of them), producing 64 stacked feature maps — which then become the 64
-          input channels for the next layer.</p>
+          <p>A color image does not have one grid of numbers. It has three (red, green, blue), called
+          <dfn>channels</dfn>. So a kernel for this input is not 3×3 but 3×3×3. It spans the full depth
+          of the input, and the sum over $c$ in the formula above adds up all three channels at once.
+          One kernel produces one output grid, called a <dfn>feature map</dfn>: a map of how strongly
+          the pattern fired at every position. A convolutional layer normally learns many kernels in
+          parallel, say 64. They produce 64 stacked feature maps, and these become the 64 input
+          channels of the next layer.</p>
+
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 440 220" role="img" aria-labelledby="fig-cnn-2-t">
+                <title id="fig-cnn-2-t">A 3-channel input and one 3 by 3 by 3 kernel give one feature map; 16 kernels give 16 stacked feature maps.</title>
+                <defs>
+                  <marker id="ah16b" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9" orient="auto"><path class="f-i" d="M0,0L10,5L0,10z"/></marker>
+                </defs>
+                <rect class="f-gs" x="26" y="46" width="76" height="76"/><rect class="ax" x="26" y="46" width="76" height="76"/><rect class="f-gs" x="19" y="53" width="76" height="76"/><rect class="ax" x="19" y="53" width="76" height="76"/><rect class="f-vs" x="12" y="60" width="76" height="76"/><rect class="ax" x="12" y="60" width="76" height="76"/>
+                <text class="lg" x="57" y="162" text-anchor="middle">input</text>
+                <text x="57" y="178" text-anchor="middle" class="sm">3 channels</text>
+                <path class="ln s-i thin" d="M110,98H130" marker-end="url(#ah16b)"/>
+                <rect class="f-p" x="146" y="78" width="24" height="24"/><rect class="ln s-a thin" x="146" y="78" width="24" height="24"/><rect class="f-p" x="142" y="82" width="24" height="24"/><rect class="ln s-a thin" x="142" y="82" width="24" height="24"/><rect class="f-as" x="138" y="86" width="24" height="24"/><rect class="ln s-a thin" x="138" y="86" width="24" height="24"/>
+                <text class="lg" x="154" y="140" text-anchor="middle">kernel</text>
+                <text x="154" y="156" text-anchor="middle" class="sm">3×3×3</text>
+                <path class="ln s-i thin" d="M178,98H198" marker-end="url(#ah16b)"/>
+                <rect class="f-as" x="204" y="68" width="60" height="60"/><rect class="ax" x="204" y="68" width="60" height="60"/>
+                <text class="lg" x="234" y="150" text-anchor="middle">one map</text>
+                <path class="ln s-i thin dash" d="M272,98H306" marker-end="url(#ah16b)"/>
+                <text x="289" y="86" text-anchor="middle" class="sm">×16</text>
+                <rect class="f-p" x="338" y="48" width="56" height="56"/><rect class="ax" x="338" y="48" width="56" height="56"/><rect class="f-p" x="332" y="54" width="56" height="56"/><rect class="ax" x="332" y="54" width="56" height="56"/><rect class="f-p" x="326" y="60" width="56" height="56"/><rect class="ax" x="326" y="60" width="56" height="56"/><rect class="f-p" x="320" y="66" width="56" height="56"/><rect class="ax" x="320" y="66" width="56" height="56"/><rect class="f-as" x="314" y="72" width="56" height="56"/><rect class="ax" x="314" y="72" width="56" height="56"/>
+                <text class="lg" x="366" y="150" text-anchor="middle">16 maps</text>
+                <text x="366" y="166" text-anchor="middle" class="sm">= 16 input channels</text>
+                <text x="366" y="181" text-anchor="middle" class="sm">of the next layer</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 16.2</b> One kernel always spans all input channels and gives one
+            feature map. The number of kernels, not the number of input channels, sets how many maps come
+            out. So <code>nn.Conv2d(3, 16, 3)</code> holds 16 kernels of shape 3×3×3.</figcaption>
+          </figure>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> Parameter sharing</div>
-            <p>The crucial trick: the <em>same</em> kernel weights are reused at every position in the
-            image. This single choice buys two things at once. It gives <strong>translation
-            invariance</strong> — a pattern the kernel learned to detect in one corner is automatically
-            detected anywhere else, since it's the same weights doing the checking. And it slashes the
-            parameter count: a 3×3 kernel over 3 input channels producing 64 output feature maps needs
-            <span style="white-space:nowrap">$3\times3\times3\times64 = 1{,}728$</span> weights —
-            regardless of whether the image is 32×32 or 3200×3200. Compare that to the 150-million-weight
-            fully-connected layer from the start of this section: convolution is doing more useful work with four orders
-            of magnitude fewer numbers.</p>
+            <p>The key trick: the <em>same</em> kernel weights are used at every position in the image.
+            This one choice gives two things.</p>
+            <p>First, <strong>translation equivariance</strong>. Shift the input image, and the feature
+            map shifts by the same amount; its values do not change. A pattern the kernel learned in one
+            corner is found anywhere else, because the same weights do the checking. (Equivariance means
+            “the output moves with the input.” <strong>Invariance</strong> means “the output does not
+            change at all.” Convolution gives equivariance. Pooling, in the next section, adds a small
+            amount of invariance.)</p>
+            <p>Second, far fewer parameters. A 3×3 kernel over 3 input channels, with 64 output feature
+            maps, needs $3\times3\times3\times64 = 1{,}728$ weights. That is true whether the image is
+            32×32 or 3200×3200. The fully-connected layer at the start of this lesson needed over 150
+            million weights. That is about 87,000 times more, or roughly five orders of magnitude.</p>
           </div>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
-          <p class="codecap">nn.Conv2d and the shape formula in action</p>
+          <p class="codecap">nn.Conv2d, the shape formula, and the sum by hand</p>
           <pre><code class="language-python">import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
+torch.manual_seed(0)
 # batch of 8 RGB images, 32x32 pixels: shape (batch, channels, height, width)
 x = torch.randn(8, 3, 32, 32)
 
@@ -216,29 +324,36 @@ conv = nn.Conv2d(in_channels=3, out_channels=16, kernel_size=3, stride=1, paddin
 y = conv(x)
 print(y.shape)  # torch.Size([8, 16, 32, 32])
 # height/width: floor((32 - 3 + 2*1)/1) + 1 = 32  -> "same" padding, confirmed
-# channels: 16, one feature map per learned filter
+# channels: 16, one feature map per learned kernel
 
 print(conv.weight.shape)  # torch.Size([16, 3, 3, 3]) -> (out_ch, in_ch, K, K)
 print(sum(p.numel() for p in conv.parameters()))  # 16*3*3*3 + 16 bias = 448
+
+# the triple sum y[i,j] = sum_c sum_u sum_v w[c,u,v] * x[c, i+u, j+v] + b, by hand
+with torch.no_grad():
+    xp = F.pad(x[0], (1, 1, 1, 1))              # image 0, padded with P = 1
+    i, j = 5, 7                                 # any output position (S = 1)
+    by_hand = (conv.weight[0] * xp[:, i:i+3, j:j+3]).sum() + conv.bias[0]
+    print(torch.allclose(by_hand, y[0, 0, i, j]))  # True
 
 # a downsampling conv: stride 2, no padding
 down = nn.Conv2d(3, 16, kernel_size=3, stride=2, padding=0)
 print(down(x).shape)  # torch.Size([8, 16, 15, 15])
 # floor((32 - 3 + 0)/2) + 1 = floor(29/2) + 1 = 14 + 1 = 15</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">An input feature map is 28×28. You apply a convolution with kernel size 5, stride 1, and padding 2. What is the output size, and how many weights does one such filter have if the input has 8 channels?</span>
+                <span class="check__q">An input feature map is 28×28 with 8 channels. You apply a convolution with kernel size 5, stride 1, padding 2, and 32 output channels. Predict the output shape and the number of weights (without biases).</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>Output size: <code>floor((28 − 5 + 2·2)/1) + 1 = floor(27/1) + 1 = 27 + 1 = 28</code> —
-                padding of 2 with a 5-wide kernel again gives "same" padding, so the output stays 28×28.
-                One filter spanning 8 input channels has <code>5 × 5 × 8 = 200</code> weights (plus 1
-                bias), no matter how large the 28×28 map is — that independence from spatial size is the
-                whole point of parameter sharing.</p>
+                <p>Output size: $\lfloor (28 - 5 + 4)/1 \rfloor + 1 = 28$. Padding 2 with a 5-wide kernel
+                is again “same” padding, so the output is 32 maps of 28×28. Each kernel spans all 8
+                input channels, so it has $5 \times 5 \times 8 = 200$ weights. There are 32 kernels, so
+                the layer has $200 \times 32 = 6{,}400$ weights (plus 32 biases). This number does not
+                depend on the 28×28 size: that is parameter sharing.</p>
               </div>
             </details>
           </div>
@@ -247,32 +362,34 @@ print(down(x).shape)  # torch.Size([8, 16, 15, 15])
           <h2><span class="h-num">3</span>Pooling: shrinking on purpose</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>After a few convolutions you often want to shrink the feature maps deliberately — fewer
-          numbers to carry forward, and a little tolerance for the exact pattern shifting by a pixel or
-          two. <strong>Pooling</strong> does this with no learned weights at all: it slides a small
-          window over the input and, at each position, keeps just one summary number.</p>
+          <p>After a few convolutions, you often want to make the feature maps smaller on purpose. There
+          are fewer numbers to carry forward. The network also gets a little tolerance when a pattern
+          moves by a pixel or two. <strong>Pooling</strong> does this with no learned weights. It slides
+          a small window over the input and keeps one summary number at each position.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>Think of a company town-hall: instead of forwarding every employee's individual comment
-            up the chain, each team submits a single summary. <strong>Max pooling</strong> is a team
-            forwarding its loudest, strongest opinion (the maximum value in the window) — great for
-            asking “did this pattern show up anywhere in this neighbourhood?” <strong>Average
-            pooling</strong> is a team forwarding its average sentiment (the mean of the window) — a
-            smoother, less spiky summary.</p>
+            <p>Think of a weather report for a country. The report does not list the temperature of
+            every street. It gives one number per region. <strong>Max pooling</strong> reports the
+            highest temperature in each region. It answers “did it get hot anywhere in this region?”
+            <strong>Average pooling</strong> reports the regional mean. It is a smoother summary. In
+            both cases, a heat spot that moves a little inside its region gives the same report.</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>Pooling uses the exact same sliding mechanics as convolution — and the exact same output-size
-          formula from earlier — but with kernel size <b>K</b> and stride <b>S</b> usually set equal
-          (so windows don't overlap), and no weights: the operation itself, not learned numbers, decides
-          the output.</p>
+          <p>Pooling uses the same sliding window as convolution, so the same output-size formula
+          applies. Usually the kernel size $K$ and the stride $S$ are equal, so the windows do not
+          overlap. There are no weights. For max pooling, the output at $(i, j)$ in each channel $c$
+          is:</p>
+          $$ y[c, i, j] = \max_{0 \le u, v < K} x[c,\, iS{+}u,\, jS{+}v] $$
           $$ \text{out} = \left\lfloor \frac{W - K + 2P}{S} \right\rfloor + 1 $$
-          <p class="gloss"><b>In words:</b> same formula as convolution's output size, because pooling
-          is structurally the same sliding-window operation — only the thing computed inside each window
-          (max, or mean) differs.</p>
+          <p class="gloss"><b>In words:</b> the same sliding window as the convolution sum, but the
+          window takes the largest value instead of a weighted sum. Each channel is pooled on its
+          own, so the number of channels does not change. Average pooling replaces the max with the
+          mean of the $K^2$ values.</p>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">2×2 max pooling halves height and width</p>
           <pre><code class="language-python">import torch
 import torch.nn as nn
 
@@ -283,21 +400,20 @@ y = pool(x)
 print(y.shape)  # torch.Size([8, 16, 16, 16])
 # floor((32 - 2 + 0)/2) + 1 = 15 + 1 = 16, applied to height and width</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">Why does 2×2 max pooling with stride 2 give a small amount of tolerance to the input shifting by one pixel, while a plain matrix multiply wouldn't?</span>
+                <span class="check__q">A 2×2 max pool with stride 2 sees a strong activation at column 0 of a window. The feature map shifts one pixel to the right. Does the pooled output stay the same? What if the activation was at column 1?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>Inside each 2×2 window, max pooling only cares which value is largest, not exactly
-                where it sits within that window. So if the whole feature map shifts by a pixel, a strong
-                activation that used to be, say, top-left of its window is now top-right of the same
-                window — and max pooling still reports the same maximum. A fully-connected or purely
-                positional operation has no such slack: every input slot maps to a fixed, distinct
-                weight, so a one-pixel shift changes which weights get multiplied by what, and the output
-                changes too.</p>
+                <p>At column 0, the shift moves the activation to column 1, which is still inside the
+                same window (columns 0–1). The window reports the same maximum, so the output often stays
+                the same. At column 1, the shift moves it to column 2, which is in the <em>next</em>
+                window. Now the output changes. So max pooling gives tolerance to some one-pixel shifts,
+                not to all of them. The invariance is partial. A fully-connected layer has no such
+                tolerance at all: any shift changes which weights multiply which values.</p>
               </div>
             </details>
           </div>
@@ -306,53 +422,88 @@ print(y.shape)  # torch.Size([8, 16, 16, 16])
           <h2><span class="h-num">4</span>ResNets and skip connections</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>Once researchers had convolutions, the obvious next move was to stack more of them — deeper
-          networks should be strictly more powerful, since a deep network can always just copy the input
-          through unchanged if extra layers aren't helping. But in practice, plain stacks of convolutions
-          got <em>harder</em> to train past a certain depth, and not because of overfitting — even
-          <em>training</em> accuracy got worse. The culprit is the same one from
-          <a href="01-linear-algebra.html">Section 1</a>'s eigenvalue discussion and
-          <a href="12-training-dynamics.html">Section 12</a>: gradients have to flow backward through
-          every layer, and if each layer shrinks the gradient a little, dozens of layers shrink it to
-          essentially zero — the <strong>vanishing gradient</strong> problem. Early layers stop learning
-          because barely any error signal reaches them.</p>
+          <p>With convolutions in hand, the next idea was to stack many more of them. A deeper network
+          should never be worse: its extra layers could copy the input through unchanged if they did
+          not help. But in practice, plain stacks of convolutions became <em>harder</em> to train past a
+          certain depth. This was not overfitting. Even the <em>training</em> accuracy got worse. He et
+          al. (2015), who introduced ResNets, called this the <strong>degradation problem</strong>.</p>
+          <p>What caused it? Their networks used batch normalization, which keeps gradients at a
+          healthy size. So the authors argued that vanishing gradients (<a
+          href="12-training-dynamics.html">Section 12</a>) were probably not the main cause. The
+          problem was optimization. A stack of plain layers finds it hard to learn even the identity
+          function (“output = input”). So the extra layers could not learn to “do nothing”, and they
+          made things worse instead.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>Picture a long road with a set of traffic lights at every block. If each light only lets
-            80% of cars through, by block 50 almost no car from the start of the road has made it to the
-            end — not because the road is broken, just because the effect compounds. Now add an express
-            lane that runs alongside the whole road, letting some traffic skip every light entirely and
-            arrive untouched. Even if the light-by-light lane is badly congested, the express lane
-            guarantees traffic still gets through. A skip connection is that express lane, for
-            gradients.</p>
+            <p>Imagine you edit a good essay with a team. The plain way: each editor must rewrite the
+            whole essay from memory. Even if an editor has nothing to add, they must reproduce every
+            sentence perfectly, and small errors pile up. The residual way: each editor gets the essay
+            and writes only <em>corrections</em> in the margin. An editor with nothing to add writes
+            nothing, and the essay passes on unchanged. A residual block works like the second editor:
+            it learns a correction $F(\mathbf{x})$ that is added to the input.</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>A plain layer computes some function of its input, <b>F(x)</b>, and passes only that
-          forward. A <strong>residual block</strong> instead computes:</p>
-          $$ y = x + F(x) $$
-          <p class="gloss"><b>In words:</b> <b>F(x)</b> (a couple of convolutions) still gets computed
-          and still gets used, but it's <em>added to</em> the original input <b>x</b> rather than
-          replacing it. If <b>F</b> learns nothing useful, <b>F(x) ≈ 0</b> and the block simply passes
-          <b>x</b> through untouched — the identity is always available as a fallback, which is exactly
-          the “deeper should never hurt” property plain stacks failed to get in practice.</p>
+          <p>A plain layer computes some function of its input, $F(\mathbf{x})$, and passes only that
+          forward. A <strong>residual block</strong> computes:</p>
+          $$ \mathbf{y} = \mathbf{x} + F(\mathbf{x}) $$
+          <p class="gloss"><b>In words:</b> $F(\mathbf{x})$ (usually two convolutions) is still
+          computed and used. But it is <em>added to</em> the input $\mathbf{x}$ instead of replacing it.
+          To “do nothing”, the block only needs $F(\mathbf{x}) \approx 0$. That is easy: set the weights
+          near zero. A plain layer would have to learn the identity map exactly, which is much harder.</p>
 
-          <p>Here's why this fixes the gradient problem. During backpropagation (see
-          <a href="12-training-dynamics.html">Section 12</a>) we need the derivative of the output
-          <b>y</b> with respect to the input <b>x</b>, by the chain rule:</p>
-          $$ \frac{\partial y}{\partial x} = \frac{\partial x}{\partial x} + \frac{\partial F(x)}{\partial x} = I + \frac{\partial F}{\partial x} $$
-          <p class="gloss"><b>In words:</b> the gradient splits into two paths, added together: an
-          <b>identity</b> path (<b>I</b>, exactly 1 — the derivative of <b>x</b> with respect to itself)
-          and whatever the convolutions inside <b>F</b> contribute. Stack many residual blocks and the
-          gradient through the whole stack is a product of terms that each look like
-          <span style="white-space:nowrap">$(I + \partial F/\partial x)$</span>. Even if every
-          <span style="white-space:nowrap">$\partial F/\partial x$</span> is tiny or poorly scaled, the
-          “<b>1 +</b>” guarantees each factor stays close to 1 instead of collapsing toward 0 — so the
-          gradient signal reaches early layers largely intact. This is the same shrink-or-explode story
-          as repeated matrix multiplication in <a href="01-linear-algebra.html">Section 1</a>'s
-          eigenvalue example and the recurrent networks in <a href="17-sequence-models.html">Section
-          17</a>; the skip connection is a structural fix rather than a tuning fix.</p>
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 440 170" role="img" aria-labelledby="fig-cnn-3-t">
+                <title id="fig-cnn-3-t">A residual block: x goes through conv, ReLU, conv to give F of x, and a skip path carries x around them to a plus node; the sum goes through a ReLU to give y.</title>
+                <defs>
+                  <marker id="ah16c" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9" orient="auto"><path class="f-i" d="M0,0L10,5L0,10z"/></marker>
+                  <marker id="ah16d" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9" orient="auto"><path class="f-g" d="M0,0L10,5L0,10z"/></marker>
+                </defs>
+                <text x="12" y="115" class="m" text-anchor="middle">x</text>
+                <path class="ln s-i thin" d="M20,110H38" marker-end="url(#ah16c)"/>
+                <rect class="f-vs" x="40" y="92" width="60" height="36" rx="6"/>
+                <text class="lg" x="70" y="114" text-anchor="middle">conv</text>
+                <path class="ln s-i thin" d="M100,110H114" marker-end="url(#ah16c)"/>
+                <rect class="f-k" x="116" y="92" width="50" height="36" rx="6"/>
+                <text class="lg" x="141" y="114" text-anchor="middle">ReLU</text>
+                <path class="ln s-i thin" d="M166,110H180" marker-end="url(#ah16c)"/>
+                <rect class="f-vs" x="182" y="92" width="60" height="36" rx="6"/>
+                <text class="lg" x="212" y="114" text-anchor="middle">conv</text>
+                <path class="ln s-i thin" d="M242,110H278" marker-end="url(#ah16c)"/>
+                <text x="260" y="102" class="sm" text-anchor="middle">F(x)</text>
+                <circle class="f-p" cx="292" cy="110" r="13"/><circle class="ln s-i thin" cx="292" cy="110" r="13"/>
+                <text x="292" y="115" text-anchor="middle" class="lg b">+</text>
+                <path class="ln s-g" d="M28,110V40H292V93" marker-end="url(#ah16d)"/>
+                <text x="160" y="32" text-anchor="middle" class="tg lg">skip path: x passes unchanged</text>
+                <path class="ln s-i thin" d="M305,110H322" marker-end="url(#ah16c)"/>
+                <rect class="f-k" x="324" y="92" width="50" height="36" rx="6"/>
+                <text class="lg" x="349" y="114" text-anchor="middle">ReLU</text>
+                <path class="ln s-i thin" d="M374,110H396" marker-end="url(#ah16c)"/>
+                <text x="408" y="115" class="m" text-anchor="middle">y</text>
+                <text x="141" y="152" text-anchor="middle" class="sm">branch F learns a correction</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 16.3</b> The residual block in the code below. The green skip path
+            carries $\mathbf{x}$ around the two convolutions and adds it back. In the backward pass,
+            the gradient can flow along this path without passing through any weights.</figcaption>
+          </figure>
+
+          <p>The skip path also helps the backward pass. By the chain rule (<a
+          href="10-backprop.html">Section 10</a>), the derivative of the output with respect to the
+          input is:</p>
+          $$ \frac{\partial \mathbf{y}}{\partial \mathbf{x}} = \frac{\partial \mathbf{x}}{\partial \mathbf{x}} + \frac{\partial F(\mathbf{x})}{\partial \mathbf{x}} = I + \frac{\partial F}{\partial \mathbf{x}} $$
+          <p class="gloss"><b>In words:</b> the gradient splits into two paths that add up. One is the
+          <b>identity</b> path ($I$, the identity matrix: the derivative of $\mathbf{x}$ with respect to
+          itself). The other is whatever the convolutions inside $F$ contribute. Stack many residual
+          blocks, and the gradient through the stack is a product of factors like
+          $(I + \partial F/\partial \mathbf{x})$. Even if every $\partial F/\partial \mathbf{x}$ is
+          tiny, each factor stays close to $I$ instead of shrinking toward zero. So the gradient reaches
+          the early layers largely intact. This is the same shrink-or-explode story as the repeated
+          matrix products in <a href="01-linear-algebra.html">Section 1</a> and the recurrent networks
+          in <a href="17-sequence-models.html">Section 17</a>. The skip connection fixes it through the
+          structure of the network, not through careful tuning.</p>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
           <p class="codecap">a minimal residual block</p>
@@ -368,29 +519,35 @@ class ResidualBlock(nn.Module):
 
     def forward(self, x):
         out = self.relu(self.conv1(x))
-        out = self.conv2(out)
-        return self.relu(x + out)   # the skip connection: x + F(x)
+        out = self.conv2(out)          # out is F(x)
+        return self.relu(x + out)      # skip connection, then ReLU: ReLU(x + F(x))
 
 block = ResidualBlock(channels=16)
 x = torch.randn(8, 16, 32, 32)
 y = block(x)
 print(y.shape)  # torch.Size([8, 16, 32, 32]) -> padding=1, kernel=3 keeps size unchanged</code></pre>
+          <p class="gloss"><b>In words:</b> this is the original 2015 ResNet block. It applies a ReLU
+          <em>after</em> the addition, so it computes $\text{ReLU}(\mathbf{x} + F(\mathbf{x}))$, not
+          exactly $\mathbf{x} + F(\mathbf{x})$. A later version (He et al., 2016, “pre-activation”
+          ResNets) moves the ReLUs inside $F$ and drops the last one. Then the skip path is a pure
+          identity.</p>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">In a residual block y = x + F(x), suppose training has driven F's weights to nearly zero everywhere (the block hasn't found anything useful to add yet). What does the block output, and what is the gradient flowing back through it?</span>
+                <span class="check__q">In the block above, training has pushed F's weights and biases to nearly zero. What does the block output for an input value of 2.0? For −2.0? What is the gradient through the skip path?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>The output is <code>y ≈ x + 0 = x</code>: the block behaves like an identity function,
-                passing its input through essentially unchanged — harmless, not broken. The gradient is
-                <code>∂y/∂x = I + ∂F/∂x ≈ I</code>: with F contributing almost nothing, the gradient
-                passes through at essentially full strength (multiplied by 1), rather than being crushed
-                by whatever a plain (non-residual) layer would have done. This is exactly why very deep
-                ResNets can train at all: untrained or unhelpful blocks default to "do nothing" instead of
-                "actively destroy the signal."</p>
+                <p>With $F(\mathbf{x}) \approx 0$, the block outputs $\text{ReLU}(\mathbf{x})$. So 2.0
+                comes out as 2.0: the block passes it through unchanged. But −2.0 comes out as 0, because
+                of the final ReLU. The block is an exact identity only for values that are not negative.
+                (The pre-activation version, with no ReLU after the add, is an identity for every
+                value.) Through the addition itself, the gradient is $I + \partial F/\partial \mathbf{x}
+                \approx I$. Where the final ReLU is active, the gradient passes at full strength. This is
+                why very deep ResNets train. A block that has not learned anything useful yet mostly
+                passes its input on. It does not damage the signal.</p>
               </div>
             </details>
           </div>
@@ -399,14 +556,15 @@ print(y.shape)  # torch.Size([8, 16, 32, 32]) -> padding=1, kernel=3 keeps size 
 
           <h2><span class="h-num">5</span>What to carry forward</h2>
           <ul>
-            <li>Fully-connected layers give images too many parameters and no reuse of learned patterns across positions; convolution fixes both.</li>
-            <li>A <strong>convolution</strong> slides a small kernel over the input, computing a dot product at each position; output size follows <span style="white-space:nowrap">$\lfloor (W-K+2P)/S \rfloor + 1$</span> — derive it, don't memorize it.</li>
-            <li><strong>Parameter sharing</strong> (the same kernel reused everywhere) gives translation invariance and cuts parameter counts by orders of magnitude versus a fully-connected layer.</li>
-            <li><strong>Pooling</strong> downsamples with no learned weights, using the same sliding-window formula, and adds a little shift tolerance.</li>
-            <li><strong>Skip connections</strong> (<span style="white-space:nowrap">$y = x + F(x)$</span>) keep gradients flowing in very deep networks because the identity path contributes a "+1" that a shrinking <span style="white-space:nowrap">$\partial F/\partial x$</span> can't cancel out.</li>
+            <li>Fully-connected layers give images too many parameters and no reuse of patterns across positions. Convolution fixes both.</li>
+            <li>A <strong>convolution</strong> slides a small kernel over the input and computes a dot product (summed over all input channels) at each position. The output size is $\lfloor (W-K+2P)/S \rfloor + 1$. Derive it; do not memorize it.</li>
+            <li><strong>Parameter sharing</strong> (the same kernel used everywhere) gives translation <em>equivariance</em> and cuts the parameter count by orders of magnitude compared with a fully-connected layer.</li>
+            <li><strong>Pooling</strong> shrinks feature maps with no learned weights, uses the same sliding-window formula, and adds a little shift <em>invariance</em>.</li>
+            <li><strong>Skip connections</strong> ($\mathbf{y} = \mathbf{x} + F(\mathbf{x})$) make “do nothing” easy to learn and give gradients an identity path, so very deep networks train.</li>
           </ul>
-          <p>Convolutions assume a grid with local structure — great for images, but text and audio have a
-          different structure: order along a single sequence. Next we'll see how networks handle that.</p>
+          <p>Convolutions assume a grid with local structure. That is great for images. Text and audio
+          have a different structure: order along a single sequence. Next we will see how networks
+          handle that.</p>
 
           <div class="complete-bar" data-complete>
             <span class="complete-bar__text">Finished this section? Mark it done to fill your progress bar.</span>

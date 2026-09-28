@@ -38,56 +38,65 @@
         <header class="lesson-head">
           <p class="lesson-eyebrow">Part 2 · Classical ML <span class="dot"></span> Section 6</p>
           <h1 class="lesson-title">Logistic Regression</h1>
-          <p class="lesson-standfirst">One S-shaped curve turns a raw number into a probability, and one loss function turns wrong probabilities into a clean, learnable signal.</p>
+          <p class="lesson-standfirst">One S-shaped curve turns a raw number into a probability. One loss function turns wrong probabilities into a clear, learnable signal.</p>
           <div class="lesson-meta">
-            <span><b>24 min</b> read</span>
-            <span><b>You'll learn:</b> sigmoid · probabilities · decision boundaries · binary cross-entropy</span>
+            <span><b>36 min</b> read</span>
+          </div>
+          <div class="objectives">
+            <div class="objectives__label">You'll learn</div>
+            <ul>
+              <li>sigmoid</li>
+              <li>probabilities</li>
+              <li>decision boundaries</li>
+              <li>binary cross-entropy</li>
+            </ul>
           </div>
         </header>
 
         <div class="prose">
           <p class="lead">Linear regression predicts a number: a price, a temperature, a score.
-          Plenty of real questions instead want a category: spam or not spam, will this patient
-          relapse or not, does this photo contain a cat. Logistic regression takes almost the exact
-          same machinery as linear regression and bends it, with one extra ingredient, into a
+          Many real questions want a category instead. Is this email spam? Will this patient get
+          sick again? Does this photo contain a cat? Logistic regression uses almost the same
+          machinery as linear regression. It adds one extra part that turns the output into a
           probability.</p>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> The one idea to hold onto</div>
-            <p>Compute a plain linear score, same as linear regression. Then squash that score
-            through a curve that only ever outputs numbers between 0 and 1, so it can be read as
-            "probability of class 1." Everything else in this section is either building that curve
-            or building the loss that teaches it.</p>
+            <p>Compute a plain linear score, as in linear regression. Then pass that score through a
+            curve whose output is always between 0 and 1, so you can read it as “probability of
+            class 1”. The rest of this section builds that curve and the loss that trains it.</p>
           </div>
 
           <!-- ===================== CLASSIFICATION VS REGRESSION ===================== -->
           <h2><span class="h-num">1</span>Classification vs. regression</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p><strong>Regression</strong> predicts a continuous number — anything on a sliding scale.
-          <strong>Classification</strong> predicts which of a fixed set of categories something
-          belongs to. The output isn't "how much," it's "which one."</p>
+          <p><strong>Regression</strong> predicts a continuous number, anywhere on a scale.
+          <strong>Classification</strong> predicts which category, from a fixed set, an example
+          belongs to. The output is not “how much” but “which one”.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>A weather forecast does both jobs side by side. "Tomorrow's high will be 22°C" is
-            regression — a number on a continuous scale, and being off by half a degree is a small
-            mistake. "Will it rain tomorrow: yes or no" is classification — there is no
-            "half a rain," just one of two buckets, and the model's job is to say which bucket is
-            more likely.</p>
+            <p>A weather forecast does both jobs. “Tomorrow’s high will be 22 °C” is regression: a
+            number on a continuous scale, and missing by half a degree is a small mistake. “Will it
+            rain tomorrow, yes or no?” is classification. There is no “half a rain”. There are two
+            categories, and the model says which one is more likely.</p>
           </div>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">Is "will this email be marked as spam?" a regression or a classification problem, and why?</span>
+                <span class="check__q">You want to predict how many stars (1 to 5) a customer will give a product. Is this regression or classification?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>Classification — the answer is one of two discrete categories (spam / not spam),
-                not a number on a continuous scale. Logistic regression is built exactly for this
-                two-category ("binary") case.</p>
+                <p>It can be either, and the choice matters. As classification, the model treats
+                the five ratings as unrelated categories, so predicting 4 when the truth is 5 is as
+                wrong as predicting 1. As regression, the model knows that 4 is close to 5, but it
+                may predict values like 3.7 that no customer can give. Many people choose
+                regression here and round the result. This shows that the problem does not decide
+                the type alone. How you score mistakes decides it.</p>
               </div>
             </details>
           </div>
@@ -96,37 +105,50 @@
           <h2><span class="h-num">2</span>The sigmoid: turning any number into a probability</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>A linear score $wx+b$ can be any real number — huge, tiny, negative, whatever the data
-          demands. But a probability has to live strictly between 0 and 1. The <strong>sigmoid
-          function</strong> is a squashing curve that takes any real number in and always returns a
-          number in that range, so we can hand it a raw linear score and get back something we're
-          allowed to call "probability."</p>
+          <p>A linear score $wx+b$ can be any real number: huge, tiny, or negative. A probability
+          must be between 0 and 1. The <strong>sigmoid function</strong> is an S-shaped curve. It
+          takes any real number and returns a number between 0 and 1. So we can give it a raw
+          linear score and get back something we may call a probability.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>Think of it as a dimmer switch built to never quite reach fully off or fully on — the
-            light can get extremely dim or extremely bright, but it always stays a real, positive
-            amount of light. Or picture a student's chance of passing an exam as study hours climb:
-            near zero hours, the chance sits near 0%; past some point, a few extra hours barely move
-            the needle because it's already close to 100%. The chance rises in a smooth S-shape, never
-            quite touching 0% or 100%.</p>
+            <p>Think about a student’s chance of passing an exam as their study hours grow. With
+            almost no study, the chance is near 0%. In the middle range, each extra hour helps a
+            lot. After many hours, the chance is already close to 100%, so a few more hours change
+            it very little. The chance rises in a smooth S-shape and never quite reaches 0% or 100%.
+            Hours play the role of the score $z$, and the chance plays the role of $\sigma(z)$.</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>Given any real number $z$ (called the <dfn>logit</dfn>), the sigmoid is:</p>
+          <p>For any real number $z$, the sigmoid is:</p>
           $$ \sigma(z) = \frac{1}{1+e^{-z}} $$
-          <p class="gloss"><b>In words:</b> $e^{-z}$ shrinks toward 0 as $z$ grows large and blows up
-          toward infinity as $z$ becomes very negative. So the whole fraction crawls toward
-          $1/(1+0)=1$ for large positive $z$, and toward $1/(1+\infty)\approx 0$ for very negative $z$
-          — exactly the squashing behavior we wanted.</p>
+          <p class="gloss"><b>In words:</b> $e^{-z}$ shrinks toward 0 as $z$ grows. It grows
+          toward infinity as $z$ becomes very negative. So the fraction moves toward
+          $1/(1+0)=1$ for large positive $z$, and toward 0 for very negative $z$. That is the
+          squashing we wanted.</p>
 
-          <p>Two properties worth deriving, because we'll lean on both later. First, the midpoint:</p>
+          <p>The input $z$ is called the <dfn>logit</dfn>. The name comes from the inverse of the
+          sigmoid. Solve $p = \sigma(z)$ for $z$:</p>
+          $$
+          \begin{aligned}
+          p\,(1+e^{-z}) &= 1 \\
+          e^{-z} &= \frac{1-p}{p} \\
+          z &= \log\frac{p}{1-p}
+          \end{aligned}
+          $$
+          <p class="gloss"><b>In words:</b> $p/(1-p)$ is the <dfn>odds</dfn>: the probability that
+          something happens divided by the probability that it does not. So the logit is the
+          <em>log-odds</em>. A logit of 0 means odds of 1 to 1. Each step of +1 in the logit
+          multiplies the odds by $e \approx 2.7$.</p>
+
+          <p>We will need two more properties later. First, the midpoint:</p>
           $$ \sigma(0) = \frac{1}{1+e^{0}} = \frac{1}{1+1} = \frac12 $$
-          <p class="gloss"><b>In words:</b> a logit of exactly zero maps to a probability of exactly
-          one-half — total uncertainty, the tipping point of the curve.</p>
+          <p class="gloss"><b>In words:</b> a logit of zero gives a probability of one-half. Both
+          classes are equally likely.</p>
 
-          <p>Second, the sigmoid's derivative — needed later to derive the cross-entropy gradient.
-          Rewrite $\sigma(z)=(1+e^{-z})^{-1}$ and apply the chain rule:</p>
+          <p>Second, the sigmoid’s derivative. We need it for the gradient of the loss. Write
+          $\sigma(z)=(1+e^{-z})^{-1}$ and apply the chain rule
+          (<a href="02-calculus.html">Section 2</a>):</p>
           $$
           \begin{aligned}
           \frac{d\sigma}{dz} &= -(1+e^{-z})^{-2}\cdot(-e^{-z}) \\
@@ -135,29 +157,60 @@
           &= \sigma(z)\big(1-\sigma(z)\big)
           \end{aligned}
           $$
-          <p class="gloss"><b>In words:</b> the last line uses the fact that
-          $1-\sigma(z) = \tfrac{e^{-z}}{1+e^{-z}}$ (subtract the fraction from 1 and simplify). So the
-          slope of the sigmoid at any point is just $\sigma(z)$ times $(1-\sigma(z))$ — a tidy
-          self-referential formula that's largest at $z=0$ (where the curve is steepest) and shrinks
-          toward 0 at either extreme (where the curve is nearly flat).</p>
+          <p class="gloss"><b>In words:</b> the last line uses
+          $1-\sigma(z) = \tfrac{e^{-z}}{1+e^{-z}}$ (subtract the fraction from 1 and simplify). So
+          the slope of the sigmoid is $\sigma(z)$ times $1-\sigma(z)$. Both factors are positive, so
+          the slope is always greater than 0. The slope is largest at $z=0$, where it equals
+          $0.25$. It shrinks toward 0 at both ends, where the curve is almost flat.</p>
+
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 520 230" role="img" aria-labelledby="fig-06-1-t">
+                <title id="fig-06-1-t">The S-shaped sigmoid curve from 0 to 1 and its bell-shaped slope curve, which peaks at 0.25 at z equals 0</title>
+                <line class="ax" x1="60" y1="200" x2="480" y2="200"/><line class="ax" x1="270" y1="205" x2="270" y2="25"/>
+                <text class="sm" x="60.0" y="216" text-anchor="middle">-6</text>
+                <text class="sm" x="130.0" y="216" text-anchor="middle">-4</text>
+                <text class="sm" x="200.0" y="216" text-anchor="middle">-2</text>
+                <text class="sm" x="270.0" y="216" text-anchor="middle">0</text>
+                <text class="sm" x="340.0" y="216" text-anchor="middle">2</text>
+                <text class="sm" x="410.0" y="216" text-anchor="middle">4</text>
+                <text class="sm" x="480.0" y="216" text-anchor="middle">6</text>
+                <line class="grid" x1="60" x2="480" y1="157.5" y2="157.5"/><text class="sm" x="54" y="161.5" text-anchor="end">0.25</text>
+                <line class="grid" x1="60" x2="480" y1="115.0" y2="115.0"/><text class="sm" x="54" y="119.0" text-anchor="end">0.5</text>
+                <line class="grid" x1="60" x2="480" y1="30.0" y2="30.0"/><text class="sm" x="54" y="34.0" text-anchor="end">1</text>
+                <path class="ln s-v" d="M60.0,199.6 L64.4,199.5 L68.8,199.5 L73.1,199.4 L77.5,199.3 L81.9,199.2 L86.2,199.1 L90.6,199.0 L95.0,198.9 L99.4,198.7 L103.8,198.5 L108.1,198.3 L112.5,198.1 L116.9,197.9 L121.2,197.6 L125.6,197.3 L130.0,196.9 L134.4,196.5 L138.8,196.1 L143.1,195.6 L147.5,195.0 L151.9,194.4 L156.2,193.7 L160.6,192.8 L165.0,191.9 L169.4,190.9 L173.8,189.8 L178.1,188.5 L182.5,187.1 L186.9,185.5 L191.2,183.8 L195.6,181.9 L200.0,179.7 L204.4,177.4 L208.8,174.8 L213.1,172.0 L217.5,169.0 L221.9,165.7 L226.2,162.1 L230.6,158.3 L235.0,154.3 L239.4,150.0 L243.8,145.5 L248.1,140.7 L252.5,135.8 L256.9,130.8 L261.2,125.6 L265.6,120.3 L270.0,115.0 L274.4,109.7 L278.8,104.4 L283.1,99.2 L287.5,94.2 L291.9,89.3 L296.2,84.5 L300.6,80.0 L305.0,75.7 L309.4,71.7 L313.8,67.9 L318.1,64.3 L322.5,61.0 L326.9,58.0 L331.2,55.2 L335.6,52.6 L340.0,50.3 L344.4,48.1 L348.8,46.2 L353.1,44.5 L357.5,42.9 L361.9,41.5 L366.2,40.2 L370.6,39.1 L375.0,38.1 L379.4,37.2 L383.8,36.3 L388.1,35.6 L392.5,35.0 L396.9,34.4 L401.2,33.9 L405.6,33.5 L410.0,33.1 L414.4,32.7 L418.8,32.4 L423.1,32.1 L427.5,31.9 L431.9,31.7 L436.2,31.5 L440.6,31.3 L445.0,31.1 L449.4,31.0 L453.8,30.9 L458.1,30.8 L462.5,30.7 L466.9,30.6 L471.2,30.5 L475.6,30.5 L480.0,30.4"/>
+                <path class="ln s-a dash" d="M60.0,199.6 L64.4,199.5 L68.8,199.5 L73.1,199.4 L77.5,199.3 L81.9,199.2 L86.2,199.1 L90.6,199.0 L95.0,198.9 L99.4,198.7 L103.8,198.6 L108.1,198.4 L112.5,198.2 L116.9,197.9 L121.2,197.6 L125.6,197.3 L130.0,197.0 L134.4,196.6 L138.8,196.2 L143.1,195.7 L147.5,195.2 L151.9,194.6 L156.2,193.9 L160.6,193.1 L165.0,192.3 L169.4,191.4 L173.8,190.4 L178.1,189.3 L182.5,188.1 L186.9,186.8 L191.2,185.3 L195.6,183.8 L200.0,182.2 L204.4,180.4 L208.8,178.6 L213.1,176.6 L217.5,174.6 L221.9,172.6 L226.2,170.6 L230.6,168.5 L235.0,166.6 L239.4,164.7 L243.8,163.0 L248.1,161.4 L252.5,160.0 L256.9,159.0 L261.2,158.2 L265.6,157.7 L270.0,157.5 L274.4,157.7 L278.8,158.2 L283.1,159.0 L287.5,160.0 L291.9,161.4 L296.2,163.0 L300.6,164.7 L305.0,166.6 L309.4,168.5 L313.8,170.6 L318.1,172.6 L322.5,174.6 L326.9,176.6 L331.2,178.6 L335.6,180.4 L340.0,182.2 L344.4,183.8 L348.8,185.3 L353.1,186.8 L357.5,188.1 L361.9,189.3 L366.2,190.4 L370.6,191.4 L375.0,192.3 L379.4,193.1 L383.8,193.9 L388.1,194.6 L392.5,195.2 L396.9,195.7 L401.2,196.2 L405.6,196.6 L410.0,197.0 L414.4,197.3 L418.8,197.6 L423.1,197.9 L427.5,198.2 L431.9,198.4 L436.2,198.6 L440.6,198.7 L445.0,198.9 L449.4,199.0 L453.8,199.1 L458.1,199.2 L462.5,199.3 L466.9,199.4 L471.2,199.5 L475.6,199.5 L480.0,199.6"/>
+                <circle class="f-v" cx="270.0" cy="115.0" r="4.5"/>
+                <text class="tv lg" x="350.5" y="30.5" text-anchor="end">σ(z)</text>
+                <text class="ta lg" x="326.0" y="161.5">σ′(z) = σ(z)(1 − σ(z))</text>
+                <text class="m" x="484" y="204">z</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 6.1</b> The sigmoid (violet) passes through 0.5 at $z=0$. Its
+            slope (amber, dashed) is largest there, at 0.25, and is almost zero when $|z|$ is
+            larger than about 5. Remember these flat regions: they cause the problem in the loss section below.</figcaption>
+          </figure>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">the sigmoid at three logits</p>
           <pre><code class="language-python">import torch
 
 z = torch.tensor([-5.0, 0.0, 5.0])
 print(torch.sigmoid(z))   # tensor([0.0067, 0.5000, 0.9933])</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">What is σ(0), and why does that make it the natural cutoff for the decision boundary?</span>
+                <span class="check__q">$\sigma(3) \approx 0.953$. Without a calculator, what is $\sigma(-3)$?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>σ(0) = 0.5 exactly. Since a probability of 0.5 is the point of maximum
-                uncertainty (equally likely to be either class), the logit value that produces it —
-                z = 0 — is the natural line between "lean toward class 1" and "lean toward class 0."</p>
+                <p>About $0.047$, because $\sigma(-z) = 1-\sigma(z)$ for every $z$. To see why,
+                multiply the top and bottom of $\sigma(-z) = \tfrac{1}{1+e^{z}}$ by $e^{-z}$. You
+                get $\tfrac{e^{-z}}{e^{-z}+1}$, which is the expression for $1-\sigma(z)$ from the
+                derivation above. The output above shows the same symmetry: 0.0067 and 0.9933 add
+                up to 1.</p>
               </div>
             </details>
           </div>
@@ -166,48 +219,122 @@ print(torch.sigmoid(z))   # tensor([0.0067, 0.5000, 0.9933])</code></pre>
           <h2><span class="h-num">3</span>From logit to probability to decision boundary</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>Logistic regression computes the same linear score as linear regression, then passes it
-          through the sigmoid. The point where the model flips from predicting "class 0" to
-          predicting "class 1" turns out to be a perfectly straight line (or flat plane, in higher
-          dimensions) — nothing curvy about where the decision itself is made.</p>
+          <p>Logistic regression computes the same linear score as linear regression, then passes
+          it through the sigmoid. At some places the model changes from predicting class 0 to
+          predicting class 1. Together these places form the <dfn>decision boundary</dfn>. For
+          logistic regression, the boundary is a straight line (or a flat plane in higher
+          dimensions). Nothing about it is curved.</p>
 
           <p class="beat beat--math">Now the math</p>
-          <p>The score, called the logit, is exactly linear regression's formula:</p>
+          <p>The logit is the linear-regression formula:</p>
           $$ z = \mathbf{w}^\top\mathbf{x} + b $$
-          <p>Pass it through the sigmoid to get a probability of belonging to class 1:</p>
+          <p>Pass it through the sigmoid to get the probability of class 1:</p>
           $$ p = \sigma(z) = \frac{1}{1+e^{-(\mathbf{w}^\top\mathbf{x}+b)}} $$
-          <p class="gloss"><b>In words:</b> $z$ can be any real number depending on $x$; $p$ is that
-          number squashed into a genuine probability between 0 and 1.</p>
+          <p class="gloss"><b>In words:</b> $z$ can be any real number, depending on
+          $\mathbf{x}$. $p$ is that number squashed into a probability between 0 and 1.</p>
 
-          <p>The prediction rule is: predict class 1 when $p\ge 0.5$. Because
-          $\sigma'(z)=\sigma(z)(1-\sigma(z))\ge 0$ everywhere, the sigmoid is non-decreasing —
-          it never turns downward — and we showed $\sigma(0)=\tfrac12$. Combining those two facts:</p>
-          $$ p \ge \tfrac12 \iff \sigma(z)\ge\sigma(0) \iff z\ge 0 \iff \mathbf{w}^\top\mathbf{x}+b\ge 0 $$
-          <p class="gloss"><b>In words:</b> because the sigmoid only ever goes up (or stays flat) as
-          $z$ increases, and it crosses exactly one-half at $z=0$, asking "is the probability at least
-          a half" is exactly the same question as "is the raw logit non-negative." The messy curved
-          probability threshold reduces to a simple straight-line threshold on the underlying score.</p>
+          <p>The prediction rule is: predict class 1 when $p\ge 0.5$. We showed that
+          $\sigma'(z)=\sigma(z)(1-\sigma(z)) &gt; 0$ everywhere. So the sigmoid is <em>strictly
+          increasing</em>: a larger $z$ always gives a larger $p$. We also showed
+          $\sigma(0)=\tfrac12$. Together:</p>
+          $$ p \ge \tfrac12 \iff \sigma(z)\ge\sigma(0) \iff z\ge 0 $$
+          <p class="gloss"><b>In words:</b> the sigmoid always goes up, and it passes one-half at
+          $z=0$. So these two questions always have the same answer: “is the probability at least one-half?” and “is the logit at least zero?” The curved probability test becomes a straight-line test on the
+          score.</p>
 
-          <p>The boundary itself — where the model is perfectly on the fence, $p$ exactly $0.5$ — is
-          the set of points where $\mathbf{w}^\top\mathbf{x}+b=0$. With two features $x_1,x_2$ this
-          rearranges into the equation of a straight line:</p>
-          $$ w_1x_1+w_2x_2+b=0 \;\;\Longrightarrow\;\; x_2 = -\frac{w_1}{w_2}x_1 - \frac{b}{w_2} $$
-          <p class="gloss"><b>In words:</b> that's just $y=mx+c$ in disguise, with slope
-          $-w_1/w_2$ and intercept $-b/w_2$. With three features it would be a flat plane instead of a
-          line; with more, a flat <em>hyperplane</em> — but always flat, never curved, no matter how
-          curved the probability surface around it looks.</p>
+          <p>The boundary is where $p = 0.5$ exactly, so it is the set of points where
+          $\mathbf{w}^\top\mathbf{x}+b=0$. With two features $x_1,x_2$, rearrange this into the
+          equation of a line:</p>
+          $$
+          \begin{aligned}
+          w_1x_1+w_2x_2+b &= 0 \\
+          x_2 &= -\frac{w_1}{w_2}x_1 - \frac{b}{w_2}
+          \end{aligned}
+          $$
+          <p class="gloss"><b>In words:</b> this is a line in the $(x_1, x_2)$ plane with slope
+          $-w_1/w_2$ and intercept $-b/w_2$ (assuming $w_2 \ne 0$). With three features the
+          boundary is a flat plane. With more, it is a flat <em>hyperplane</em>. It is always flat,
+          even though the probability changes along a curve as you cross it.</p>
 
-          <div class="check">
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 410 280" role="img" aria-labelledby="fig-06-2-t">
+                <title id="fig-06-2-t">Points of two classes in a plane, split by a straight boundary line, with dashed lines where the probability is 0.1 and 0.9</title>
+                <rect class="f-rs" x="60" y="10" width="240" height="240"/>
+                <path class="f-vs" d="M60.0,250.0 L61.2,250.0 L62.4,250.0 L63.6,250.0 L64.8,250.0 L66.0,250.0 L67.2,250.0 L68.4,250.0 L69.6,250.0 L70.9,250.0 L72.1,250.0 L73.3,250.0 L74.5,250.0 L75.7,250.0 L76.9,250.0 L78.1,250.0 L79.3,250.0 L80.5,250.0 L81.7,250.0 L82.9,250.0 L84.1,250.0 L85.3,250.0 L86.5,250.0 L87.7,250.0 L88.9,250.0 L90.2,250.0 L91.4,250.0 L92.6,250.0 L93.8,250.0 L95.0,250.0 L96.2,250.0 L97.4,250.0 L98.6,250.0 L99.8,250.0 L101.0,250.0 L102.2,250.0 L103.4,250.0 L104.6,250.0 L105.8,250.0 L107.0,250.0 L108.2,250.0 L109.4,250.0 L110.7,250.0 L111.9,250.0 L113.1,250.0 L114.3,250.0 L115.5,250.0 L116.7,250.0 L117.9,250.0 L119.1,250.0 L120.3,249.6 L121.5,248.0 L122.7,246.4 L123.9,244.8 L125.1,243.2 L126.3,241.6 L127.5,239.9 L128.7,238.3 L129.9,236.7 L131.2,235.1 L132.4,233.5 L133.6,231.9 L134.8,230.3 L136.0,228.7 L137.2,227.1 L138.4,225.5 L139.6,223.9 L140.8,222.3 L142.0,220.7 L143.2,219.0 L144.4,217.4 L145.6,215.8 L146.8,214.2 L148.0,212.6 L149.2,211.0 L150.5,209.4 L151.7,207.8 L152.9,206.2 L154.1,204.6 L155.3,203.0 L156.5,201.4 L157.7,199.7 L158.9,198.1 L160.1,196.5 L161.3,194.9 L162.5,193.3 L163.7,191.7 L164.9,190.1 L166.1,188.5 L167.3,186.9 L168.5,185.3 L169.7,183.7 L171.0,182.1 L172.2,180.5 L173.4,178.8 L174.6,177.2 L175.8,175.6 L177.0,174.0 L178.2,172.4 L179.4,170.8 L180.6,169.2 L181.8,167.6 L183.0,166.0 L184.2,164.4 L185.4,162.8 L186.6,161.2 L187.8,159.5 L189.0,157.9 L190.3,156.3 L191.5,154.7 L192.7,153.1 L193.9,151.5 L195.1,149.9 L196.3,148.3 L197.5,146.7 L198.7,145.1 L199.9,143.5 L201.1,141.9 L202.3,140.3 L203.5,138.6 L204.7,137.0 L205.9,135.4 L207.1,133.8 L208.3,132.2 L209.5,130.6 L210.8,129.0 L212.0,127.4 L213.2,125.8 L214.4,124.2 L215.6,122.6 L216.8,121.0 L218.0,119.3 L219.2,117.7 L220.4,116.1 L221.6,114.5 L222.8,112.9 L224.0,111.3 L225.2,109.7 L226.4,108.1 L227.6,106.5 L228.8,104.9 L230.1,103.3 L231.3,101.7 L232.5,100.1 L233.7,98.4 L234.9,96.8 L236.1,95.2 L237.3,93.6 L238.5,92.0 L239.7,90.4 L240.9,88.8 L242.1,87.2 L243.3,85.6 L244.5,84.0 L245.7,82.4 L246.9,80.8 L248.1,79.1 L249.3,77.5 L250.6,75.9 L251.8,74.3 L253.0,72.7 L254.2,71.1 L255.4,69.5 L256.6,67.9 L257.8,66.3 L259.0,64.7 L260.2,63.1 L261.4,61.5 L262.6,59.8 L263.8,58.2 L265.0,56.6 L266.2,55.0 L267.4,53.4 L268.6,51.8 L269.8,50.2 L271.1,48.6 L272.3,47.0 L273.5,45.4 L274.7,43.8 L275.9,42.2 L277.1,40.6 L278.3,38.9 L279.5,37.3 L280.7,35.7 L281.9,34.1 L283.1,32.5 L284.3,30.9 L285.5,29.3 L286.7,27.7 L287.9,26.1 L289.1,24.5 L290.4,22.9 L291.6,21.3 L292.8,19.6 L294.0,18.0 L295.2,16.4 L296.4,14.8 L297.6,13.2 L298.8,11.6 L300.0,10.0 L300.0,250.0 L298.8,250.0 L297.6,250.0 L296.4,250.0 L295.2,250.0 L294.0,250.0 L292.8,250.0 L291.6,250.0 L290.4,250.0 L289.1,250.0 L287.9,250.0 L286.7,250.0 L285.5,250.0 L284.3,250.0 L283.1,250.0 L281.9,250.0 L280.7,250.0 L279.5,250.0 L278.3,250.0 L277.1,250.0 L275.9,250.0 L274.7,250.0 L273.5,250.0 L272.3,250.0 L271.1,250.0 L269.8,250.0 L268.6,250.0 L267.4,250.0 L266.2,250.0 L265.0,250.0 L263.8,250.0 L262.6,250.0 L261.4,250.0 L260.2,250.0 L259.0,250.0 L257.8,250.0 L256.6,250.0 L255.4,250.0 L254.2,250.0 L253.0,250.0 L251.8,250.0 L250.6,250.0 L249.3,250.0 L248.1,250.0 L246.9,250.0 L245.7,250.0 L244.5,250.0 L243.3,250.0 L242.1,250.0 L240.9,250.0 L239.7,250.0 L238.5,250.0 L237.3,250.0 L236.1,250.0 L234.9,250.0 L233.7,250.0 L232.5,250.0 L231.3,250.0 L230.1,250.0 L228.8,250.0 L227.6,250.0 L226.4,250.0 L225.2,250.0 L224.0,250.0 L222.8,250.0 L221.6,250.0 L220.4,250.0 L219.2,250.0 L218.0,250.0 L216.8,250.0 L215.6,250.0 L214.4,250.0 L213.2,250.0 L212.0,250.0 L210.8,250.0 L209.5,250.0 L208.3,250.0 L207.1,250.0 L205.9,250.0 L204.7,250.0 L203.5,250.0 L202.3,250.0 L201.1,250.0 L199.9,250.0 L198.7,250.0 L197.5,250.0 L196.3,250.0 L195.1,250.0 L193.9,250.0 L192.7,250.0 L191.5,250.0 L190.3,250.0 L189.0,250.0 L187.8,250.0 L186.6,250.0 L185.4,250.0 L184.2,250.0 L183.0,250.0 L181.8,250.0 L180.6,250.0 L179.4,250.0 L178.2,250.0 L177.0,250.0 L175.8,250.0 L174.6,250.0 L173.4,250.0 L172.2,250.0 L171.0,250.0 L169.7,250.0 L168.5,250.0 L167.3,250.0 L166.1,250.0 L164.9,250.0 L163.7,250.0 L162.5,250.0 L161.3,250.0 L160.1,250.0 L158.9,250.0 L157.7,250.0 L156.5,250.0 L155.3,250.0 L154.1,250.0 L152.9,250.0 L151.7,250.0 L150.5,250.0 L149.2,250.0 L148.0,250.0 L146.8,250.0 L145.6,250.0 L144.4,250.0 L143.2,250.0 L142.0,250.0 L140.8,250.0 L139.6,250.0 L138.4,250.0 L137.2,250.0 L136.0,250.0 L134.8,250.0 L133.6,250.0 L132.4,250.0 L131.2,250.0 L129.9,250.0 L128.7,250.0 L127.5,250.0 L126.3,250.0 L125.1,250.0 L123.9,250.0 L122.7,250.0 L121.5,250.0 L120.3,250.0 L119.1,250.0 L117.9,250.0 L116.7,250.0 L115.5,250.0 L114.3,250.0 L113.1,250.0 L111.9,250.0 L110.7,250.0 L109.4,250.0 L108.2,250.0 L107.0,250.0 L105.8,250.0 L104.6,250.0 L103.4,250.0 L102.2,250.0 L101.0,250.0 L99.8,250.0 L98.6,250.0 L97.4,250.0 L96.2,250.0 L95.0,250.0 L93.8,250.0 L92.6,250.0 L91.4,250.0 L90.2,250.0 L88.9,250.0 L87.7,250.0 L86.5,250.0 L85.3,250.0 L84.1,250.0 L82.9,250.0 L81.7,250.0 L80.5,250.0 L79.3,250.0 L78.1,250.0 L76.9,250.0 L75.7,250.0 L74.5,250.0 L73.3,250.0 L72.1,250.0 L70.9,250.0 L69.6,250.0 L68.4,250.0 L67.2,250.0 L66.0,250.0 L64.8,250.0 L63.6,250.0 L62.4,250.0 L61.2,250.0 L60.0,250.0Z"/>
+                <path class="ln thin s-f dash" d="M60.0,242.1 L234.1,10.0"/>
+                <path class="ln thin s-f dash" d="M185.9,250.0 L300.0,97.9"/>
+                <path class="ln s-i" d="M120.0,250.0 L300.0,10.0"/>
+                <rect class="f-r" x="81.5" y="187.1" width="8" height="8"/>
+                <circle class="f-v" cx="248.7" cy="110.9" r="4.5"/>
+                <rect class="f-r" x="83.5" y="141.5" width="8" height="8"/>
+                <rect class="f-r" x="171.2" y="204.9" width="8" height="8"/>
+                <circle class="f-v" cx="233.5" cy="219.6" r="4.5"/>
+                <rect class="f-r" x="151.2" y="122.1" width="8" height="8"/>
+                <rect class="f-r" x="160.2" y="105.9" width="8" height="8"/>
+                <rect class="f-r" x="230.2" y="20.1" width="8" height="8"/>
+                <rect class="f-r" x="126.8" y="91.5" width="8" height="8"/>
+                <circle class="f-v" cx="224.7" cy="178.1" r="4.5"/>
+                <rect class="f-r" x="62.3" y="16.2" width="8" height="8"/>
+                <rect class="f-r" x="130.0" y="169.2" width="8" height="8"/>
+                <circle class="f-v" cx="269.3" cy="110.2" r="4.5"/>
+                <rect class="f-r" x="169.5" y="62.6" width="8" height="8"/>
+                <rect class="f-r" x="68.9" y="78.0" width="8" height="8"/>
+                <circle class="f-v" cx="151.3" cy="224.9" r="4.5"/>
+                <rect class="f-r" x="212.6" y="25.9" width="8" height="8"/>
+                <rect class="f-r" x="109.2" y="95.8" width="8" height="8"/>
+                <rect class="f-r" x="130.0" y="69.9" width="8" height="8"/>
+                <circle class="f-v" cx="230.7" cy="195.3" r="4.5"/>
+                <circle class="f-v" cx="255.2" cy="93.4" r="4.5"/>
+                <rect class="f-r" x="217.7" y="51.7" width="8" height="8"/>
+                <rect class="f-r" x="159.7" y="66.0" width="8" height="8"/>
+                <circle class="f-v" cx="266.3" cy="222.3" r="4.5"/>
+                <circle class="f-v" cx="259.7" cy="154.6" r="4.5"/>
+                <circle class="f-v" cx="175.4" cy="212.1" r="4.5"/>
+                <circle class="f-v" cx="225.2" cy="178.3" r="4.5"/>
+                <circle class="f-v" cx="264.6" cy="182.1" r="4.5"/>
+                <circle class="f-v" cx="194.1" cy="153.3" r="4.5"/>
+                <circle class="f-v" cx="205.7" cy="200.4" r="4.5"/>
+                <rect class="f-r" x="103.1" y="68.7" width="8" height="8"/>
+                <circle class="f-v" cx="237.5" cy="114.5" r="4.5"/>
+                <circle class="f-v" cx="276.0" cy="198.3" r="4.5"/>
+                <circle class="f-v" cx="260.0" cy="206.8" r="4.5"/>
+                <circle class="f-v" cx="285.9" cy="101.3" r="4.5"/>
+                <rect class="f-r" x="200.4" y="16.8" width="8" height="8"/>
+                <rect class="f-r" x="241.4" y="58.7" width="8" height="8"/>
+                <rect class="f-r" x="74.3" y="156.3" width="8" height="8"/>
+                <rect class="f-r" x="81.4" y="197.1" width="8" height="8"/>
+                <rect class="f-r" x="110.8" y="42.8" width="8" height="8"/>
+                <rect class="ax" x="60" y="10" width="240" height="240"/>
+                <text class="m" x="180" y="270" text-anchor="middle">x₁</text><text class="m" x="44" y="134" text-anchor="end">x₂</text>
+                <circle class="f-v" cx="322" cy="40" r="4.5"/><text x="334" y="44">class 1</text>
+                <rect class="f-r" x="318" y="61" width="8" height="8"/><text x="334" y="69">class 0</text>
+                <line class="ln s-i" x1="314" x2="330" y1="94" y2="94"/><text x="334" y="98">p = 0.5</text>
+                <line class="ln thin s-f dash" x1="314" x2="330" y1="119" y2="119"/><text x="334" y="123">p = 0.1, 0.9</text>
+                <rect class="f-vs" x="314" y="140" width="16" height="12"/><text x="334" y="150">predict 1</text>
+                <rect class="f-rs" x="314" y="165" width="16" height="12"/><text x="334" y="175">predict 0</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 6.2</b> A model with $\mathbf{w} = [2, -1]$ and $b = -3$. The
+            solid line is the boundary $2x_1 - x_2 - 3 = 0$. The dashed lines, where $p = 0.1$ and
+            $p = 0.9$, are parallel to it: every level of probability is a straight line. Points near
+            the boundary are the uncertain ones, and some of them fall on the “wrong” side.</figcaption>
+          </figure>
+
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">With w = [2, −1] and b = −3, is the point x = [2, 1] on the decision boundary, and which class does it favor?</span>
+                <span class="check__q">With $\mathbf{w} = [2, -1]$ and $b = -3$, where is the point $\mathbf{x} = [2, 1]$, and what does the model predict for it? What if you double both $\mathbf{w}$ and $b$?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>z = (2)(2) + (−1)(1) + (−3) = 4 − 1 − 3 = 0. Since z = 0, this point sits exactly
-                on the decision boundary — σ(0) = 0.5, so the model is perfectly torn between the two
-                classes, favoring neither.</p>
+                <p>$z = 2\cdot 2 + (-1)\cdot 1 - 3 = 0$, so the point is on the boundary and
+                $p = \sigma(0) = 0.5$. The model is equally unsure about both classes. The rule
+                “predict 1 when $p \ge 0.5$” still gives an answer: class 1. Doubling $\mathbf{w}$
+                and $b$ does not move the boundary, because $2z = 0$ exactly where $z = 0$. It does
+                make the probabilities change faster: the dashed lines in Figure 6.2 move closer
+                to the boundary.</p>
               </div>
             </details>
           </div>
@@ -216,44 +343,107 @@ print(torch.sigmoid(z))   # tensor([0.0067, 0.5000, 0.9933])</code></pre>
           <h2><span class="h-num">4</span>The loss: binary cross-entropy</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>You might guess we'd reuse Mean Squared Error on the probability output — predicted
-          probability minus true label, squared. It turns out that choice quietly breaks
-          optimization. Instead, classification uses <strong>binary cross-entropy</strong>, a loss
-          built specifically for comparing probabilities.</p>
+          <p>You might reuse Mean Squared Error on the probability: predicted probability minus
+          true label, squared. That choice makes training slow and unreliable. Classification uses
+          <strong>binary cross-entropy</strong> instead, a loss built for comparing
+          probabilities.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Imagine scoring a weather forecaster. Each day, look at the probability they gave to
+            what really happened, and charge them $-\log$ of it. If they said 90% rain and it
+            rained, the charge is small ($-\log 0.9 \approx 0.1$). If they said 1% rain and it
+            rained, the charge is large ($-\log 0.01 \approx 4.6$). A forecaster who says “0%” and is
+            wrong pays an unlimited price. This is binary cross-entropy.</p>
+          </div>
 
           <div class="callout definition">
             <div class="callout__label">Definition</div>
-            <p>A function is <dfn>convex</dfn> when its graph is bowl-shaped: exactly one lowest point,
-            with the surface sloping downward toward it from every direction and no other dips or flat
-            plateaus to get stuck in. Gradient descent is guaranteed to find the true minimum of a
-            convex loss; on a non-convex loss it can stall on a flat shelf or a false valley.</p>
+            <p>A function is <dfn>convex</dfn> when its graph is bowl-shaped: the straight segment
+            between any two points on the graph never goes below the graph. A convex function has
+            no false valleys. Every local minimum is a global minimum, so gradient descent (with a
+            small enough learning rate) cannot get stuck in a bad dip. A <dfn>strictly convex</dfn>
+            function has at most one lowest point. A convex function can still have no minimum at
+            all (think of $e^{-z}$, which keeps going down toward 0), and this matters below.</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>Here is exactly why squared error misbehaves on top of a sigmoid. Let
-          $L_{sq}=(\hat y - y)^2$ with $\hat y=\sigma(z)$. By the chain rule (Section 2), using
-          the sigmoid's own derivative $\sigma'(z)=\hat y(1-\hat y)$ from earlier in this section:</p>
-          $$ \frac{\partial L_{sq}}{\partial z} = 2(\hat y-y)\,\sigma'(z) = 2(\hat y - y)\,\hat y(1-\hat y) $$
-          <p class="gloss"><b>In words:</b> the gradient carries a factor of $\hat y(1-\hat y)$, the
-          sigmoid's own slope. Suppose the true label is $y=1$ but the model is confidently — and
-          badly — wrong, predicting $\hat y\approx 0$ (a very negative logit). Then
-          $\hat y(1-\hat y)\approx 0\times 1 = 0$, so the <em>entire gradient collapses to nearly
-          zero</em> — right when the model most needs a large correction. That vanishing signal on
-          confidently-wrong predictions is what makes squared error's loss surface here riddled with
-          near-flat shelves instead of one clean bowl: exactly the non-convexity described above.</p>
+          <p>First, where binary cross-entropy comes from. The label $y$ is 0 or 1, so it is a
+          Bernoulli variable (<a href="03-probability.html">Section 3</a>). The model says
+          “$y = 1$ with probability $\hat y$”. The probability the model gives to the true label
+          can be written in one formula:</p>
+          $$ P(y \mid \mathbf{x}) = \hat y^{\,y}\,(1-\hat y)^{1-y} $$
+          <p class="gloss"><b>In words:</b> if $y = 1$, the formula gives $\hat y$. If $y = 0$, it
+          gives $1-\hat y$. The exponents only select the right factor.</p>
+          <p>Maximum likelihood says: make this probability large. That is the same as making its
+          negative log small:</p>
+          $$
+          \begin{aligned}
+          L &= -\log P(y\mid\mathbf{x}) \\
+             &= -\big[y\log \hat y + (1-y)\log(1-\hat y)\big]
+          \end{aligned}
+          $$
+          <p class="gloss"><b>In words:</b> for each example, only one term is active. If $y=1$,
+          the loss is $-\log\hat y$. It is small when $\hat y$ is near 1 and grows without limit as
+          $\hat y\to 0$. If $y=0$, the loss is $-\log(1-\hat y)$, with the roles swapped. This is
+          also the cross-entropy $H(p, q)$ from <a href="04-information-theory.html">Section 4</a>,
+          with true distribution $p = (y,\, 1-y)$ and model distribution
+          $q = (\hat y,\, 1-\hat y)$.</p>
 
-          <p>Binary cross-entropy fixes this. For a true label $y\in\{0,1\}$ and predicted probability
-          $\hat y=\sigma(z)$ (see <a href="04-information-theory.html">Section 4</a> for where
-          cross-entropy comes from more generally):</p>
-          $$ L(\hat y, y) = -\big[y\log \hat y + (1-y)\log(1-\hat y)\big] $$
-          <p class="gloss"><b>In words:</b> exactly one of the two bracketed terms is "active" for any
-          given example — if $y=1$ the loss is $-\log\hat y$ (small when $\hat y$ is close to 1, and
-          shoots toward infinity as $\hat y\to 0$); if $y=0$ it's $-\log(1-\hat y)$ (small when $\hat y$
-          is close to 0, exploding as $\hat y\to 1$). Being confidently wrong is now punished by an
-          unboundedly growing loss, not a shrinking gradient.</p>
+          <p>Now, why does squared error behave badly on top of a sigmoid? Let
+          $L_{sq}=(\hat y - y)^2$ with $\hat y=\sigma(z)$. By the chain rule, with
+          $\sigma'(z)=\hat y(1-\hat y)$:</p>
+          $$
+          \begin{aligned}
+          \frac{\partial L_{sq}}{\partial z} &= 2(\hat y-y)\,\sigma'(z) \\
+                                             &= 2(\hat y - y)\,\hat y(1-\hat y)
+          \end{aligned}
+          $$
+          <p class="gloss"><b>In words:</b> the gradient contains the sigmoid’s slope
+          $\hat y(1-\hat y)$. Suppose the true label is $y=1$, but the model is confident and
+          wrong: $\hat y\approx 0$. Then $\hat y(1-\hat y)\approx 0$, so the whole gradient is
+          almost zero. The model gets almost no correction exactly when it needs a large one.
+          Training slows down, sometimes for a very long time.</p>
 
-          <p>Now derive its gradient with respect to the logit $z$, step by step. First differentiate
-          with respect to $\hat y$:</p>
+          <p>There is a second, separate problem: squared error on a sigmoid is not convex. For
+          $y = 1$ the loss is $f(z) = (1-\sigma(z))^2$. A convex function has a slope that never
+          decreases as $z$ grows. Here $f'(0) = -2\cdot\tfrac12\cdot\tfrac14 = -\tfrac14$. But as
+          $z \to -\infty$, the curve flattens out, so $f'(z) \to 0$. The slope therefore
+          <em>decreases</em> from about 0 far to the left down to $-\tfrac14$ at $z=0$. That is
+          impossible for a convex function. Figure 6.3 shows the flat shelf on the left.</p>
+
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 520 240" role="img" aria-labelledby="fig-06-3-t">
+                <title id="fig-06-3-t">For a true label of 1, the cross-entropy loss rises steadily as the logit gets more negative, while squared error flattens out at 1</title>
+                <line class="ax" x1="60" y1="200" x2="480" y2="200"/><line class="ax" x1="270" y1="205" x2="270" y2="15"/>
+                <text class="sm" x="60.0" y="216" text-anchor="middle">-6</text>
+                <text class="sm" x="130.0" y="216" text-anchor="middle">-4</text>
+                <text class="sm" x="200.0" y="216" text-anchor="middle">-2</text>
+                <text class="sm" x="270.0" y="216" text-anchor="middle">0</text>
+                <text class="sm" x="340.0" y="216" text-anchor="middle">2</text>
+                <text class="sm" x="410.0" y="216" text-anchor="middle">4</text>
+                <text class="sm" x="480.0" y="216" text-anchor="middle">6</text>
+                <line class="grid" x1="60" x2="480" y1="155.0" y2="155.0"/><text class="sm" x="54" y="159.0" text-anchor="end">1</text>
+                <line class="grid" x1="60" x2="480" y1="110.0" y2="110.0"/><text class="sm" x="54" y="114.0" text-anchor="end">2</text>
+                <line class="grid" x1="60" x2="480" y1="65.0" y2="65.0"/><text class="sm" x="54" y="69.0" text-anchor="end">3</text>
+                <line class="grid" x1="60" x2="480" y1="20.0" y2="20.0"/><text class="sm" x="54" y="24.0" text-anchor="end">4</text>
+                <path class="ln s-v" d="M130.0,19.2 L134.4,24.7 L138.8,30.2 L143.1,35.7 L147.5,41.2 L151.9,46.6 L156.2,52.0 L160.6,57.4 L165.0,62.8 L169.4,68.2 L173.8,73.5 L178.1,78.7 L182.5,83.9 L186.9,89.1 L191.2,94.2 L195.6,99.3 L200.0,104.3 L204.4,109.2 L208.8,114.0 L213.1,118.8 L217.5,123.4 L221.9,128.0 L226.2,132.4 L230.6,136.7 L235.0,140.9 L239.4,144.9 L243.8,148.8 L248.1,152.6 L252.5,156.2 L256.9,159.6 L261.2,162.8 L265.6,165.9 L270.0,168.8 L274.4,171.5 L278.8,174.1 L283.1,176.5 L287.5,178.7 L291.9,180.7 L296.2,182.6 L300.6,184.3 L305.0,185.9 L309.4,187.3 L313.8,188.7 L318.1,189.9 L322.5,190.9 L326.9,191.9 L331.2,192.8 L335.6,193.6 L340.0,194.3 L344.4,194.9 L348.8,195.5 L353.1,196.0 L357.5,196.4 L361.9,196.9 L366.2,197.2 L370.6,197.5 L375.0,197.8 L379.4,198.1 L383.8,198.3 L388.1,198.5 L392.5,198.7 L396.9,198.8 L401.2,199.0 L405.6,199.1 L410.0,199.2 L414.4,199.3 L418.8,199.4 L423.1,199.4 L427.5,199.5 L431.9,199.6 L436.2,199.6 L440.6,199.7 L445.0,199.7 L449.4,199.7 L453.8,199.8 L458.1,199.8 L462.5,199.8 L466.9,199.8 L471.2,199.9 L475.6,199.9 L480.0,199.9"/>
+                <path class="ln s-a" d="M60.0,155.2 L64.4,155.3 L68.8,155.3 L73.1,155.3 L77.5,155.4 L81.9,155.4 L86.2,155.5 L90.6,155.5 L95.0,155.6 L99.4,155.7 L103.8,155.8 L108.1,155.9 L112.5,156.0 L116.9,156.1 L121.2,156.3 L125.6,156.4 L130.0,156.6 L134.4,156.8 L138.8,157.0 L143.1,157.3 L147.5,157.6 L151.9,157.9 L156.2,158.3 L160.6,158.7 L165.0,159.2 L169.4,159.7 L173.8,160.2 L178.1,160.9 L182.5,161.6 L186.9,162.3 L191.2,163.2 L195.6,164.1 L200.0,165.1 L204.4,166.2 L208.8,167.3 L213.1,168.6 L217.5,169.9 L221.9,171.3 L226.2,172.8 L230.6,174.4 L235.0,175.9 L239.4,177.6 L243.8,179.2 L248.1,180.9 L252.5,182.6 L256.9,184.2 L261.2,185.8 L265.6,187.3 L270.0,188.8 L274.4,190.1 L278.8,191.4 L283.1,192.5 L287.5,193.6 L291.9,194.5 L296.2,195.4 L300.6,196.1 L305.0,196.7 L309.4,197.3 L313.8,197.8 L318.1,198.2 L322.5,198.5 L326.9,198.8 L331.2,199.0 L335.6,199.2 L340.0,199.4 L344.4,199.5 L348.8,199.6 L353.1,199.7 L357.5,199.7 L361.9,199.8 L366.2,199.8 L370.6,199.9 L375.0,199.9 L379.4,199.9 L383.8,199.9 L388.1,200.0 L392.5,200.0 L396.9,200.0 L401.2,200.0 L405.6,200.0 L410.0,200.0 L414.4,200.0 L418.8,200.0 L423.1,200.0 L427.5,200.0 L431.9,200.0 L436.2,200.0 L440.6,200.0 L445.0,200.0 L449.4,200.0 L453.8,200.0 L458.1,200.0 L462.5,200.0 L466.9,200.0 L471.2,200.0 L475.6,200.0 L480.0,200.0"/>
+                <text class="tv lg" x="186.0" y="51.5">−log σ(z)</text>
+                <text class="ta lg" x="67.0" y="145.0">(1 − σ(z))²</text>
+                <text class="m" x="484" y="204">z</text><text class="sm" x="60.0" y="232">wrong and confident</text><text class="sm" x="480.0" y="232" text-anchor="end">right and confident</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 6.3</b> Loss for one example with true label $y = 1$, as a
+            function of the logit $z$. Cross-entropy (violet) keeps rising in a nearly straight
+            line when the model is confidently wrong, so its slope stays near −1. Squared error
+            (amber) flattens out at 1, so its slope goes to 0 there. It also bends the wrong way
+            for a convex function.</figcaption>
+          </figure>
+
+          <p>Now derive the gradient of binary cross-entropy with respect to the logit $z$. First
+          differentiate with respect to $\hat y$:</p>
           $$
           \begin{aligned}
           \frac{\partial L}{\partial \hat y} &= -\frac{y}{\hat y} + \frac{1-y}{1-\hat y} \\
@@ -262,35 +452,48 @@ print(torch.sigmoid(z))   # tensor([0.0067, 0.5000, 0.9933])</code></pre>
           &= \frac{\hat y - y}{\hat y(1-\hat y)}
           \end{aligned}
           $$
-          <p>Then apply the chain rule through $\hat y=\sigma(z)$, using $\partial\hat y/\partial z=\hat y(1-\hat y)$:</p>
-          $$ \frac{\partial L}{\partial z} = \frac{\partial L}{\partial \hat y}\cdot\frac{\partial \hat y}{\partial z}
-             = \frac{\hat y-y}{\hat y(1-\hat y)}\cdot \hat y(1-\hat y) = \hat y - y $$
-          <p class="gloss"><b>In words:</b> the messy $\hat y(1-\hat y)$ terms cancel exactly, leaving
-          the cleanest possible gradient: predicted probability minus true label. No vanishing, no
-          exploding — just a signal directly proportional to how wrong the prediction is.</p>
+          <p>Then apply the chain rule through $\hat y=\sigma(z)$, using
+          $\partial\hat y/\partial z=\hat y(1-\hat y)$:</p>
+          $$
+          \begin{aligned}
+          \frac{\partial L}{\partial z} &= \frac{\partial L}{\partial \hat y}\cdot\frac{\partial \hat y}{\partial z} \\
+             &= \frac{\hat y-y}{\hat y(1-\hat y)}\cdot \hat y(1-\hat y) = \hat y - y
+          \end{aligned}
+          $$
+          <p class="gloss"><b>In words:</b> the $\hat y(1-\hat y)$ factors cancel. What is left is
+          the simplest possible gradient: predicted probability minus true label. It does not
+          vanish when the model is confidently wrong. Its size is proportional to how wrong the
+          prediction is.</p>
 
-          <p>Finally, since $z=\mathbf{w}^\top\mathbf{x}+b$, we have $\partial z/\partial w_j = x_j$, so
-          by the chain rule one more time:</p>
+          <p>Finally, $z=\mathbf{w}^\top\mathbf{x}+b$, so $\partial z/\partial w_j = x_j$ and
+          $\partial z/\partial b = 1$. One more chain rule gives:</p>
           $$ \frac{\partial L}{\partial \mathbf{w}} = (\hat y - y)\,\mathbf{x}, \qquad \frac{\partial L}{\partial b} = \hat y - y $$
-          <p class="gloss"><b>In words:</b> the gradient with respect to each weight is (error) ×
-          (that feature's value) — the exact same clean shape as linear regression's gradient, even
-          though we started from a completely different loss. This is why logistic regression's
-          training loop looks almost identical to linear regression's.</p>
+          <p class="gloss"><b>In words:</b> the gradient for each weight is (error) × (that
+          feature’s value). This has the same shape as linear regression’s gradient, although the
+          loss is different. That is why the training loop for logistic regression looks almost
+          the same as the one for linear regression.</p>
 
-          <div class="check">
+          <p>Is binary cross-entropy convex in $\mathbf{w}$ and $b$? Yes. As a function of $z$,
+          its second derivative is $\partial(\hat y - y)/\partial z = \hat y(1-\hat y) &gt; 0$,
+          so it curves upward everywhere. A convex function of a linear function of the weights
+          is convex in the weights, and a sum of convex functions is convex. So there are no false
+          valleys. But convex does not guarantee that a minimum exists, as the next section
+          shows.</p>
+
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">True label y = 1, model predicts ŷ = 0.2 (confidently wrong). What is ∂L/∂z, and which direction does gradient descent push the logit?</span>
+                <span class="check__q">True label $y = 1$. Compare a prediction of $\hat y = 0.2$ with $\hat y = 0.01$. For each, what is $\partial L/\partial z$, and which way does gradient descent push the logit?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>∂L/∂z = ŷ − y = 0.2 − 1 = −0.8. Gradient descent updates z (indirectly, through w
-                and b) by subtracting a positive multiple of this gradient, so z moves by
-                −(−0.8)·(something positive) = a positive amount — the logit is pushed <em>up</em>,
-                which pushes ŷ toward 1, correcting the mistake. A more confidently wrong prediction
-                (say ŷ = 0.01) gives an even larger-magnitude gradient (−0.99), a bigger correction —
-                exactly the opposite of the vanishing-gradient problem squared error had.</p>
+                <p>For $\hat y = 0.2$: $\partial L/\partial z = 0.2 - 1 = -0.8$. For
+                $\hat y = 0.01$: $-0.99$. Gradient descent subtracts a positive multiple of the
+                gradient, so in both cases the logit moves <em>up</em> and $\hat y$ moves toward 1.
+                The more wrong prediction gets the larger push. With squared error, the pushes
+                would be $2(0.2-1)(0.2)(0.8) = -0.256$ and $2(0.01-1)(0.01)(0.99) \approx -0.0196$:
+                the more wrong prediction would get the <em>smaller</em> push.</p>
               </div>
             </details>
           </div>
@@ -299,6 +502,7 @@ print(torch.sigmoid(z))   # tensor([0.0067, 0.5000, 0.9933])</code></pre>
           <h2><span class="h-num">5</span>Training logistic regression in PyTorch</h2>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">train on four students: hours studied, passed or failed</p>
           <pre><code class="language-python">import torch
 import torch.nn as nn
 
@@ -309,12 +513,12 @@ w = torch.zeros(1, requires_grad=True)
 b = torch.zeros(1, requires_grad=True)
 lr = 0.1
 
-# BCEWithLogitsLoss combines sigmoid + binary cross-entropy in one numerically
-# stable call -- computing log(sigmoid(z)) directly avoids log(0) errors
+# BCEWithLogitsLoss = sigmoid + binary cross-entropy in one stable function.
+# It takes the raw logit z, not a probability.
 loss_fn = nn.BCEWithLogitsLoss()
 
 for step in range(1000):
-    z = X.squeeze() * w + b        # the logit -- do NOT apply sigmoid before this loss
+    z = X.squeeze() * w + b        # the logit: no sigmoid before this loss
     loss = loss_fn(z, y)
 
     loss.backward()
@@ -324,35 +528,101 @@ for step in range(1000):
         w.grad.zero_()
         b.grad.zero_()
 
-probs = torch.sigmoid(X.squeeze() * w + b)   # convert logits to probabilities for reporting
-print(probs, loss.item())</code></pre>
+probs = torch.sigmoid(X.squeeze() * w + b)   # logits to probabilities, for reporting
+print(probs, loss.item())
+# tensor([0.0301, 0.2764, 0.8246, 0.9830], grad_fn=&lt;SigmoidBackward0&gt;) 0.14109164476394653
+print(w.item(), b.item())
+# 1.2552133798599243 -5.98319673538208</code></pre>
+
+          <p>The model predicts “pass” for 6 and 8 hours and “fail” for 2 and 4 hours. Its
+          boundary is at $-b/w \approx 4.77$ hours.</p>
 
           <div class="callout pitfall">
             <div class="callout__label"><span class="ic">▲</span> Watch out</div>
-            <p>Don't apply <code>torch.sigmoid</code> yourself and then feed the result into
-            <code>nn.BCELoss</code> if you can instead use <code>nn.BCEWithLogitsLoss</code> directly on
-            the raw logit — the combined version is numerically stable (it never actually computes
-            $\log(0)$ even when the sigmoid saturates near 0 or 1), while doing the two steps separately
-            can silently produce <code>nan</code> losses on confidently wrong predictions.</p>
+            <p>Give <code>nn.BCEWithLogitsLoss</code> the raw logit. Do not apply
+            <code>torch.sigmoid</code> yourself and then use <code>nn.BCELoss</code>. The combined
+            function computes $\log\sigma(z)$ in a numerically stable way (with the log-sum-exp
+            trick), so large logits cause no problems. The two-step version fails when the sigmoid
+            saturates. In float32, $\sigma(-200)$ is exactly 0. <code>nn.BCELoss</code> then clamps
+            $\log 0$ to −100, so the loss stays finite, but the gradient is 0 and learning
+            stops.</p>
+          </div>
+
+          <p class="codecap">the same confident mistake, two ways</p>
+          <pre><code class="language-python">import torch
+import torch.nn as nn
+
+target = torch.tensor([1.])
+
+z = torch.tensor([-200.], requires_grad=True)
+loss = nn.BCELoss()(torch.sigmoid(z), target)
+loss.backward()
+print(loss.item(), z.grad)   # 100.0 tensor([-0.])
+
+z = torch.tensor([-200.], requires_grad=True)
+loss = nn.BCEWithLogitsLoss()(z, target)
+loss.backward()
+print(loss.item(), z.grad)   # 200.0 tensor([-1.])</code></pre>
+
+          <p>The stable version reports the true loss (200) and the correct gradient
+          $\hat y - y = -1$. The two-step version reports a clamped loss and no gradient at
+          all.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> When the classes can be separated perfectly</div>
+            <p>Our four students can be split perfectly: everyone below 5 hours failed, everyone
+            above passed. For such <dfn>separable</dfn> data, the loss has no minimum. Making
+            $w$ and $b$ larger (while keeping $-b/w$ near 5) always makes every probability more
+            confident and the loss smaller. So training never stops growing the weights:</p>
+                        <p class="codecap">w, b and loss as training continues</p>
+            <pre><code class="language-plaintext">steps     w       b       loss
+1000      1.26   -5.98   0.1411
+10000     3.00  -14.81   0.0248
+100000    5.27  -26.15   0.0026</code></pre>
+            <p>The model becomes more and more certain, even though four examples cannot justify
+            that certainty. The usual fixes are regularization (a penalty on large weights,
+            <a href="07-overfitting.html">Section 7</a>) or stopping training early.</p>
+          </div>
+
+          <div class="check-wrap">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">Add a fifth student who studied 7 hours but failed. Does training still grow $w$ and $b$ forever?</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>No. Now no single threshold separates the classes: the student at 7 hours failed,
+                but the one at 6 hours passed. If the weights grew without limit, the model would
+                become certain that the 7-hour student passed. That student’s loss
+                $-\log(1-\hat y)$ would grow without limit too. So at some finite $w$ and $b$ the
+                total loss is smallest, and gradient descent settles there. Overlapping classes
+                give the loss a real minimum.</p>
+              </div>
+            </details>
           </div>
 
           <hr />
 
           <h2><span class="h-num">6</span>What to carry forward</h2>
           <ul>
-            <li><strong>Classification</strong> predicts a category, not a number; logistic
+            <li><strong>Classification</strong> predicts a category, not a number. Logistic
             regression handles the two-category case.</li>
-            <li>The <strong>sigmoid</strong> $\sigma(z)=1/(1+e^{-z})$ squashes any real logit into a
-            valid probability, with $\sigma(0)=0.5$ and derivative $\sigma(z)(1-\sigma(z))$.</li>
-            <li>The <strong>decision boundary</strong> ($p=0.5$) is exactly where the logit
-            $\mathbf{w}^\top\mathbf{x}+b$ crosses zero — always flat, a line or hyperplane.</li>
-            <li><strong>Binary cross-entropy</strong> replaces squared error because squared error's
-            gradient vanishes on confidently-wrong predictions; cross-entropy's gradient simplifies
-            cleanly to $(\hat y-y)\mathbf{x}$.</li>
+            <li>The <strong>sigmoid</strong> $\sigma(z)=1/(1+e^{-z})$ squashes any logit into a
+            valid probability. $\sigma(0)=0.5$, and the slope $\sigma(z)(1-\sigma(z))$ is always
+            positive. The logit is the log-odds.</li>
+            <li>The <strong>decision boundary</strong> ($p=0.5$) is where the logit
+            $\mathbf{w}^\top\mathbf{x}+b$ crosses zero. It is always flat: a line or
+            hyperplane.</li>
+            <li><strong>Binary cross-entropy</strong> is the negative log-likelihood of a Bernoulli
+            label. It replaces squared error, whose gradient vanishes on confidently wrong
+            predictions. Its gradient is $(\hat y-y)\mathbf{x}$.</li>
+            <li>The loss is convex, but on separable data it has no minimum. Regularization or
+            early stopping keeps the weights finite.</li>
           </ul>
-          <p>Back in <a href="05-linear-regression.html">Section 5</a> we solved a regression
-          problem two ways; here we saw the same hypothesis-loss-optimization triad reused for
-          classification, just with a squashing function and a different loss.</p>
+          <p>In <a href="05-linear-regression.html">Section 5</a> we solved a regression problem in
+          two ways. Here we reused the same hypothesis–loss–optimization triad for
+          classification, with a squashing function and a different loss.</p>
 
           <div class="complete-bar" data-complete>
             <span class="complete-bar__text">Finished this section? Mark it done to fill your progress bar.</span>

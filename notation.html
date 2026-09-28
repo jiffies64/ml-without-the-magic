@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <script>try{var t=localStorage.getItem("z2h-ml-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Notation &amp; Glossary · ML Without the Magic</title>
+  <meta name="description" content="Every symbol used in the course, and a plain-English glossary of the key terms." />
+  <link rel="stylesheet" href="assets/vendor/fonts/fonts.css" />
+  <link rel="stylesheet" href="assets/course.css" />
+  <link rel="stylesheet" href="assets/vendor/katex/katex.min.css" />
+</head>
+<body data-slug="notation">
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="nav-scrim"></div>
+  <div class="layout">
+    <aside class="sidebar" aria-label="Course navigation">
+      <div class="brand">
+        <div class="brand__kicker">Machine Learning</div>
+        <div class="brand__title"><a href="index.html">Without the Magic</a></div>
+      </div>
+      <div class="progress">
+        <div class="progress__track"><div class="progress__fill" data-progress-fill></div></div>
+        <div class="progress__label" data-progress-label></div>
+      </div>
+      <nav class="nav" data-nav aria-label="Sections"></nav>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <button class="iconbtn menubtn" data-menu aria-label="Open navigation">☰</button>
+        <div class="topbar__spacer"></div>
+        <span class="topbar__meta">Reference</span>
+        <button class="iconbtn" data-theme-toggle aria-label="Toggle theme">☾</button>
+      </div>
+
+      <main id="main" class="reading">
+        <header class="lesson-head">
+          <p class="lesson-eyebrow">Reference</p>
+          <h1 class="lesson-title">Notation &amp; Glossary</h1>
+          <p class="lesson-standfirst">One symbol means one thing in this course. This page lists every symbol and the key words. Keep it open in a second tab while you read.</p>
+        </header>
+
+        <div class="prose">
+          <h2><span class="h-num">1</span>How we write things</h2>
+          <div class="scroll-x">
+          <table>
+            <thead><tr><th>Written as</th><th>Means</th><th>Example</th></tr></thead>
+            <tbody>
+              <tr><td>$x$, $w$, $\alpha$</td><td>A single number (a <em>scalar</em>). Italic, lowercase.</td><td>$w = 0.5$</td></tr>
+              <tr><td>$\mathbf{x}$, $\mathbf{b}$</td><td>A vector (a list of numbers). Bold, lowercase.</td><td>$\mathbf{x} = [2, 1, 3]$</td></tr>
+              <tr><td>$\mathbf{W}$, $\mathbf{X}$</td><td>A matrix (a grid of numbers). Bold, uppercase.</td><td>$\mathbf{W} \in \mathbb{R}^{2\times 3}$</td></tr>
+              <tr><td>$x_i$, $W_{ij}$</td><td>One entry: slot $i$ of a vector, row $i$ and column $j$ of a matrix.</td><td>$x_2 = 1$</td></tr>
+              <tr><td>$\mathbb{R}^n$</td><td>The set of all lists of $n$ real numbers.</td><td>$\mathbf{x} \in \mathbb{R}^3$</td></tr>
+              <tr><td>$\mathbf{W}^\top$</td><td>Transpose: rows become columns.</td><td>$(2\times 3)^\top \to (3\times 2)$</td></tr>
+              <tr><td>$\mathbf{a}\cdot\mathbf{b}$</td><td>Dot product: multiply matching slots, then add.</td><td>$[1,2]\cdot[3,4] = 11$</td></tr>
+              <tr><td>$\odot$</td><td>Element-wise product: multiply matching slots, keep them separate.</td><td>$[1,2]\odot[3,4] = [3,8]$</td></tr>
+              <tr><td>$\lVert\mathbf{x}\rVert$</td><td>Norm: the length of a vector (L2 unless we say L1).</td><td>$\lVert[3,4]\rVert = 5$</td></tr>
+              <tr><td>$\sum_{i=1}^{n}$</td><td>Add up the terms as $i$ counts from 1 to $n$.</td><td>$\sum_{i=1}^{3} i = 6$</td></tr>
+              <tr><td>$\hat{y}$</td><td>“y-hat”: a prediction of $y$.</td><td>$\hat{y} = 0.8$</td></tr>
+              <tr><td>$\log$, $\ln$, $\log_2$</td><td>$\ln$ and $\log$ are the natural log (base $e$). $\log_2$ is base 2 (bits).</td><td>$\log_2 8 = 3$</td></tr>
+            </tbody>
+          </table>
+          </div>
+
+          <h2><span class="h-num">2</span>Calculus and probability</h2>
+          <div class="scroll-x">
+          <table>
+            <thead><tr><th>Symbol</th><th>Means</th></tr></thead>
+            <tbody>
+              <tr><td>$\frac{dy}{dx}$</td><td>Derivative: how fast $y$ changes when $x$ changes a little.</td></tr>
+              <tr><td>$\frac{\partial L}{\partial w}$</td><td>Partial derivative: change $w$ only, keep every other input fixed.</td></tr>
+              <tr><td>$\nabla L$</td><td>Gradient: the vector of all partial derivatives. It points uphill.</td></tr>
+              <tr><td>$P(A)$, $P(A \mid B)$</td><td>Probability of $A$; probability of $A$ when we know that $B$ is true.</td></tr>
+              <tr><td>$\mathbb{E}[X]$</td><td>Expected value: the long-run average of $X$.</td></tr>
+              <tr><td>$\mu$, $\sigma$, $\sigma^2$</td><td>Mean, standard deviation, variance.</td></tr>
+              <tr><td>$H(p)$, $H(p,q)$, $D_{\text{KL}}(p\,\Vert\,q)$</td><td>Entropy, cross-entropy, KL divergence (Section 4).</td></tr>
+            </tbody>
+          </table>
+          </div>
+
+          <h2><span class="h-num">3</span>Symbols with one fixed meaning</h2>
+          <p>These letters mean the same thing in every lesson.</p>
+          <div class="scroll-x">
+          <table>
+            <thead><tr><th>Symbol</th><th>Always means</th><th>First used</th></tr></thead>
+            <tbody>
+              <tr><td>$L$</td><td>The loss: one number that says how wrong the model is.</td><td><a href="sections/05-linear-regression.html">Section 5</a></td></tr>
+              <tr><td>$\alpha$</td><td>The learning rate: the size of one gradient-descent step.</td><td><a href="sections/02-calculus.html">Section 2</a></td></tr>
+              <tr><td>$\lambda$</td><td>Regularization strength (how hard we push weights toward zero).</td><td><a href="sections/07-overfitting.html">Section 7</a></td></tr>
+              <tr><td>$\sigma(z)$</td><td>The sigmoid function $1/(1+e^{-z})$. (Alone, $\sigma$ is a standard deviation.)</td><td><a href="sections/06-logistic-regression.html">Section 6</a></td></tr>
+              <tr><td>$\phi$</td><td>Any activation function (ReLU, tanh, …).</td><td><a href="sections/09-neurons.html">Section 9</a></td></tr>
+              <tr><td>$\mathbf{W}$, $\mathbf{b}$</td><td>A layer's weights, shape (out, in), and bias. One layer: $\mathbf{y} = \mathbf{W}\mathbf{x} + \mathbf{b}$.</td><td><a href="sections/01-linear-algebra.html">Section 1</a></td></tr>
+              <tr><td>$z$, $a$</td><td>Pre-activation $z = \mathbf{w}\cdot\mathbf{x} + b$; activation $a = \phi(z)$.</td><td><a href="sections/09-neurons.html">Section 9</a></td></tr>
+              <tr><td>$\delta$</td><td>The gradient of the loss with respect to a pre-activation, $\partial L/\partial z$ (code: <code>dz</code>).</td><td><a href="sections/10-backprop.html">Section 10</a></td></tr>
+              <tr><td>$N$, $B$</td><td>Number of examples; batch size in code.</td><td><a href="sections/05-linear-regression.html">Section 5</a></td></tr>
+              <tr><td>$T$</td><td>Sequence length: the number of tokens or time steps.</td><td><a href="sections/17-sequence-models.html">Section 17</a></td></tr>
+              <tr><td>$d_{\text{model}}$, $d_k$, $d_v$</td><td>Width of the token vectors; width of keys/queries; width of values.</td><td><a href="sections/18-transformers.html">Section 18</a></td></tr>
+              <tr><td>$\mathbf{Q}$, $\mathbf{K}$, $\mathbf{V}$</td><td>Queries, keys and values in attention.</td><td><a href="sections/18-transformers.html">Section 18</a></td></tr>
+              <tr><td>$V$ (italic)</td><td>Vocabulary size.</td><td><a href="sections/19-language-modeling.html">Section 19</a></td></tr>
+              <tr><td>$E$, $k$</td><td>Number of experts; experts chosen per token.</td><td><a href="sections/22-moe.html">Section 22</a></td></tr>
+              <tr><td>$\lambda_{\text{aux}}$</td><td>Weight of the load-balancing (auxiliary) loss in a mixture of experts.</td><td><a href="sections/22-moe.html">Section 22</a></td></tr>
+            </tbody>
+          </table>
+          </div>
+
+          <h2><span class="h-num">4</span>Glossary</h2>
+          <p>Short, plain definitions. Each lesson explains the word in full the first time it appears.</p>
+          <dl class="glossary">
+            <dt>Activation function</dt><dd>A simple non-straight function (ReLU, sigmoid, tanh) applied after a layer. Without it, many layers act like one layer.</dd>
+            <dt>Attention</dt><dd>A layer where each token decides how much to use every other token, by comparing its query with their keys.</dd>
+            <dt>Autograd</dt><dd>PyTorch's automatic backpropagation: it records the operations and computes all gradients for you.</dd>
+            <dt>Backpropagation</dt><dd>The chain rule, applied backward through a computation graph, to get every gradient in one pass.</dd>
+            <dt>Batch</dt><dd>A group of examples processed together in one step.</dd>
+            <dt>Bias (of a layer)</dt><dd>The number (or vector) added after the weighted sum. Not the same as “bias” in bias–variance.</dd>
+            <dt>Bias–variance</dt><dd>Two kinds of error: bias (the model is too simple) and variance (the model changes too much with the data).</dd>
+            <dt>Computation graph</dt><dd>A diagram of every operation from inputs to loss. Backpropagation walks it backward.</dd>
+            <dt>Convex</dt><dd>Bowl-shaped: any local minimum is also the lowest point.</dd>
+            <dt>Cross-entropy</dt><dd>The usual loss for classification: the average surprise of the model at the true labels.</dd>
+            <dt>Embedding</dt><dd>A learned vector that stands for a token (or another discrete thing).</dd>
+            <dt>Epoch</dt><dd>One full pass through the training data.</dd>
+            <dt>Equivariance</dt><dd>When the input moves, the output moves in the same way. (Invariance: the output does not change.)</dd>
+            <dt>Gradient descent</dt><dd>Repeat: compute the gradient of the loss, take a small step the other way.</dd>
+            <dt>Hyperparameter</dt><dd>A setting you choose (learning rate, batch size), not a number the model learns.</dd>
+            <dt>Logit</dt><dd>A raw score before softmax or sigmoid. For two classes it is the log-odds.</dd>
+            <dt>Loss</dt><dd>One number that measures how wrong the model is. Training makes it smaller.</dd>
+            <dt>Mixture of experts (MoE)</dt><dd>A layer with many small networks (experts); a router sends each token to only a few of them.</dd>
+            <dt>Overfitting</dt><dd>The model learns the noise in the training data, so it does worse on new data.</dd>
+            <dt>Parameter</dt><dd>A number the model learns (a weight or a bias).</dd>
+            <dt>Regularization</dt><dd>Any method that keeps a model simpler so that it generalizes better (L1, L2, dropout, early stopping).</dd>
+            <dt>Softmax</dt><dd>Turns a list of scores into probabilities: make each one positive with $e^{z}$, then divide by the total.</dd>
+            <dt>Tensor</dt><dd>An array with any number of dimensions: a number, a vector, a matrix, or more.</dd>
+            <dt>Token</dt><dd>A piece of text (a word, part of a word, or a character) that the model reads as one unit.</dd>
+            <dt>Transformer</dt><dd>A network made of blocks of attention and feed-forward layers, with residual connections and normalization.</dd>
+          </dl>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script defer src="assets/vendor/katex/katex.min.js"></script>
+  <script defer src="assets/vendor/katex/auto-render.min.js"></script>
+  <script src="assets/vendor/highlight/highlight.min.js"></script>
+  <script src="assets/search-index.js"></script>
+  <script src="assets/course.js"></script>
+</body>
+</html>
