@@ -113,6 +113,7 @@ and the study times:
 ```bash
 python3 tools/build-search-index.py
 python3 tools/reading-time.py
+python3 tools/stamp-assets.py   # after changing course.css/course.js: busts browser caches
 ```
 
 House style, so that every lesson reads the same way: the four beats use fixed labels
