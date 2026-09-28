@@ -30,6 +30,7 @@ no build step, no account, no paywall.
 - [Read it / run it](#read-it--run-it)
 - [What's inside](#whats-inside)
 - [Editing the course](#editing-the-course)
+- [Rebuilding the PDF](#rebuilding-the-pdf)
 - [Authors](#authors)
 - [License](#license)
 
@@ -89,32 +90,55 @@ Everything (math via **KaTeX**, syntax highlighting via **highlight.js**, and al
 ```
 index.html                  Landing page + full syllabus
 sections/01…23-*.html       The 23 lessons
+notation.html               Every symbol with its one fixed meaning, plus a glossary
 assets/course.css           Design system (light/dark themes, every component)
 assets/course.js            Sidebar, search, progress + theme (both persisted), math/code init
 assets/search-index.js      Generated client-side search index (titles + headings + keywords)
 assets/vendor/              Vendored KaTeX, highlight.js, and web fonts (fully offline)
-tools/                      Scripts to regenerate the search index and re-vendor assets
+tools/                      Search index, study times, PDF build, and asset vendoring
 ML-Without-the-Magic.pdf    The entire course as a single 317-page PDF
 ```
 
-Features: sticky sidebar with **progress tracking that persists across visits**, **client-side
-search** that deep-links to the matching heading, a **dark/light theme** that follows you across
-every page, a responsive mobile drawer, keyboard focus, and reduced-motion support.
+Features: sticky sidebar with **progress tracking that persists across visits** and a
+**continue where you left off** button, **client-side search** that deep-links to the matching
+heading, an **on this page** outline on wide screens, **copy buttons** on every code block, inline
+**SVG figures** that follow the **dark/light theme**, a responsive mobile drawer, keyboard focus,
+reduced-motion support, and a print stylesheet that moves the answers to the end of each lesson.
 
 ## Editing the course
 
-Lessons are hand-written HTML in `sections/`. After adding or renaming headings/sections, regenerate
-the search index:
+Lessons are hand-written HTML in `sections/`. After you edit lessons, regenerate the search index
+and the study times:
 
 ```bash
 python3 tools/build-search-index.py
+python3 tools/reading-time.py
 ```
+
+House style, so that every lesson reads the same way: the four beats use fixed labels
+(*Intuition first*, *Now the math*, *The same thing in PyTorch*); every code block has a caption;
+symbols follow [notation.html](notation.html); sentences stay short and free of idioms, for readers
+whose first language is not English; figures are inline SVG that use the theme classes in
+`assets/course.css` (section 13) so that they work in light and dark mode.
 
 To re-download the vendored libraries and fonts (e.g. to bump a version):
 
 ```bash
 python3 tools/vendor-assets.py
 ```
+
+## Rebuilding the PDF
+
+The PDF is built from the site itself, so it always matches the lessons. It needs Playwright
+(Chromium):
+
+```bash
+npm install --no-save playwright
+node tools/build-pdf.mjs
+```
+
+It adds a bookmark outline, tagged (accessible) structure, and the answers to each lesson's
+questions at the end of that chapter.
 
 > **Publishing tip:** this works out-of-the-box on **GitHub Pages**, Netlify, Vercel, or any static
 > host; it's just files. For discoverability, add repo **topics** matching the keywords above so
