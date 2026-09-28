@@ -6,7 +6,7 @@
 ![Content: CC BY 4.0](https://img.shields.io/badge/content-CC%20BY%204.0-lightgrey)
 ![Dependencies: none](https://img.shields.io/badge/dependencies-none-brightgreen)
 ![Works offline](https://img.shields.io/badge/works-offline-success)
-![PDF: 317 pages](https://img.shields.io/badge/PDF-389%20pages-orange)
+![PDF: 389 pages](https://img.shields.io/badge/PDF-389%20pages-orange)
 
 If you've ever bounced off machine learning because every tutorial either hand-waves the math or
 drowns you in it, this course is built for you. It teaches **neural networks, backpropagation,
