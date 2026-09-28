@@ -38,7 +38,7 @@
         <header class="lesson-head">
           <p class="lesson-eyebrow">Part 2 · Classical ML <span class="dot"></span> Section 7</p>
           <h1 class="lesson-title">Overfitting &amp; Regularization</h1>
-          <p class="lesson-standfirst">A model that scores 100% on its training data has told you nothing yet — this section is about the honest number, the one measured on data the model has never seen, and how to protect it.</p>
+          <p class="lesson-standfirst">A model that scores 100% on its training data has not yet shown you anything. This section is about the number that counts, measured on data the model has never seen, and how to protect it.</p>
           <div class="lesson-meta">
             <span><b>26 min</b> read</span>
           </div>
@@ -55,87 +55,180 @@
         </header>
 
         <div class="prose">
-          <p class="lead">Every model can be made to fit the data it was trained on almost perfectly — that part
-          is easy, and it is also nearly meaningless. What we actually care about is whether the model works on
-          <strong>new</strong> data it has never touched: tomorrow's customer, the next photo, a sentence it
-          hasn't read. This section is about that gap, why it opens up, and the concrete tools that close it.</p>
+          <p class="lead">You can make almost any model fit its training data very closely. That part is
+          easy, and it tells you little. What we care about is whether the model works on
+          <strong>new</strong> data: tomorrow’s customer, the next photo, a sentence it has not read. This
+          section is about the gap between those two, why it opens, and the tools that close it.</p>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> The one idea to hold onto</div>
-            <p>The only score that matters is performance on data the model never saw during training. Every idea
-            below — splitting your data, cross-validation, regularization — exists purely to protect that one
-            honest number from being fooled.</p>
+            <p>The score that matters is performance on data the model never saw during training. Every idea
+            below (splitting your data, cross-validation, regularization) exists to keep that one number
+            trustworthy.</p>
           </div>
 
           <!-- ===================== GENERALIZATION ===================== -->
           <h2><span class="h-num">1</span>Generalization: doing well on data you haven't seen</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p><strong>Generalization</strong> is a model's ability to perform well on new, unseen examples — not
-          just the ones it was trained on. A model that generalizes has learned the actual pattern in the data.
-          A model that hasn't has instead memorized the specific examples, including their noise and quirks.</p>
+          <p><strong>Generalization</strong> is a model’s ability to perform well on new examples, not only
+          on the ones it trained on. A model that generalizes has learned the real pattern in the data. A
+          model that does not has memorized the specific examples, including their noise and accidents.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>Two students prepare for a history exam. One <strong>memorizes</strong> last year's exam paper word
-            for word — every date, every answer, in order. The other actually <strong>understands</strong> the
-            period: causes, consequences, how events connect. Give both students last year's exact paper and the
-            memorizer wins easily. Give them this year's paper, with the same material asked differently, and the
-            memorizer collapses while the one who understood does fine. The memorizer <em>overfit</em> to one
-            specific paper; the other <em>generalized</em> to the subject itself.</p>
+            <p>Two students prepare for a history exam. One <strong>memorizes</strong> last year’s exam
+            paper word for word. The other <strong>understands</strong> the period: causes, results, and how
+            events connect. Give both students last year’s paper, and the memorizer wins easily. Give them
+            this year’s paper, which asks about the same material in new ways, and the memorizer fails. The
+            memorizer <em>overfit</em> to one paper. The other student <em>generalized</em> to the
+            subject.</p>
           </div>
 
           <div class="callout definition">
             <div class="callout__label">Definition</div>
-            <p><dfn>Overfitting</dfn> is when a model fits the training data too closely — including its noise
-            and one-off quirks — so training error keeps dropping while error on new data gets worse.
-            <dfn>Underfitting</dfn> is the opposite: the model is too simple to capture even the real pattern, so
-            it does poorly on both the training data and new data. In between sits <dfn>model capacity</dfn> — a
-            rough measure of how flexible a model is, i.e. how complicated a pattern it's able to represent. A
-            straight line has low capacity; a deep tree with a thousand splits has very high capacity.</p>
+            <p><dfn>Overfitting</dfn> is when a model fits the training data too closely, including its
+            noise. Training error keeps going down while error on new data gets worse.
+            <dfn>Underfitting</dfn> is the opposite. The model is too simple to capture even the real
+            pattern, so it does poorly on both training data and new data. <dfn>Model capacity</dfn> is a
+            rough measure of how flexible a model is: how complicated a pattern it can represent. A straight
+            line has low capacity. A deep decision tree with a thousand splits has very high capacity.</p>
           </div>
 
-          <p>Capacity is the dial that controls both failure modes. Turn it too low and the model can't represent
-          the real pattern — it underfits. Turn it too high and the model has so much flexibility that, with only
-          a finite training set, it starts fitting the random noise in that specific set — it overfits. There's a
-          sweet spot in between, and finding it is most of what this section is about.</p>
+          <p>Capacity controls both failure modes. If it is too low, the model cannot represent the real
+          pattern, so it underfits. If it is too high, the model has so much freedom that it fits the random noise in your particular training set. Then it overfits. The best capacity is somewhere
+          in between. Most of this section is about finding it.</p>
 
-          <p class="beat beat--code">Seeing it happen</p>
-          <p class="codecap">fitting the same noisy data with three model capacities</p>
+          <p class="beat beat--code">The same thing in NumPy</p>
+          <p class="codecap">fitting the same noisy data with three capacities</p>
           <pre><code class="language-python">import numpy as np
 
 rng = np.random.default_rng(0)
 x = np.linspace(-3, 3, 20)
-y = 0.5 * x**2 + rng.normal(0, 1, size=x.shape)   # true pattern: a parabola, plus noise
+y = 0.5 * x**2 + rng.normal(0, 1, size=x.shape)       # true pattern: a parabola, plus noise
 
-x_test = np.linspace(-3, 3, 200)
-y_test = 0.5 * x_test**2                          # noise-free, for a fair test score
+x_test = rng.uniform(-3, 3, size=1000)                 # new points from the same source
+y_test = 0.5 * x_test**2 + rng.normal(0, 1, size=x_test.shape)
 
 for degree in (1, 2, 15):
     coeffs = np.polyfit(x, y, degree)
     train_mse = np.mean((np.polyval(coeffs, x) - y) ** 2)
     test_mse = np.mean((np.polyval(coeffs, x_test) - y_test) ** 2)
-    print(f"degree {degree:2d}: train MSE {train_mse:.3f}   test MSE {test_mse:.3f}")
+    print(f"degree {degree:2d}: train MSE {train_mse:.3f}   test MSE {test_mse:.3f}")</code></pre>
+                    <p class="codecap">output</p>
+          <pre><code class="language-plaintext">degree  1: train MSE 3.846   test MSE 2.935
+degree  2: train MSE 0.592   test MSE 1.182
+degree 15: train MSE 0.139   test MSE 5.758</code></pre>
+          <p>Read the three rows one at a time.</p>
+          <ul>
+            <li><strong>Degree 1</strong> (a line) cannot bend to follow a parabola. Both errors are high:
+            it underfits. (Its test error is a little lower than its training error only by chance: 20
+            training points are a small sample.)</li>
+            <li><strong>Degree 2</strong> (a parabola) matches the true pattern. Its test error, 1.18, is
+            close to 1.0, the variance of the noise. No model can predict the noise, so no model can do
+            much better on average.</li>
+            <li><strong>Degree 15</strong> has the lowest training error but by far the highest test error.
+            It learned the noise, not the pattern: it overfits.</li>
+          </ul>
 
-# degree  1 (a line): can't bend to match a parabola -> both train and test error stay high (underfit)
-# degree  2 (a parabola): matches the true pattern -> train and test error both low and close together
-# degree 15: bends through nearly every noisy point -> train error near zero, test error much worse
-#            than degree 2 -- it learned the noise, not the pattern (overfit)</code></pre>
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 610 240" role="img" aria-labelledby="fig-07-1-t">
+                <title id="fig-07-1-t">The same twenty noisy points fit by a straight line, a parabola, and a degree-15 polynomial that swings wildly between the points</title>
+                <rect class="f-k" x="10" y="30" width="190" height="180" rx="4"/>
+                <path class="ln thin s-f dash" d="M10.0,59.2 L11.9,63.6 L13.8,67.8 L15.8,72.0 L17.7,76.0 L19.6,80.0 L21.5,83.9 L23.4,87.7 L25.4,91.4 L27.3,95.1 L29.2,98.6 L31.1,102.1 L33.0,105.4 L34.9,108.7 L36.9,111.9 L38.8,115.0 L40.7,118.0 L42.6,120.9 L44.5,123.7 L46.5,126.5 L48.4,129.1 L50.3,131.7 L52.2,134.2 L54.1,136.6 L56.1,138.9 L58.0,141.1 L59.9,143.2 L61.8,145.2 L63.7,147.2 L65.7,149.1 L67.6,150.8 L69.5,152.5 L71.4,154.1 L73.3,155.6 L75.3,157.0 L77.2,158.3 L79.1,159.6 L81.0,160.7 L82.9,161.8 L84.8,162.8 L86.8,163.7 L88.7,164.4 L90.6,165.2 L92.5,165.8 L94.4,166.3 L96.4,166.8 L98.3,167.1 L100.2,167.4 L102.1,167.5 L104.0,167.6 L106.0,167.6 L107.9,167.5 L109.8,167.4 L111.7,167.1 L113.6,166.8 L115.6,166.3 L117.5,165.8 L119.4,165.2 L121.3,164.4 L123.2,163.7 L125.2,162.8 L127.1,161.8 L129.0,160.7 L130.9,159.6 L132.8,158.3 L134.7,157.0 L136.7,155.6 L138.6,154.1 L140.5,152.5 L142.4,150.8 L144.3,149.1 L146.3,147.2 L148.2,145.2 L150.1,143.2 L152.0,141.1 L153.9,138.9 L155.9,136.6 L157.8,134.2 L159.7,131.7 L161.6,129.1 L163.5,126.5 L165.5,123.7 L167.4,120.9 L169.3,118.0 L171.2,115.0 L173.1,111.9 L175.1,108.7 L177.0,105.4 L178.9,102.1 L180.8,98.6 L182.7,95.1 L184.6,91.4 L186.6,87.7 L188.5,83.9 L190.4,80.0 L192.3,76.0 L194.2,72.0 L196.2,67.8 L198.1,63.6 L200.0,59.2"/>
+                <path class="ln s-r" d="M10.0,130.5 L10.5,130.5 L11.0,130.5 L11.4,130.6 L11.9,130.6 L12.4,130.6 L12.9,130.6 L13.3,130.7 L13.8,130.7 L14.3,130.7 L14.8,130.8 L15.2,130.8 L15.7,130.8 L16.2,130.9 L16.7,130.9 L17.1,130.9 L17.6,130.9 L18.1,131.0 L18.6,131.0 L19.0,131.0 L19.5,131.1 L20.0,131.1 L20.5,131.1 L21.0,131.2 L21.4,131.2 L21.9,131.2 L22.4,131.2 L22.9,131.3 L23.3,131.3 L23.8,131.3 L24.3,131.4 L24.8,131.4 L25.2,131.4 L25.7,131.4 L26.2,131.5 L26.7,131.5 L27.1,131.5 L27.6,131.6 L28.1,131.6 L28.6,131.6 L29.0,131.7 L29.5,131.7 L30.0,131.7 L30.5,131.7 L31.0,131.8 L31.4,131.8 L31.9,131.8 L32.4,131.9 L32.9,131.9 L33.3,131.9 L33.8,132.0 L34.3,132.0 L34.8,132.0 L35.2,132.0 L35.7,132.1 L36.2,132.1 L36.7,132.1 L37.1,132.2 L37.6,132.2 L38.1,132.2 L38.6,132.3 L39.0,132.3 L39.5,132.3 L40.0,132.3 L40.5,132.4 L41.0,132.4 L41.4,132.4 L41.9,132.5 L42.4,132.5 L42.9,132.5 L43.3,132.6 L43.8,132.6 L44.3,132.6 L44.8,132.6 L45.2,132.7 L45.7,132.7 L46.2,132.7 L46.7,132.8 L47.1,132.8 L47.6,132.8 L48.1,132.9 L48.6,132.9 L49.0,132.9 L49.5,132.9 L50.0,133.0 L50.5,133.0 L51.0,133.0 L51.4,133.1 L51.9,133.1 L52.4,133.1 L52.9,133.1 L53.3,133.2 L53.8,133.2 L54.3,133.2 L54.8,133.3 L55.2,133.3 L55.7,133.3 L56.2,133.4 L56.7,133.4 L57.1,133.4 L57.6,133.4 L58.1,133.5 L58.6,133.5 L59.0,133.5 L59.5,133.6 L60.0,133.6 L60.5,133.6 L61.0,133.7 L61.4,133.7 L61.9,133.7 L62.4,133.7 L62.9,133.8 L63.3,133.8 L63.8,133.8 L64.3,133.9 L64.8,133.9 L65.2,133.9 L65.7,134.0 L66.2,134.0 L66.7,134.0 L67.1,134.0 L67.6,134.1 L68.1,134.1 L68.6,134.1 L69.0,134.2 L69.5,134.2 L70.0,134.2 L70.5,134.3 L71.0,134.3 L71.4,134.3 L71.9,134.3 L72.4,134.4 L72.9,134.4 L73.3,134.4 L73.8,134.5 L74.3,134.5 L74.8,134.5 L75.2,134.6 L75.7,134.6 L76.2,134.6 L76.7,134.6 L77.1,134.7 L77.6,134.7 L78.1,134.7 L78.6,134.8 L79.0,134.8 L79.5,134.8 L80.0,134.9 L80.5,134.9 L81.0,134.9 L81.4,134.9 L81.9,135.0 L82.4,135.0 L82.9,135.0 L83.3,135.1 L83.8,135.1 L84.3,135.1 L84.8,135.1 L85.2,135.2 L85.7,135.2 L86.2,135.2 L86.7,135.3 L87.1,135.3 L87.6,135.3 L88.1,135.4 L88.6,135.4 L89.0,135.4 L89.5,135.4 L90.0,135.5 L90.5,135.5 L91.0,135.5 L91.4,135.6 L91.9,135.6 L92.4,135.6 L92.9,135.7 L93.3,135.7 L93.8,135.7 L94.3,135.7 L94.8,135.8 L95.2,135.8 L95.7,135.8 L96.2,135.9 L96.7,135.9 L97.1,135.9 L97.6,136.0 L98.1,136.0 L98.6,136.0 L99.0,136.0 L99.5,136.1 L100.0,136.1 L100.5,136.1 L101.0,136.2 L101.4,136.2 L101.9,136.2 L102.4,136.3 L102.9,136.3 L103.3,136.3 L103.8,136.3 L104.3,136.4 L104.8,136.4 L105.2,136.4 L105.7,136.5 L106.2,136.5 L106.7,136.5 L107.1,136.6 L107.6,136.6 L108.1,136.6 L108.6,136.6 L109.0,136.7 L109.5,136.7 L110.0,136.7 L110.5,136.8 L111.0,136.8 L111.4,136.8 L111.9,136.9 L112.4,136.9 L112.9,136.9 L113.3,136.9 L113.8,137.0 L114.3,137.0 L114.8,137.0 L115.2,137.1 L115.7,137.1 L116.2,137.1 L116.7,137.1 L117.1,137.2 L117.6,137.2 L118.1,137.2 L118.6,137.3 L119.0,137.3 L119.5,137.3 L120.0,137.4 L120.5,137.4 L121.0,137.4 L121.4,137.4 L121.9,137.5 L122.4,137.5 L122.9,137.5 L123.3,137.6 L123.8,137.6 L124.3,137.6 L124.8,137.7 L125.2,137.7 L125.7,137.7 L126.2,137.7 L126.7,137.8 L127.1,137.8 L127.6,137.8 L128.1,137.9 L128.6,137.9 L129.0,137.9 L129.5,138.0 L130.0,138.0 L130.5,138.0 L131.0,138.0 L131.4,138.1 L131.9,138.1 L132.4,138.1 L132.9,138.2 L133.3,138.2 L133.8,138.2 L134.3,138.3 L134.8,138.3 L135.2,138.3 L135.7,138.3 L136.2,138.4 L136.7,138.4 L137.1,138.4 L137.6,138.5 L138.1,138.5 L138.6,138.5 L139.0,138.6 L139.5,138.6 L140.0,138.6 L140.5,138.6 L141.0,138.7 L141.4,138.7 L141.9,138.7 L142.4,138.8 L142.9,138.8 L143.3,138.8 L143.8,138.8 L144.3,138.9 L144.8,138.9 L145.2,138.9 L145.7,139.0 L146.2,139.0 L146.7,139.0 L147.1,139.1 L147.6,139.1 L148.1,139.1 L148.6,139.1 L149.0,139.2 L149.5,139.2 L150.0,139.2 L150.5,139.3 L151.0,139.3 L151.4,139.3 L151.9,139.4 L152.4,139.4 L152.9,139.4 L153.3,139.4 L153.8,139.5 L154.3,139.5 L154.8,139.5 L155.2,139.6 L155.7,139.6 L156.2,139.6 L156.7,139.7 L157.1,139.7 L157.6,139.7 L158.1,139.7 L158.6,139.8 L159.0,139.8 L159.5,139.8 L160.0,139.9 L160.5,139.9 L161.0,139.9 L161.4,140.0 L161.9,140.0 L162.4,140.0 L162.9,140.0 L163.3,140.1 L163.8,140.1 L164.3,140.1 L164.8,140.2 L165.2,140.2 L165.7,140.2 L166.2,140.3 L166.7,140.3 L167.1,140.3 L167.6,140.3 L168.1,140.4 L168.6,140.4 L169.0,140.4 L169.5,140.5 L170.0,140.5 L170.5,140.5 L171.0,140.6 L171.4,140.6 L171.9,140.6 L172.4,140.6 L172.9,140.7 L173.3,140.7 L173.8,140.7 L174.3,140.8 L174.8,140.8 L175.2,140.8 L175.7,140.8 L176.2,140.9 L176.7,140.9 L177.1,140.9 L177.6,141.0 L178.1,141.0 L178.6,141.0 L179.0,141.1 L179.5,141.1 L180.0,141.1 L180.5,141.1 L181.0,141.2 L181.4,141.2 L181.9,141.2 L182.4,141.3 L182.9,141.3 L183.3,141.3 L183.8,141.4 L184.3,141.4 L184.8,141.4 L185.2,141.4 L185.7,141.5 L186.2,141.5 L186.7,141.5 L187.1,141.6 L187.6,141.6 L188.1,141.6 L188.6,141.7 L189.0,141.7 L189.5,141.7 L190.0,141.7 L190.5,141.8 L191.0,141.8 L191.4,141.8 L191.9,141.9 L192.4,141.9 L192.9,141.9 L193.3,142.0 L193.8,142.0 L194.3,142.0 L194.8,142.0 L195.2,142.1 L195.7,142.1 L196.2,142.1 L196.7,142.2 L197.1,142.2 L197.6,142.2 L198.1,142.3 L198.6,142.3 L199.0,142.3 L199.5,142.3 L200.0,142.4"/>
+                <circle class="f-i" cx="15.9" cy="69.7" r="3"/>
+                <circle class="f-i" cx="25.3" cy="94.2" r="3"/>
+                <circle class="f-i" cx="34.7" cy="94.7" r="3"/>
+                <circle class="f-i" cx="44.1" cy="120.8" r="3"/>
+                <circle class="f-i" cx="53.4" cy="147.0" r="3"/>
+                <circle class="f-i" cx="62.8" cy="138.6" r="3"/>
+                <circle class="f-i" cx="72.2" cy="127.1" r="3"/>
+                <circle class="f-i" cx="81.6" cy="141.0" r="3"/>
+                <circle class="f-i" cx="90.9" cy="180.2" r="3"/>
+                <circle class="f-i" cx="100.3" cy="194.2" r="3"/>
+                <circle class="f-i" cx="109.7" cy="180.6" r="3"/>
+                <circle class="f-i" cx="119.1" cy="164.4" r="3"/>
+                <circle class="f-i" cx="128.4" cy="210.3" r="3"/>
+                <circle class="f-i" cx="137.8" cy="159.3" r="3"/>
+                <circle class="f-i" cx="147.2" cy="172.6" r="3"/>
+                <circle class="f-i" cx="156.6" cy="151.2" r="3"/>
+                <circle class="f-i" cx="165.9" cy="134.6" r="3"/>
+                <circle class="f-i" cx="175.3" cy="115.0" r="3"/>
+                <circle class="f-i" cx="184.7" cy="82.6" r="3"/>
+                <circle class="f-i" cx="194.1" cy="50.3" r="3"/>
+                <text class="b" x="105.0" y="20" text-anchor="middle">degree 1: underfit</text>
+                <rect class="f-k" x="215" y="30" width="190" height="180" rx="4"/>
+                <path class="ln thin s-f dash" d="M215.0,59.2 L216.9,63.6 L218.8,67.8 L220.8,72.0 L222.7,76.0 L224.6,80.0 L226.5,83.9 L228.4,87.7 L230.4,91.4 L232.3,95.1 L234.2,98.6 L236.1,102.1 L238.0,105.4 L239.9,108.7 L241.9,111.9 L243.8,115.0 L245.7,118.0 L247.6,120.9 L249.5,123.7 L251.5,126.5 L253.4,129.1 L255.3,131.7 L257.2,134.2 L259.1,136.6 L261.1,138.9 L263.0,141.1 L264.9,143.2 L266.8,145.2 L268.7,147.2 L270.7,149.1 L272.6,150.8 L274.5,152.5 L276.4,154.1 L278.3,155.6 L280.3,157.0 L282.2,158.3 L284.1,159.6 L286.0,160.7 L287.9,161.8 L289.8,162.8 L291.8,163.7 L293.7,164.4 L295.6,165.2 L297.5,165.8 L299.4,166.3 L301.4,166.8 L303.3,167.1 L305.2,167.4 L307.1,167.5 L309.0,167.6 L311.0,167.6 L312.9,167.5 L314.8,167.4 L316.7,167.1 L318.6,166.8 L320.6,166.3 L322.5,165.8 L324.4,165.2 L326.3,164.4 L328.2,163.7 L330.2,162.8 L332.1,161.8 L334.0,160.7 L335.9,159.6 L337.8,158.3 L339.7,157.0 L341.7,155.6 L343.6,154.1 L345.5,152.5 L347.4,150.8 L349.3,149.1 L351.3,147.2 L353.2,145.2 L355.1,143.2 L357.0,141.1 L358.9,138.9 L360.9,136.6 L362.8,134.2 L364.7,131.7 L366.6,129.1 L368.5,126.5 L370.5,123.7 L372.4,120.9 L374.3,118.0 L376.2,115.0 L378.1,111.9 L380.1,108.7 L382.0,105.4 L383.9,102.1 L385.8,98.6 L387.7,95.1 L389.6,91.4 L391.6,87.7 L393.5,83.9 L395.4,80.0 L397.3,76.0 L399.2,72.0 L401.2,67.8 L403.1,63.6 L405.0,59.2"/>
+                <path class="ln s-g" d="M215.0,40.9 L215.5,42.3 L216.0,43.6 L216.4,45.0 L216.9,46.3 L217.4,47.6 L217.9,49.0 L218.3,50.3 L218.8,51.6 L219.3,52.9 L219.8,54.2 L220.2,55.5 L220.7,56.7 L221.2,58.0 L221.7,59.3 L222.1,60.5 L222.6,61.8 L223.1,63.0 L223.6,64.3 L224.0,65.5 L224.5,66.7 L225.0,68.0 L225.5,69.2 L226.0,70.4 L226.4,71.6 L226.9,72.8 L227.4,74.0 L227.9,75.2 L228.3,76.3 L228.8,77.5 L229.3,78.7 L229.8,79.8 L230.2,81.0 L230.7,82.1 L231.2,83.2 L231.7,84.4 L232.1,85.5 L232.6,86.6 L233.1,87.7 L233.6,88.8 L234.0,89.9 L234.5,91.0 L235.0,92.1 L235.5,93.1 L236.0,94.2 L236.4,95.3 L236.9,96.3 L237.4,97.4 L237.9,98.4 L238.3,99.5 L238.8,100.5 L239.3,101.5 L239.8,102.5 L240.2,103.5 L240.7,104.5 L241.2,105.5 L241.7,106.5 L242.1,107.5 L242.6,108.5 L243.1,109.4 L243.6,110.4 L244.0,111.3 L244.5,112.3 L245.0,113.2 L245.5,114.2 L246.0,115.1 L246.4,116.0 L246.9,116.9 L247.4,117.8 L247.9,118.7 L248.3,119.6 L248.8,120.5 L249.3,121.4 L249.8,122.3 L250.2,123.1 L250.7,124.0 L251.2,124.9 L251.7,125.7 L252.1,126.6 L252.6,127.4 L253.1,128.2 L253.6,129.0 L254.0,129.9 L254.5,130.7 L255.0,131.5 L255.5,132.3 L256.0,133.0 L256.4,133.8 L256.9,134.6 L257.4,135.4 L257.9,136.1 L258.3,136.9 L258.8,137.6 L259.3,138.4 L259.8,139.1 L260.2,139.8 L260.7,140.6 L261.2,141.3 L261.7,142.0 L262.1,142.7 L262.6,143.4 L263.1,144.1 L263.6,144.8 L264.0,145.4 L264.5,146.1 L265.0,146.8 L265.5,147.4 L266.0,148.1 L266.4,148.7 L266.9,149.3 L267.4,150.0 L267.9,150.6 L268.3,151.2 L268.8,151.8 L269.3,152.4 L269.8,153.0 L270.2,153.6 L270.7,154.2 L271.2,154.8 L271.7,155.3 L272.1,155.9 L272.6,156.4 L273.1,157.0 L273.6,157.5 L274.0,158.1 L274.5,158.6 L275.0,159.1 L275.5,159.6 L276.0,160.1 L276.4,160.7 L276.9,161.1 L277.4,161.6 L277.9,162.1 L278.3,162.6 L278.8,163.1 L279.3,163.5 L279.8,164.0 L280.2,164.4 L280.7,164.9 L281.2,165.3 L281.7,165.7 L282.1,166.2 L282.6,166.6 L283.1,167.0 L283.6,167.4 L284.0,167.8 L284.5,168.2 L285.0,168.6 L285.5,168.9 L286.0,169.3 L286.4,169.7 L286.9,170.0 L287.4,170.4 L287.9,170.7 L288.3,171.0 L288.8,171.4 L289.3,171.7 L289.8,172.0 L290.2,172.3 L290.7,172.6 L291.2,172.9 L291.7,173.2 L292.1,173.5 L292.6,173.8 L293.1,174.0 L293.6,174.3 L294.0,174.6 L294.5,174.8 L295.0,175.0 L295.5,175.3 L296.0,175.5 L296.4,175.7 L296.9,176.0 L297.4,176.2 L297.9,176.4 L298.3,176.6 L298.8,176.8 L299.3,176.9 L299.8,177.1 L300.2,177.3 L300.7,177.4 L301.2,177.6 L301.7,177.7 L302.1,177.9 L302.6,178.0 L303.1,178.2 L303.6,178.3 L304.0,178.4 L304.5,178.5 L305.0,178.6 L305.5,178.7 L306.0,178.8 L306.4,178.9 L306.9,179.0 L307.4,179.0 L307.9,179.1 L308.3,179.1 L308.8,179.2 L309.3,179.2 L309.8,179.3 L310.2,179.3 L310.7,179.3 L311.2,179.3 L311.7,179.4 L312.1,179.4 L312.6,179.4 L313.1,179.3 L313.6,179.3 L314.0,179.3 L314.5,179.3 L315.0,179.2 L315.5,179.2 L316.0,179.1 L316.4,179.1 L316.9,179.0 L317.4,179.0 L317.9,178.9 L318.3,178.8 L318.8,178.7 L319.3,178.6 L319.8,178.5 L320.2,178.4 L320.7,178.3 L321.2,178.2 L321.7,178.0 L322.1,177.9 L322.6,177.7 L323.1,177.6 L323.6,177.4 L324.0,177.3 L324.5,177.1 L325.0,176.9 L325.5,176.7 L326.0,176.6 L326.4,176.4 L326.9,176.2 L327.4,175.9 L327.9,175.7 L328.3,175.5 L328.8,175.3 L329.3,175.0 L329.8,174.8 L330.2,174.5 L330.7,174.3 L331.2,174.0 L331.7,173.8 L332.1,173.5 L332.6,173.2 L333.1,172.9 L333.6,172.6 L334.0,172.3 L334.5,172.0 L335.0,171.7 L335.5,171.4 L336.0,171.0 L336.4,170.7 L336.9,170.4 L337.4,170.0 L337.9,169.7 L338.3,169.3 L338.8,168.9 L339.3,168.5 L339.8,168.2 L340.2,167.8 L340.7,167.4 L341.2,167.0 L341.7,166.6 L342.1,166.1 L342.6,165.7 L343.1,165.3 L343.6,164.9 L344.0,164.4 L344.5,164.0 L345.0,163.5 L345.5,163.0 L346.0,162.6 L346.4,162.1 L346.9,161.6 L347.4,161.1 L347.9,160.6 L348.3,160.1 L348.8,159.6 L349.3,159.1 L349.8,158.6 L350.2,158.1 L350.7,157.5 L351.2,157.0 L351.7,156.4 L352.1,155.9 L352.6,155.3 L353.1,154.7 L353.6,154.2 L354.0,153.6 L354.5,153.0 L355.0,152.4 L355.5,151.8 L356.0,151.2 L356.4,150.6 L356.9,150.0 L357.4,149.3 L357.9,148.7 L358.3,148.0 L358.8,147.4 L359.3,146.7 L359.8,146.1 L360.2,145.4 L360.7,144.7 L361.2,144.1 L361.7,143.4 L362.1,142.7 L362.6,142.0 L363.1,141.3 L363.6,140.5 L364.0,139.8 L364.5,139.1 L365.0,138.4 L365.5,137.6 L366.0,136.9 L366.4,136.1 L366.9,135.4 L367.4,134.6 L367.9,133.8 L368.3,133.0 L368.8,132.2 L369.3,131.4 L369.8,130.6 L370.2,129.8 L370.7,129.0 L371.2,128.2 L371.7,127.4 L372.1,126.5 L372.6,125.7 L373.1,124.8 L373.6,124.0 L374.0,123.1 L374.5,122.3 L375.0,121.4 L375.5,120.5 L376.0,119.6 L376.4,118.7 L376.9,117.8 L377.4,116.9 L377.9,116.0 L378.3,115.1 L378.8,114.1 L379.3,113.2 L379.8,112.3 L380.2,111.3 L380.7,110.4 L381.2,109.4 L381.7,108.4 L382.1,107.5 L382.6,106.5 L383.1,105.5 L383.6,104.5 L384.0,103.5 L384.5,102.5 L385.0,101.5 L385.5,100.4 L386.0,99.4 L386.4,98.4 L386.9,97.3 L387.4,96.3 L387.9,95.2 L388.3,94.2 L388.8,93.1 L389.3,92.0 L389.8,91.0 L390.2,89.9 L390.7,88.8 L391.2,87.7 L391.7,86.6 L392.1,85.5 L392.6,84.3 L393.1,83.2 L393.6,82.1 L394.0,80.9 L394.5,79.8 L395.0,78.6 L395.5,77.5 L396.0,76.3 L396.4,75.1 L396.9,73.9 L397.4,72.8 L397.9,71.6 L398.3,70.4 L398.8,69.1 L399.3,67.9 L399.8,66.7 L400.2,65.5 L400.7,64.3 L401.2,63.0 L401.7,61.8 L402.1,60.5 L402.6,59.2 L403.1,58.0 L403.6,56.7 L404.0,55.4 L404.5,54.1 L405.0,52.8"/>
+                <circle class="f-i" cx="220.9" cy="69.7" r="3"/>
+                <circle class="f-i" cx="230.3" cy="94.2" r="3"/>
+                <circle class="f-i" cx="239.7" cy="94.7" r="3"/>
+                <circle class="f-i" cx="249.1" cy="120.8" r="3"/>
+                <circle class="f-i" cx="258.4" cy="147.0" r="3"/>
+                <circle class="f-i" cx="267.8" cy="138.6" r="3"/>
+                <circle class="f-i" cx="277.2" cy="127.1" r="3"/>
+                <circle class="f-i" cx="286.6" cy="141.0" r="3"/>
+                <circle class="f-i" cx="295.9" cy="180.2" r="3"/>
+                <circle class="f-i" cx="305.3" cy="194.2" r="3"/>
+                <circle class="f-i" cx="314.7" cy="180.6" r="3"/>
+                <circle class="f-i" cx="324.1" cy="164.4" r="3"/>
+                <circle class="f-i" cx="333.4" cy="210.3" r="3"/>
+                <circle class="f-i" cx="342.8" cy="159.3" r="3"/>
+                <circle class="f-i" cx="352.2" cy="172.6" r="3"/>
+                <circle class="f-i" cx="361.6" cy="151.2" r="3"/>
+                <circle class="f-i" cx="370.9" cy="134.6" r="3"/>
+                <circle class="f-i" cx="380.3" cy="115.0" r="3"/>
+                <circle class="f-i" cx="389.7" cy="82.6" r="3"/>
+                <circle class="f-i" cx="399.1" cy="50.3" r="3"/>
+                <text class="b" x="310.0" y="20" text-anchor="middle">degree 2: good fit</text>
+                <rect class="f-k" x="420" y="30" width="190" height="180" rx="4"/>
+                <path class="ln thin s-f dash" d="M420.0,59.2 L421.9,63.6 L423.8,67.8 L425.8,72.0 L427.7,76.0 L429.6,80.0 L431.5,83.9 L433.4,87.7 L435.4,91.4 L437.3,95.1 L439.2,98.6 L441.1,102.1 L443.0,105.4 L444.9,108.7 L446.9,111.9 L448.8,115.0 L450.7,118.0 L452.6,120.9 L454.5,123.7 L456.5,126.5 L458.4,129.1 L460.3,131.7 L462.2,134.2 L464.1,136.6 L466.1,138.9 L468.0,141.1 L469.9,143.2 L471.8,145.2 L473.7,147.2 L475.7,149.1 L477.6,150.8 L479.5,152.5 L481.4,154.1 L483.3,155.6 L485.3,157.0 L487.2,158.3 L489.1,159.6 L491.0,160.7 L492.9,161.8 L494.8,162.8 L496.8,163.7 L498.7,164.4 L500.6,165.2 L502.5,165.8 L504.4,166.3 L506.4,166.8 L508.3,167.1 L510.2,167.4 L512.1,167.5 L514.0,167.6 L516.0,167.6 L517.9,167.5 L519.8,167.4 L521.7,167.1 L523.6,166.8 L525.6,166.3 L527.5,165.8 L529.4,165.2 L531.3,164.4 L533.2,163.7 L535.2,162.8 L537.1,161.8 L539.0,160.7 L540.9,159.6 L542.8,158.3 L544.7,157.0 L546.7,155.6 L548.6,154.1 L550.5,152.5 L552.4,150.8 L554.3,149.1 L556.3,147.2 L558.2,145.2 L560.1,143.2 L562.0,141.1 L563.9,138.9 L565.9,136.6 L567.8,134.2 L569.7,131.7 L571.6,129.1 L573.5,126.5 L575.5,123.7 L577.4,120.9 L579.3,118.0 L581.2,115.0 L583.1,111.9 L585.1,108.7 L587.0,105.4 L588.9,102.1 L590.8,98.6 L592.7,95.1 L594.6,91.4 L596.6,87.7 L598.5,83.9 L600.4,80.0 L602.3,76.0 L604.2,72.0 L606.2,67.8 L608.1,63.6 L610.0,59.2"/>
+                <path class="ln s-a" d="M425.7,43.2 L426.2,95.7 L426.7,134.3 L427.1,161.5 L427.6,179.3 L428.1,189.7 L428.6,194.2 L429.0,194.1 L429.5,190.5 L430.0,184.5 L430.5,176.7 L431.0,167.8 L431.4,158.3 L431.9,148.6 L432.4,139.1 L432.9,130.0 L433.3,121.4 L433.8,113.6 L434.3,106.5 L434.8,100.3 L435.2,94.9 L435.7,90.4 L436.2,86.7 L436.7,83.7 L437.1,81.4 L437.6,79.8 L438.1,78.8 L438.6,78.3 L439.0,78.3 L439.5,78.7 L440.0,79.4 L440.5,80.4 L441.0,81.6 L441.4,83.0 L441.9,84.6 L442.4,86.2 L442.9,87.9 L443.3,89.6 L443.8,91.4 L444.3,93.1 L444.8,94.8 L445.2,96.5 L445.7,98.1 L446.2,99.7 L446.7,101.3 L447.1,102.7 L447.6,104.2 L448.1,105.6 L448.6,106.9 L449.0,108.2 L449.5,109.5 L450.0,110.8 L450.5,112.0 L451.0,113.2 L451.4,114.5 L451.9,115.7 L452.4,116.9 L452.9,118.2 L453.3,119.4 L453.8,120.7 L454.3,122.0 L454.8,123.3 L455.2,124.6 L455.7,125.9 L456.2,127.3 L456.7,128.6 L457.1,130.0 L457.6,131.4 L458.1,132.7 L458.6,134.0 L459.0,135.4 L459.5,136.7 L460.0,137.9 L460.5,139.1 L461.0,140.3 L461.4,141.4 L461.9,142.5 L462.4,143.5 L462.9,144.4 L463.3,145.3 L463.8,146.0 L464.3,146.7 L464.8,147.2 L465.2,147.7 L465.7,148.1 L466.2,148.3 L466.7,148.5 L467.1,148.5 L467.6,148.5 L468.1,148.3 L468.6,148.0 L469.0,147.6 L469.5,147.2 L470.0,146.6 L470.5,146.0 L471.0,145.2 L471.4,144.4 L471.9,143.5 L472.4,142.5 L472.9,141.5 L473.3,140.5 L473.8,139.4 L474.3,138.2 L474.8,137.1 L475.2,135.9 L475.7,134.8 L476.2,133.6 L476.7,132.5 L477.1,131.4 L477.6,130.3 L478.1,129.3 L478.6,128.3 L479.0,127.4 L479.5,126.6 L480.0,125.9 L480.5,125.2 L481.0,124.6 L481.4,124.2 L481.9,123.8 L482.4,123.6 L482.9,123.5 L483.3,123.5 L483.8,123.6 L484.3,123.8 L484.8,124.2 L485.2,124.7 L485.7,125.3 L486.2,126.1 L486.7,127.0 L487.1,128.0 L487.6,129.1 L488.1,130.3 L488.6,131.7 L489.0,133.2 L489.5,134.7 L490.0,136.4 L490.5,138.1 L491.0,139.9 L491.4,141.8 L491.9,143.8 L492.4,145.8 L492.9,147.9 L493.3,150.0 L493.8,152.2 L494.3,154.4 L494.8,156.5 L495.2,158.7 L495.7,160.9 L496.2,163.1 L496.7,165.2 L497.1,167.3 L497.6,169.4 L498.1,171.4 L498.6,173.4 L499.0,175.3 L499.5,177.2 L500.0,178.9 L500.5,180.6 L501.0,182.2 L501.4,183.7 L501.9,185.1 L502.4,186.3 L502.9,187.5 L503.3,188.6 L503.8,189.6 L504.3,190.4 L504.8,191.2 L505.2,191.8 L505.7,192.3 L506.2,192.7 L506.7,193.0 L507.1,193.2 L507.6,193.2 L508.1,193.2 L508.6,193.1 L509.0,192.9 L509.5,192.6 L510.0,192.2 L510.5,191.7 L511.0,191.2 L511.4,190.6 L511.9,189.9 L512.4,189.2 L512.9,188.4 L513.3,187.6 L513.8,186.8 L514.3,185.9 L514.8,185.1 L515.2,184.2 L515.7,183.3 L516.2,182.4 L516.7,181.6 L517.1,180.8 L517.6,179.9 L518.1,179.2 L518.6,178.4 L519.0,177.7 L519.5,177.1 L520.0,176.5 L520.5,176.0 L521.0,175.5 L521.4,175.1 L521.9,174.8 L522.4,174.5 L522.9,174.3 L523.3,174.2 L523.8,174.1 L524.3,174.1 L524.8,174.2 L525.2,174.4 L525.7,174.6 L526.2,174.9 L526.7,175.3 L527.1,175.7 L527.6,176.2 L528.1,176.7 L528.6,177.3 L529.0,177.9 L529.5,178.6 L530.0,179.3 L530.5,180.0 L531.0,180.7 L531.4,181.5 L531.9,182.3 L532.4,183.0 L532.9,183.8 L533.3,184.5 L533.8,185.2 L534.3,185.9 L534.8,186.6 L535.2,187.2 L535.7,187.8 L536.2,188.3 L536.7,188.8 L537.1,189.2 L537.6,189.6 L538.1,189.9 L538.6,190.1 L539.0,190.2 L539.5,190.2 L540.0,190.2 L540.5,190.1 L541.0,189.9 L541.4,189.6 L541.9,189.3 L542.4,188.8 L542.9,188.3 L543.3,187.7 L543.8,187.0 L544.3,186.3 L544.8,185.4 L545.2,184.6 L545.7,183.6 L546.2,182.6 L546.7,181.5 L547.1,180.5 L547.6,179.3 L548.1,178.2 L548.6,177.0 L549.0,175.8 L549.5,174.6 L550.0,173.4 L550.5,172.2 L551.0,171.0 L551.4,169.8 L551.9,168.7 L552.4,167.5 L552.9,166.5 L553.3,165.5 L553.8,164.5 L554.3,163.6 L554.8,162.7 L555.2,161.9 L555.7,161.2 L556.2,160.5 L556.7,160.0 L557.1,159.4 L557.6,159.0 L558.1,158.6 L558.6,158.3 L559.0,158.1 L559.5,157.9 L560.0,157.8 L560.5,157.7 L561.0,157.7 L561.4,157.7 L561.9,157.7 L562.4,157.8 L562.9,157.9 L563.3,157.9 L563.8,158.0 L564.3,158.0 L564.8,158.1 L565.2,158.0 L565.7,158.0 L566.2,157.8 L566.7,157.6 L567.1,157.4 L567.6,157.0 L568.1,156.5 L568.6,155.9 L569.0,155.3 L569.5,154.4 L570.0,153.5 L570.5,152.5 L571.0,151.3 L571.4,150.0 L571.9,148.5 L572.4,147.0 L572.9,145.3 L573.3,143.5 L573.8,141.6 L574.3,139.6 L574.8,137.6 L575.2,135.5 L575.7,133.3 L576.2,131.2 L576.7,129.0 L577.1,126.8 L577.6,124.7 L578.1,122.7 L578.6,120.8 L579.0,118.9 L579.5,117.3 L580.0,115.8 L580.5,114.4 L581.0,113.3 L581.4,112.5 L581.9,111.9 L582.4,111.5 L582.9,111.5 L583.3,111.7 L583.8,112.2 L584.3,113.0 L584.8,114.0 L585.2,115.3 L585.7,116.8 L586.2,118.4 L586.7,120.2 L587.1,122.1 L587.6,124.0 L588.1,125.8 L588.6,127.4 L589.0,128.8 L589.5,129.8 L590.0,130.4 L590.5,130.4 L591.0,129.6 L591.4,127.9 L591.9,125.3 L592.4,121.5 L592.9,116.4 L593.3,109.9 L593.8,101.8 L594.3,92.1 L594.8,80.7 L595.2,67.5 L595.7,52.5 L596.2,35.8"/>
+                <circle class="f-i" cx="425.9" cy="69.7" r="3"/>
+                <circle class="f-i" cx="435.3" cy="94.2" r="3"/>
+                <circle class="f-i" cx="444.7" cy="94.7" r="3"/>
+                <circle class="f-i" cx="454.1" cy="120.8" r="3"/>
+                <circle class="f-i" cx="463.4" cy="147.0" r="3"/>
+                <circle class="f-i" cx="472.8" cy="138.6" r="3"/>
+                <circle class="f-i" cx="482.2" cy="127.1" r="3"/>
+                <circle class="f-i" cx="491.6" cy="141.0" r="3"/>
+                <circle class="f-i" cx="500.9" cy="180.2" r="3"/>
+                <circle class="f-i" cx="510.3" cy="194.2" r="3"/>
+                <circle class="f-i" cx="519.7" cy="180.6" r="3"/>
+                <circle class="f-i" cx="529.1" cy="164.4" r="3"/>
+                <circle class="f-i" cx="538.4" cy="210.3" r="3"/>
+                <circle class="f-i" cx="547.8" cy="159.3" r="3"/>
+                <circle class="f-i" cx="557.2" cy="172.6" r="3"/>
+                <circle class="f-i" cx="566.6" cy="151.2" r="3"/>
+                <circle class="f-i" cx="575.9" cy="134.6" r="3"/>
+                <circle class="f-i" cx="585.3" cy="115.0" r="3"/>
+                <circle class="f-i" cx="594.7" cy="82.6" r="3"/>
+                <circle class="f-i" cx="604.1" cy="50.3" r="3"/>
+                <text class="b" x="515.0" y="20" text-anchor="middle">degree 15: overfit</text>
+                <text x="105.0" y="230" text-anchor="middle">train 3.85 · test 2.94</text>
+                <text x="310.0" y="230" text-anchor="middle">train 0.59 · test 1.18</text>
+                <text x="515.0" y="230" text-anchor="middle">train 0.14 · test 5.76</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 7.1</b> The 20 training points from the code, with the true parabola
+            (dashed). The line misses the curve. The parabola follows it. The degree-15 curve passes close
+            to the points but swings far away between them, and those swings are what the test points
+            punish.</figcaption>
+          </figure>
 
           <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">A model reaches 99% accuracy on its training set but only 61% on its validation set. Is this overfitting or underfitting, and what's a sensible first fix?</span>
+                <span class="check__q">A model reaches 99% accuracy on its training set but only 61% on its validation set. Is this overfitting or underfitting? What is a good first fix?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>This is <strong>overfitting</strong> — near-perfect training performance next to much worse
-                performance on data the model didn't train on is the signature. The model has enough capacity to
-                memorize the training set rather than learn the general pattern. Sensible first fixes: reduce
-                capacity (a smaller model, fewer tree splits), add regularization (covered later in this section),
-                collect more training data (harder to memorize a bigger set), or stop training earlier before it
-                starts fitting noise.</p>
+                <p>This is <strong>overfitting</strong>. Near-perfect training performance next to much
+                worse performance on unseen data is its typical sign. The model has enough capacity to
+                memorize the training set instead of learning the general pattern. Good first fixes: reduce capacity (a smaller model, fewer tree splits), or add regularization (later in this section). You can also collect more training data, because a bigger set is harder to memorize. Or stop training earlier, before the model starts fitting noise.</p>
               </div>
             </details>
           </div>
@@ -144,71 +237,81 @@ for degree in (1, 2, 15):
           <h2><span class="h-num">2</span>Train / validation / test — and cross-validation</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>If you only ever measure your model on the data it trained on, you have no way to detect
-          overfitting — the memorizer always looks brilliant on the paper it memorized. So we split the data
-          into three separate pots, each with a different job, and we never let them mix.</p>
+          <p>If you measure your model only on the data it trained on, you cannot detect overfitting. The
+          memorizer always looks excellent on the paper it memorized. So we split the data into three
+          separate parts. Each part has a different job, and we never let them mix.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>Studying for a real exam has three phases. You do <strong>practice questions</strong> to learn the
-            material (the <strong>training set</strong>). You then sit a <strong>mock exam</strong> to see how
-            you're doing and decide what to restudy or which strategy to change (the <strong>validation set</strong>).
-            Finally, you sit the <strong>real exam</strong> exactly once (the <strong>test set</strong>) — its
-            whole value comes from the fact that you never adjusted your studying based on it. If you somehow saw
-            the real exam early and kept "improving" based on it, your final grade would no longer tell you
-            anything honest about how well you actually know the material.</p>
+            <p>Preparing for a real exam has three phases. You do <strong>practice questions</strong> to
+            learn the material (the <strong>training set</strong>). You take a <strong>practice
+            exam</strong> to see how you are doing and to decide what to study again (the
+            <strong>validation set</strong>). Finally, you take the <strong>real exam</strong> once (the
+            <strong>test set</strong>). Its value comes from the fact that you never changed your studying
+            because of it. Suppose you saw the real exam early and kept “improving” based on it. Then your final grade would no longer tell you how well you know the material.</p>
           </div>
 
           <div class="callout definition">
             <div class="callout__label">Definition</div>
-            <p>The <dfn>training set</dfn> is what the model directly learns its numbers from. The <dfn>validation
-            set</dfn> is held out during training and used to make decisions — which model, which settings (called
-            <dfn>hyperparameters</dfn>: choices you pick before training, like capacity or the regularization
-            strength below). The <dfn>test set</dfn> is touched exactly once, at the very end, to report a final,
-            unbiased number. If you tune anything based on the test set, you've quietly turned it into a second
-            validation set, and your reported score stops being trustworthy.</p>
+            <p>The <dfn>training set</dfn> is what the model learns its numbers from. The <dfn>validation
+            set</dfn> is held out during training and used to make decisions: which model, which settings.
+            These settings are called <dfn>hyperparameters</dfn>: choices you make before training, such as
+            capacity or the regularization strength below. The <dfn>test set</dfn> is used once, at the end,
+            to report a final, unbiased number. If you tune anything based on the test set, it becomes a
+            second validation set, and your reported score is no longer trustworthy.</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>With only one validation split, your estimate of "how good is this model" depends on which examples
-          happened to land in that split — a small, unlucky validation set can make a good model look bad, or vice
-          versa. <strong>k-fold cross-validation</strong> fixes this by rotating which slice is held out, so every
-          example gets used for validation exactly once:</p>
-          $$ \text{CV score} = \frac{1}{k}\sum_{i=1}^{k} \text{score}\big(\text{model trained on all folds except } i,\ \text{evaluated on fold } i\big) $$
-          <p class="gloss"><b>In words:</b> split the training data into <b>k</b> equal-sized folds (5 and 10 are
-          the common choices). Train <b>k</b> separate times, each time leaving out a different fold to validate
-          on, then average the <b>k</b> validation scores. Every example gets validated on exactly once, so the
-          final average is far less sensitive to one unlucky split — and you also get a spread across the
-          <b>k</b> scores, telling you how stable the estimate is.</p>
+          <p>With only one validation split, your estimate of “how good is this model” depends on which
+          examples happened to land in that split. A small, unlucky validation set can make a good model
+          look bad, or the other way around. <strong>k-fold cross-validation</strong> fixes this. It rotates
+          which part is held out, so every example is used for validation exactly once. Let
+          $s_i$ be the validation score of a model trained on all folds except fold $i$ and evaluated on
+          fold $i$. Then:</p>
+          $$ \text{CV score} = \frac{1}{k}\sum_{i=1}^{k} s_i $$
+          <p class="gloss"><b>In words:</b> split the training data into $k$ folds of equal size (5 and 10
+          are common choices). Train $k$ separate times, each time leaving out a different fold to validate
+          on. Then average the $k$ validation scores. Every example is validated on exactly once, so the
+          average depends much less on one unlucky split. The spread of the $k$ scores also tells you how
+          stable the estimate is.</p>
 
-          <p class="beat beat--code">The same thing in code</p>
+          <p class="beat beat--code">The same thing in NumPy</p>
+          <p class="codecap">split 10 rows into 5 folds</p>
           <pre><code class="language-python">import numpy as np
-from sklearn.model_selection import KFold
 
 X = np.arange(20).reshape(10, 2)          # 10 training examples, 2 features each
-kf = KFold(n_splits=5, shuffle=True, random_state=0)
+k = 5
+rng = np.random.default_rng(0)
+folds = np.array_split(rng.permutation(len(X)), k)   # shuffle, then cut into k folds
 
-for fold, (train_idx, val_idx) in enumerate(kf.split(X)):
-    print(f"fold {fold}: {len(train_idx)} rows train, {len(val_idx)} rows validate")
-
-# 5 folds of 10 rows -> each validation fold has 2 rows, each training fold has the other 8.
-# By the end, every one of the 10 rows has served as validation data exactly once.</code></pre>
+for i in range(k):
+    val_idx = folds[i]
+    train_idx = np.concatenate([folds[j] for j in range(k) if j != i])
+    print(f"fold {i}: train on {len(train_idx)} rows, validate on rows {sorted(val_idx.tolist())}")</code></pre>
+                    <p class="codecap">output</p>
+          <pre><code class="language-plaintext">fold 0: train on 8 rows, validate on rows [4, 6]
+fold 1: train on 8 rows, validate on rows [2, 7]
+fold 2: train on 8 rows, validate on rows [3, 5]
+fold 3: train on 8 rows, validate on rows [0, 9]
+fold 4: train on 8 rows, validate on rows [1, 8]</code></pre>
+          <p>Each of the 10 rows appears in exactly one validation fold. In practice you would use a
+          library for this, for example scikit-learn’s <code>KFold(n_splits=5, shuffle=True)</code>, which
+          does the same job.</p>
 
           <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">While tuning a model, you check test-set accuracy after every change and keep the version that scores highest on the test set. What's wrong with this, even though you never trained on the test set directly?</span>
+                <span class="check__q">While tuning a model, you check test-set accuracy after every change and keep the version with the best test score. You never train on the test set. What is wrong?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>You never trained on it, but you <strong>selected</strong> based on it — and selection is a
-                form of fitting. Across enough attempts, some version will score well on the test set purely by
-                luck (matching its particular noise), and picking "the best on the test set" is indistinguishable
-                from tuning on it. The reported number stops estimating real-world performance and starts
-                estimating "how well did I get lucky on this one fixed sample." The fix is to do all that tuning
-                against the validation set (or cross-validation), and touch the test set only once, at the very
-                end, to report the final number.</p>
+                <p>You did not train on the test set, but you <strong>selected</strong> based on it, and
+                selecting is a form of fitting. After enough attempts, some version will score well on the
+                test set by luck, because it happens to match that set’s particular noise. Picking “the best
+                on the test set” then has the same effect as tuning on it. The reported number no longer
+                estimates real-world performance. The fix is to do all tuning with the validation set (or
+                cross-validation) and use the test set once, at the end.</p>
               </div>
             </details>
           </div>
@@ -217,77 +320,123 @@ for fold, (train_idx, val_idx) in enumerate(kf.split(X)):
           <h2><span class="h-num">3</span>The bias–variance tradeoff</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>Overfitting and underfitting are two flavors of a deeper split: a model's test error comes from two
-          separate sources, <strong>bias</strong> and <strong>variance</strong>, and they trade off against each
-          other as capacity changes.</p>
+          <p>Overfitting and underfitting are two sides of a deeper split. A model’s test error comes from
+          two separate sources, <strong>bias</strong> and <strong>variance</strong>. As capacity changes, one
+          goes down while the other goes up.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>Picture a dartboard. <strong>High bias</strong> is a thrower whose darts land in a tight little
-            cluster — but that cluster is off in the upper-left corner, nowhere near the bullseye. Consistent, but
-            consistently wrong: a systematic error. <strong>High variance</strong> is a thrower whose darts scatter
-            all over the board — sometimes near the bullseye, sometimes far from it, with no consistency at all.
-            A great model is the rare thrower who is both consistent <em>and</em> centered on the bullseye; a bad
-            one can fail in either direction, or both.</p>
+            <p>Picture a dartboard. Each dart is one model, trained on a new random sample of data. The
+            bullseye is the true answer. <strong>High bias</strong> means the darts land in a tight group,
+            but the group is far from the bullseye: consistent, but consistently wrong. <strong>High
+            variance</strong> means the darts scatter over the board: each new sample gives a very different
+            model. A good model is both consistent <em>and</em> centered on the bullseye. A bad one can fail
+            in either way, or both.</p>
           </div>
 
           <div class="callout definition">
             <div class="callout__label">Definition</div>
-            <p><dfn>Bias</dfn> is systematic error: the model's assumptions are too simple to capture the real
-            pattern, so its predictions are wrong in the same direction no matter what training data it sees
-            (an underfitting straight line, forced to fit a curve, is high-bias). <dfn>Variance</dfn> is
-            sensitivity to the particular training set: retrain on a slightly different sample and the predictions
-            swing wildly (a deep, unconstrained tree that carves itself around every training point is
-            high-variance).</p>
+            <p><dfn>Bias</dfn> is systematic error. The model’s assumptions are too simple for the real
+            pattern, so its predictions are wrong in the same direction whatever training data it sees. A
+            straight line forced to fit a curve has high bias. <dfn>Variance</dfn> is sensitivity to the
+            particular training set. Retrain on a slightly different sample, and the predictions change a
+            lot. A deep, unconstrained tree that bends around every training point has high variance.</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>Suppose the true relationship is $y = f(x) + \epsilon$, where
-          $\epsilon$ is random noise with mean 0 and variance
-          $\sigma^2$ (irreducible — no model can predict pure noise).
-          We train a model on a random training set <b>D</b>, getting a prediction
-          $\hat f_D(x)$ at some test point <b>x</b>. Let
-          $\bar f(x) = \mathbb{E}_D[\hat f_D(x)]$ be the <em>average</em>
-          prediction you'd get if you retrained on many different random training sets. Then the expected squared
-          error at <b>x</b>, averaged over training sets, splits cleanly into three pieces:</p>
-          $$ \begin{aligned}
-          \mathbb{E}_D\big[(y - \hat f_D(x))^2\big]
-          &= \mathbb{E}_D\big[\big((f(x)-\bar f(x)) + (\bar f(x)-\hat f_D(x)) + \epsilon\big)^2\big] \\
-          &= \underbrace{(f(x)-\bar f(x))^2}_{\text{Bias}^2} \;+\; \underbrace{\mathbb{E}_D\big[(\bar f(x)-\hat f_D(x))^2\big]}_{\text{Variance}} \;+\; \underbrace{\sigma^2}_{\text{irreducible noise}}
-          \end{aligned} $$
-          <p class="gloss"><b>In words:</b> the cross terms vanish when you average over many retrainings, because
-          the noise $\epsilon$ has mean zero and is independent of the
-          data, and $\hat f_D(x)$ deviates from its own average
-          $\bar f(x)$ in both directions equally. What's left is three
-          additive pieces: how far off-center your average prediction is (<b>bias²</b>), how much predictions
-          swing between different training sets (<b>variance</b>), and noise you could never predict no matter
-          how good the model is (<b>σ²</b>). Total test error is the sum of all three — you can trade bias for
-          variance, but you can never drive either below zero, and you can never remove the noise floor.</p>
+          <p>Suppose the true relationship is $y = f(x) + \epsilon$. The noise $\epsilon$ has mean 0 and
+          variance $\sigma^2$, and it is independent of everything else. No model can predict it, so we call
+          it irreducible. We train a model on a random training set $D$ and get the prediction
+          $\hat f_D(x)$ at a test point $x$. Let $\bar f(x) = \mathbb{E}_D[\hat f_D(x)]$ be the
+          <em>average</em> prediction over many random training sets.</p>
+          <p>We want the expected squared error at $x$, averaged over both the training set $D$ and the
+          noise $\epsilon$ in the test label. Add and subtract $\bar f(x)$, and write the error as a sum of
+          three parts:</p>
+          $$ y - \hat f_D(x) = a + b_D + \epsilon $$
+          <p class="gloss"><b>In words:</b> $a = f(x)-\bar f(x)$ is a fixed number (it does not depend
+          on $D$). $b_D = \bar f(x)-\hat f_D(x)$ changes with the training set. $\epsilon$ is the
+          test-label noise. The three parts add up to $y - \hat f_D(x)$ because $y = f(x) + \epsilon$.</p>
+          <p>Square the sum and take the expectation of each term:</p>
+          $$
+          \begin{aligned}
+          &\mathbb{E}\big[(a + b_D + \epsilon)^2\big] \\
+          &\quad= a^2 + \mathbb{E}[b_D^2] + \mathbb{E}[\epsilon^2] \\
+          &\qquad + 2a\,\mathbb{E}[b_D] + 2a\,\mathbb{E}[\epsilon] \\
+          &\qquad + 2\,\mathbb{E}[b_D\,\epsilon]
+          \end{aligned}
+          $$
+          <p class="gloss"><b>In words:</b> the last three terms (the cross terms) are all zero. Also, $\mathbb{E}[\epsilon^2] = \sigma^2$.
+          $\mathbb{E}[b_D] = \bar f(x) - \mathbb{E}_D[\hat f_D(x)] = 0$ by the definition of $\bar f$.
+          $\mathbb{E}[\epsilon] = 0$ because the noise has mean zero. $\mathbb{E}[b_D\,\epsilon] =
+          \mathbb{E}[b_D]\,\mathbb{E}[\epsilon] = 0$ because the test noise is independent of the training
+          set.</p>
+          <p>What remains is the bias–variance decomposition:</p>
+          $$
+          \begin{aligned}
+          &\mathbb{E}\big[(y - \hat f_D(x))^2\big] \\
+          &\quad= \underbrace{(f(x)-\bar f(x))^2}_{\text{bias}^2} \\
+          &\qquad + \underbrace{\mathbb{E}_D\big[(\bar f(x)-\hat f_D(x))^2\big]}_{\text{variance}} + \underbrace{\sigma^2}_{\text{noise}}
+          \end{aligned}
+          $$
+          <p class="gloss"><b>In words:</b> three parts add up to the test error. <b>Bias²</b> is how far
+          the average prediction is from the truth. <b>Variance</b> is how much predictions change between
+          training sets. <b>Noise</b> $\sigma^2$ is the part no model can predict. All three are
+          non-negative, so the test error can never go below $\sigma^2$.</p>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> The tradeoff</div>
-            <p>Raising model capacity (a deeper tree, more parameters, a higher-degree polynomial) typically
-            <strong>lowers bias</strong> — the model can now represent the true pattern more closely — but
-            <strong>raises variance</strong> — it also has more freedom to chase the noise in whatever training
-            set it happens to see. Total test error, plotted against capacity, is usually U-shaped: too little
-            capacity and bias dominates, too much and variance dominates, with a minimum somewhere in the middle.
-            Regularization, up next, is a way to buy back some of that variance without fully giving up capacity.</p>
+            <p>More capacity (a deeper tree, more parameters, a higher polynomial degree) usually
+            <strong>lowers bias</strong>, because the model can follow the true pattern more closely. It
+            usually also <strong>raises variance</strong>, because the model has more freedom to follow the
+            noise in its training set. So total test error, plotted against capacity, is often U-shaped (Figure
+            7.2). Regularization, next, is a way to reduce variance without giving up all the
+            capacity.</p>
           </div>
+
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 460 265" role="img" aria-labelledby="fig-07-2-t">
+                <title id="fig-07-2-t">Bias squared falls and variance rises as polynomial degree grows; their sum plus noise is U-shaped with its minimum at degree 5</title>
+                <line class="ax" x1="60" y1="220" x2="445" y2="220"/><line class="ax" x1="60" y1="220" x2="60" y2="15"/>
+                <text class="sm" x="60.0" y="236" text-anchor="middle">0</text>
+                <text class="sm" x="136.0" y="236" text-anchor="middle">2</text>
+                <text class="sm" x="212.0" y="236" text-anchor="middle">4</text>
+                <text class="sm" x="288.0" y="236" text-anchor="middle">6</text>
+                <text class="sm" x="364.0" y="236" text-anchor="middle">8</text>
+                <text class="sm" x="440.0" y="236" text-anchor="middle">10</text>
+                <line class="grid" x1="60" x2="440" y1="157.5" y2="157.5"/><text class="sm" x="54" y="161.5" text-anchor="end">1</text>
+                <line class="grid" x1="60" x2="440" y1="95.0" y2="95.0"/><text class="sm" x="54" y="99.0" text-anchor="end">2</text>
+                <line class="grid" x1="60" x2="440" y1="32.5" y2="32.5"/><text class="sm" x="54" y="36.5" text-anchor="end">3</text>
+                <path class="ln thin s-f dash" d="M60.0,157.5 L440.0,157.5"/>
+                <path class="ln s-r" d="M60.0,99.4 L98.0,113.2 L136.0,144.8 L174.0,202.3 L212.0,213.9 L250.0,219.6 L288.0,219.9 L326.0,220.0 L364.0,220.0 L402.0,220.0 L440.0,220.0"/>
+                <path class="ln s-a" d="M60.0,216.0 L98.0,213.2 L136.0,210.4 L174.0,207.3 L212.0,203.6 L250.0,200.9 L288.0,195.7 L326.0,192.4 L364.0,187.6 L402.0,182.3 L440.0,175.5"/>
+                <path class="ln s-v" d="M60.0,33.0 L98.0,43.9 L136.0,72.7 L174.0,127.1 L212.0,135.0 L250.0,138.0 L288.0,133.1 L326.0,129.9 L364.0,125.1 L402.0,119.7 L440.0,113.0"/>
+                <circle class="f-v" cx="250.0" cy="138.0" r="5"/>
+                <text class="tv lg" x="440.0" y="99.0" text-anchor="end">total test error</text>
+                <text class="tr lg" x="113.2" y="115.2">bias²</text>
+                <text class="ta lg" x="386.8" y="204.3">variance</text>
+                <text class="sm" x="440.0" y="151.5" text-anchor="end">noise σ² = 1</text>
+                <text x="252" y="256" text-anchor="middle">polynomial degree (capacity)</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 7.2</b> Bias² (rose) and variance (amber) measured by simulation. We drew 2,000 training sets of 15 noisy points from a wavy curve and fit polynomials of each degree. Total test
+            error (violet) is bias² + variance + noise (dashed line at 1). It is lowest at degree 5, where
+            bias² is already near zero and variance has not yet grown much.</figcaption>
+          </figure>
 
           <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">A single straight line is fit to clearly curved data, and separately, a deep unregularized decision tree is fit to the same data. Which one is high-bias/low-variance, and which is low-bias/high-variance?</span>
+                <span class="check__q">You keep the model (degree 15) but collect ten times more training data from the same source. Which of bias², variance and noise changes, and in which direction?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>The straight line is <strong>high-bias, low-variance</strong>: it's too simple to bend to the
-                curve (systematic error, the same wrong shape no matter what sample you train it on), but retrain
-                it on a different sample and you'll get almost the same line back — it's stable. The deep tree is
-                <strong>low-bias, high-variance</strong>: it's flexible enough to fit the curve closely on
-                average, but it also carves itself around whichever specific noisy points it happened to see, so a
-                different training sample produces a noticeably different tree.</p>
+                <p>Variance goes down. With more points, each random training set pins the curve down more
+                firmly, so different training sets give more similar models. Bias² stays about the same,
+                because it depends on what the model <em>can</em> represent, and that did not change. (Here
+                it is already near zero.) Noise does not change at all: it belongs to the data, not the
+                model. This is why more data is the classic cure for overfitting.</p>
               </div>
             </details>
           </div>
@@ -296,103 +445,189 @@ for fold, (train_idx, val_idx) in enumerate(kf.split(X)):
           <h2><span class="h-num">4</span>Regularization: penalizing the size of the weights</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p><dfn>Regularization</dfn> is a way to fight overfitting directly: add an extra term to the loss that
-          penalizes weights for being <em>large</em>, on top of the usual term that penalizes wrong predictions.
-          A model can still use every weight, but it now pays a price for using it aggressively, which pushes it
-          toward simpler, smoother solutions that are less likely to be chasing noise. The penalty is measured
-          with the norms from <a href="01-linear-algebra.html">Section 1</a> — L2 or L1, applied to the weights.</p>
+          <p><dfn>Regularization</dfn> fights overfitting directly. It adds an extra term to the loss that
+          penalizes <em>large</em> weights, on top of the usual term that penalizes wrong predictions. The
+          model can still use every weight, but it pays a price for large ones. This pushes it toward
+          simpler, smoother solutions that are less likely to follow noise. The penalty uses the norms from
+          <a href="01-linear-algebra.html">Section 1</a>: L2 or L1, applied to the weights.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>Put yourself on a strict monthly budget. With plenty of room to spend, you buy everything that
-            seems even a little useful. Under a tight budget, you're forced to make choices: some small,
-            marginal purchases get <strong>cut to zero</strong> entirely (you decide you don't need them at all),
-            while the purchases you keep, you trim down a little across the board to stay under the limit. L1
-            regularization behaves like the first kind of budgeting — it zeroes out the marginal weights entirely.
-            L2 behaves like the second — it trims everything down a bit, but rarely cuts anything all the way
-            to nothing.</p>
+            <p>Imagine two ways to charge you for shopping. <strong>L1</strong> is a flat fee on every dollar you spend. Per dollar, a small purchase pays the same fee as a big one. A
+            purchase that is only a little useful is not worth that fee, so you drop it completely.
+            <strong>L2</strong> is a tax on the <em>square</em> of each purchase. Big purchases are taxed
+            heavily, but small ones are taxed almost nothing, so you keep them, only a little smaller. L1
+            drops weights to zero. L2 shrinks all weights but rarely drops one.</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p><strong>L2 regularization</strong> (also called <dfn>ridge</dfn>, or <dfn>weight decay</dfn> when
-          used with gradient descent) adds the squared L2 norm of the weights to the loss:</p>
-          $$ L_{\text{ridge}}(\boldsymbol\theta) = L_{\text{data}}(\boldsymbol\theta) + \lambda \lVert\boldsymbol\theta\rVert_2^2 = L_{\text{data}}(\boldsymbol\theta) + \lambda\sum_i \theta_i^2 $$
-          <p class="gloss"><b>In words:</b> $L_{\text{data}}$ is
-          the ordinary loss measuring wrong predictions; $\lambda$
-          (lambda, a hyperparameter you choose) controls how strongly we punish large weights. Take the gradient
-          of this loss with respect to one weight $\theta_i$ and plug it
-          into a gradient descent step with learning rate $\alpha$:</p>
-          $$ \theta_i \leftarrow \theta_i - \alpha\Big(\frac{\partial L_{\text{data}}}{\partial \theta_i} + 2\lambda\theta_i\Big) = \underbrace{(1 - 2\alpha\lambda)}_{\text{shrink factor} \lt 1}\,\theta_i \;-\; \alpha\frac{\partial L_{\text{data}}}{\partial \theta_i} $$
-          <p class="gloss"><b>In words:</b> every single update multiplies the weight by a shrink factor slightly
-          less than 1, <em>before</em> applying the usual data-driven update. That's why L2 is nicknamed "weight
-          decay" — the weight quietly decays toward zero every step, on top of whatever the data pushes it toward.
-          Because the shrink is proportional to the weight's own size, it acts on every weight, but never fully
-          zeroes one out — a smaller and smaller nudge as the weight approaches zero, never quite finishing.</p>
+          <p><strong>L2 regularization</strong> (also called <dfn>ridge</dfn>, or <dfn>weight decay</dfn>
+          with gradient descent) adds the squared L2 norm of the weights $\boldsymbol\theta$ to the
+          loss:</p>
+          $$
+          \begin{aligned}
+          L_{\text{ridge}}(\boldsymbol\theta) &= L_{\text{data}}(\boldsymbol\theta) + \lambda \lVert\boldsymbol\theta\rVert_2^2 \\
+          &= L_{\text{data}}(\boldsymbol\theta) + \lambda\sum_i \theta_i^2
+          \end{aligned}
+          $$
+          <p class="gloss"><b>In words:</b> $L_{\text{data}}$ is the ordinary loss for wrong predictions.
+          $\lambda$ (lambda) is a hyperparameter you choose. It sets how strongly we punish large
+          weights.</p>
+          <p>The penalty $\lambda\theta_i^2$ has derivative $2\lambda\theta_i$. Put the full gradient into
+          a gradient descent step with learning rate $\alpha$:</p>
+          $$
+          \begin{aligned}
+          \theta_i &\leftarrow \theta_i - \alpha\Big(\frac{\partial L_{\text{data}}}{\partial \theta_i} + 2\lambda\theta_i\Big) \\
+          &= \underbrace{(1 - 2\alpha\lambda)}_{\text{shrink factor}}\,\theta_i \;-\; \alpha\frac{\partial L_{\text{data}}}{\partial \theta_i}
+          \end{aligned}
+          $$
+          <p class="gloss"><b>In words:</b> each update multiplies the weight by a factor a little below 1,
+          then applies the usual data-driven step. That is why L2 is called “weight decay”: the weight
+          decays toward zero every step, on top of whatever the data pushes it toward. The shrink is
+          proportional to the weight’s own size, so it gets weaker as the weight gets small. It does not by
+          itself drive a weight to exactly zero.</p>
 
-          <p><strong>L1 regularization</strong> (also called <dfn>lasso</dfn>) instead adds the L1 norm:</p>
-          $$ L_{\text{lasso}}(\boldsymbol\theta) = L_{\text{data}}(\boldsymbol\theta) + \lambda \lVert\boldsymbol\theta\rVert_1 = L_{\text{data}}(\boldsymbol\theta) + \lambda\sum_i |\theta_i| $$
-          <p class="gloss"><b>In words:</b> the penalty's gradient with respect to $\theta_i$
-          is just $\lambda\cdot\text{sign}(\theta_i)$ — a <em>constant</em>
-          push toward zero, the same size whether the weight is huge or tiny. Unlike L2's shrink-by-a-fraction,
-          this is shrink-by-a-fixed-amount every step, so a small weight can get pushed straight through zero and
-          the optimizer sets it to exactly zero and leaves it there. That's L1 doing <dfn>feature selection</dfn>:
-          deciding certain inputs are simply not worth using.</p>
+          <p><strong>L1 regularization</strong> (also called <dfn>lasso</dfn>) adds the L1 norm
+          instead:</p>
+          $$
+          \begin{aligned}
+          L_{\text{lasso}}(\boldsymbol\theta) &= L_{\text{data}}(\boldsymbol\theta) + \lambda \lVert\boldsymbol\theta\rVert_1 \\
+          &= L_{\text{data}}(\boldsymbol\theta) + \lambda\sum_i |\theta_i|
+          \end{aligned}
+          $$
+          <p class="gloss"><b>In words:</b> for $\theta_i \ne 0$, the penalty’s gradient is
+          $\lambda\,\text{sign}(\theta_i)$. This is a <em>constant</em> push toward zero, the same size for a huge weight and a tiny one. L2 shrinks by a fraction. L1 shrinks by a fixed amount. Suppose a weight
+          sits at zero and its data gradient there is smaller than $\lambda$ in size. Then the data cannot
+          overcome the push, so the best value for that weight is exactly zero. That is L1 doing <dfn>feature selection</dfn>: it decides that some
+          inputs are not worth using.</p>
+
+          <p>There is a catch. The best value is exactly zero, but plain gradient descent does not reach
+          it. Near zero, the constant push overshoots: the weight jumps from +0.001 to −0.001 and back, and
+          it rarely lands on 0.0 exactly. Solvers that produce exact zeros use a different step. After the
+          ordinary data step, they apply <dfn>soft-thresholding</dfn>: move each weight toward zero by
+          $\alpha\lambda$, and stop at zero instead of crossing it.</p>
+          $$ \theta_i \leftarrow \text{sign}(\theta_i)\,\max\big(|\theta_i| - \alpha\lambda,\; 0\big) $$
+          <p class="gloss"><b>In words:</b> a weight smaller than $\alpha\lambda$ becomes exactly 0. A
+          larger weight shrinks by $\alpha\lambda$. This is called a <em>proximal</em> gradient step.
+          scikit-learn’s <code>Lasso</code> uses coordinate descent, which applies the same
+          soft-thresholding to one weight at a time.</p>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">L1 with plain gradient steps vs. with soft-thresholding</p>
+          <pre><code class="language-python">import torch
+
+torch.manual_seed(0)
+X = torch.randn(200, 6)
+true_w = torch.tensor([3.0, -2.0, 0.0, 0.0, 0.0, 0.0])   # only 2 features matter
+y = X @ true_w + 0.5 * torch.randn(200)
+
+lam, lr = 0.1, 0.05
+
+def data_grad(w):                       # gradient of the MSE part only
+    return 2 * X.T @ (X @ w - y) / len(y)
+
+# (a) plain gradient descent on MSE + lam * |w|  (sign(w) as the gradient of |w|)
+w = torch.zeros(6)
+for step in range(2000):
+    w = w - lr * (data_grad(w) + lam * torch.sign(w))
+print("plain GD:", [round(v, 4) for v in w.tolist()])
+
+# (b) proximal step: a normal step on the data loss, then soft-thresholding
+w = torch.zeros(6)
+for step in range(2000):
+    w = w - lr * data_grad(w)
+    w = torch.sign(w) * torch.clamp(w.abs() - lr * lam, min=0)   # shrink; stop at 0
+print("proximal:", [round(v, 4) for v in w.tolist()])
+
+# plain GD: [2.9864, -1.9335, 0.0072, 0.0029, 0.0008, 0.0035]
+# proximal: [2.9871, -1.934, 0.0, 0.0, 0.0, 0.0]</code></pre>
+          <p>Both runs find the two useful weights. Only the proximal version sets the four useless weights
+          to exactly zero. Plain gradient descent leaves them moving around near zero.</p>
 
           <div class="callout keyidea">
-            <div class="callout__label"><span class="ic">◆</span> Why L1 zeroes weights and L2 doesn't: the geometric reason</div>
-            <p>Both penalties can be viewed as a budget: keep the total penalty under some limit <b>t</b> while
-            minimizing the data loss. The L2 budget $\sum\theta_i^2 \le t$
-            traces out a smooth <strong>circle</strong> (or sphere, in higher dimensions) around the origin. The
-            L1 budget $\sum|\theta_i| \le t$ traces out a
-            <strong>diamond</strong> — a shape with sharp corners that sit exactly on the axes (where one weight
-            is zero and the rest aren't). As the loss's contour lines expand outward from their unconstrained
-            best point, the first place they touch the constraint region is, for a smooth circle, almost never
-            exactly on an axis — but for a diamond, the corners stick out further than the flat edges, so contours
-            very often make first contact right at a corner. Touching at a corner means at least one weight is
-            <em>exactly</em> zero. The circle has no corners to land on, so L2 shrinks everything smoothly instead.</p>
+            <div class="callout__label"><span class="ic">◆</span> Why L1 zeroes weights and L2 doesn’t: the geometric reason</div>
+            <p>You can view each penalty as a budget: minimize the data loss while keeping the penalty below
+            some limit $t$. The L2 budget $\sum\theta_i^2 \le t$ is a round disk (a ball in higher
+            dimensions). The L1 budget $\sum|\theta_i| \le t$ is a <strong>diamond</strong>. Its sharp
+            corners lie on the axes, where one weight is zero.</p>
+            <p>Now let the loss contours grow outward from the unconstrained best point. The solution is
+            where they first touch the budget region. A round disk has no special points, so the contact is
+            almost never on an axis. A diamond’s corners stick out, so the contours often touch a corner
+            first. Touching at a corner means a weight is exactly zero (Figure 7.3).</p>
           </div>
+
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 470 245" role="img" aria-labelledby="fig-07-3-t">
+                <title id="fig-07-3-t">The same elliptical loss contours touch a circular L2 budget at a point with both weights nonzero, and a diamond-shaped L1 budget at its corner on the theta-one axis</title>
+                <line class="ax" x1="20.0" x2="220.0" y1="172.5" y2="172.5"/><line class="ax" y1="235.0" y2="35.0" x1="82.5" x2="82.5"/>
+                <circle class="f-vs s-v ln thin" cx="82.5" cy="172.5" r="45.8"/>
+                <path class="ln thin s-f" d="M174.8,165.5 L173.8,166.2 L172.7,166.8 L171.5,167.2 L170.2,167.6 L168.9,167.8 L167.5,167.8 L166.0,167.8 L164.5,167.6 L162.9,167.3 L161.3,166.8 L159.6,166.2 L158.0,165.5 L156.3,164.7 L154.6,163.8 L152.9,162.7 L151.3,161.6 L149.6,160.3 L148.0,158.9 L146.4,157.5 L144.9,156.0 L143.4,154.4 L142.0,152.7 L140.7,151.0 L139.4,149.2 L138.2,147.4 L137.1,145.6 L136.0,143.7 L135.1,141.8 L134.3,139.9 L133.6,138.1 L133.0,136.2 L132.5,134.4 L132.1,132.6 L131.8,130.8 L131.7,129.1 L131.6,127.5 L131.7,125.9 L131.9,124.4 L132.2,123.0 L132.7,121.7 L133.2,120.5 L133.9,119.4 L134.7,118.4 L135.5,117.5 L136.5,116.7 L137.6,116.0 L138.7,115.5 L140.0,115.1 L141.3,114.8 L142.7,114.7 L144.1,114.7 L145.6,114.8 L147.2,115.1 L148.8,115.4 L150.4,116.0 L152.0,116.6 L153.7,117.4 L155.4,118.2 L157.1,119.2 L158.7,120.4 L160.4,121.6 L162.0,122.9 L163.6,124.3 L165.2,125.8 L166.7,127.3 L168.1,129.0 L169.5,130.7 L170.8,132.4 L172.1,134.2 L173.2,136.0 L174.3,137.9 L175.3,139.7 L176.1,141.6 L176.9,143.5 L177.6,145.4 L178.1,147.2 L178.6,149.0 L178.9,150.8 L179.1,152.5 L179.2,154.2 L179.2,155.8 L179.0,157.3 L178.8,158.8 L178.4,160.1 L177.9,161.4 L177.3,162.6 L176.6,163.7 L175.8,164.6 L174.8,165.5Z"/>
+                <path class="ln thin s-a" d="M190.9,185.4 L189.0,186.7 L187.0,187.8 L184.8,188.7 L182.5,189.3 L180.0,189.7 L177.4,189.8 L174.7,189.7 L171.9,189.3 L169.0,188.8 L166.1,187.9 L163.1,186.9 L160.1,185.6 L157.0,184.1 L154.0,182.4 L150.9,180.4 L147.9,178.3 L144.9,176.0 L141.9,173.5 L139.0,170.9 L136.2,168.1 L133.5,165.2 L131.0,162.2 L128.5,159.0 L126.1,155.8 L124.0,152.5 L121.9,149.1 L120.1,145.7 L118.4,142.3 L116.9,138.9 L115.5,135.5 L114.4,132.1 L113.5,128.7 L112.8,125.5 L112.3,122.3 L112.1,119.1 L112.0,116.2 L112.2,113.3 L112.5,110.6 L113.1,108.0 L113.9,105.6 L114.9,103.3 L116.1,101.3 L117.5,99.4 L119.1,97.8 L120.9,96.4 L122.8,95.2 L124.9,94.2 L127.2,93.5 L129.6,93.0 L132.1,92.7 L134.8,92.7 L137.5,92.9 L140.3,93.4 L143.2,94.1 L146.2,95.1 L149.2,96.2 L152.3,97.6 L155.3,99.3 L158.4,101.1 L161.5,103.1 L164.5,105.3 L167.4,107.7 L170.4,110.3 L173.2,113.0 L176.0,115.8 L178.6,118.8 L181.1,121.9 L183.5,125.1 L185.8,128.4 L187.9,131.7 L189.9,135.1 L191.6,138.5 L193.2,141.9 L194.7,145.3 L195.9,148.7 L196.9,152.1 L197.7,155.4 L198.3,158.7 L198.7,161.8 L198.8,164.9 L198.8,167.8 L198.5,170.6 L198.0,173.3 L197.3,175.7 L196.4,178.1 L195.3,180.2 L194.0,182.2 L192.5,183.9 L190.9,185.4Z"/>
+                <circle class="f-i" cx="155.4" cy="141.2" r="3.5"/>
+                <circle class="f-a" cx="122.1" cy="149.4" r="5"/>
+                <text class="b lg" x="120" y="18" text-anchor="middle">L2 penalty</text>
+                <text class="m" x="220.0" y="190.5" text-anchor="end">θ₁</text><text class="m" x="90.5" y="39.2">θ₂</text>
+                <line class="ax" x1="250.0" x2="450.0" y1="172.5" y2="172.5"/><line class="ax" y1="235.0" y2="35.0" x1="312.5" x2="312.5"/>
+                <path class="f-vs s-v ln thin" d="M358.3,172.5 L312.5,126.7 L266.7,172.5 L312.5,218.3Z"/>
+                <path class="ln thin s-f" d="M410.1,172.0 L408.8,172.9 L407.4,173.7 L405.9,174.3 L404.2,174.7 L402.5,175.0 L400.7,175.1 L398.9,175.0 L396.9,174.7 L394.9,174.3 L392.9,173.8 L390.8,173.0 L388.7,172.1 L386.5,171.1 L384.4,169.9 L382.3,168.5 L380.2,167.1 L378.1,165.5 L376.0,163.7 L374.0,161.9 L372.1,160.0 L370.2,157.9 L368.4,155.8 L366.7,153.6 L365.0,151.4 L363.5,149.1 L362.1,146.7 L360.8,144.4 L359.6,142.0 L358.6,139.6 L357.7,137.2 L356.9,134.9 L356.2,132.5 L355.8,130.2 L355.4,128.0 L355.2,125.9 L355.2,123.8 L355.3,121.8 L355.6,119.9 L356.0,118.1 L356.5,116.4 L357.2,114.8 L358.1,113.4 L359.0,112.1 L360.1,111.0 L361.4,110.0 L362.7,109.2 L364.2,108.5 L365.8,108.0 L367.4,107.6 L369.2,107.5 L371.0,107.5 L372.9,107.6 L374.9,107.9 L376.9,108.4 L379.0,109.1 L381.1,109.9 L383.2,110.9 L385.4,112.0 L387.5,113.3 L389.6,114.7 L391.7,116.2 L393.8,117.9 L395.8,119.7 L397.8,121.6 L399.7,123.5 L401.6,125.6 L403.3,127.8 L405.0,130.0 L406.6,132.3 L408.0,134.6 L409.4,137.0 L410.6,139.3 L411.8,141.7 L412.7,144.1 L413.6,146.5 L414.3,148.8 L414.9,151.1 L415.3,153.4 L415.5,155.6 L415.7,157.7 L415.6,159.7 L415.4,161.7 L415.1,163.5 L414.6,165.3 L414.0,166.9 L413.2,168.4 L412.3,169.7 L411.3,171.0 L410.1,172.0Z"/>
+                <path class="ln thin s-a" d="M430.5,197.4 L428.1,199.1 L425.5,200.5 L422.8,201.5 L419.8,202.3 L416.7,202.8 L413.4,203.0 L410.0,202.8 L406.4,202.4 L402.7,201.6 L399.0,200.6 L395.2,199.3 L391.3,197.6 L387.5,195.7 L383.6,193.5 L379.7,191.1 L375.8,188.4 L372.0,185.4 L368.3,182.3 L364.6,178.9 L361.0,175.4 L357.6,171.7 L354.3,167.8 L351.2,163.8 L348.2,159.7 L345.4,155.5 L342.8,151.3 L340.5,146.9 L338.3,142.6 L336.4,138.2 L334.7,133.9 L333.3,129.6 L332.2,125.3 L331.3,121.2 L330.6,117.1 L330.3,113.2 L330.2,109.3 L330.4,105.7 L330.9,102.2 L331.6,98.9 L332.6,95.9 L333.9,93.0 L335.5,90.4 L337.2,88.1 L339.3,86.0 L341.5,84.2 L344.0,82.7 L346.7,81.5 L349.5,80.5 L352.6,79.9 L355.8,79.6 L359.2,79.6 L362.6,79.8 L366.2,80.4 L369.9,81.3 L373.7,82.5 L377.6,84.0 L381.4,85.8 L385.3,87.9 L389.2,90.2 L393.1,92.7 L396.9,95.6 L400.7,98.6 L404.4,101.9 L408.0,105.3 L411.5,108.9 L414.9,112.7 L418.1,116.7 L421.2,120.7 L424.0,124.9 L426.7,129.1 L429.2,133.4 L431.5,137.7 L433.5,142.1 L435.3,146.4 L436.8,150.8 L438.1,155.1 L439.2,159.3 L439.9,163.4 L440.4,167.4 L440.6,171.3 L440.6,175.0 L440.2,178.6 L439.6,181.9 L438.7,185.1 L437.6,188.1 L436.2,190.8 L434.5,193.3 L432.6,195.5 L430.5,197.4Z"/>
+                <circle class="f-i" cx="385.4" cy="141.2" r="3.5"/>
+                <circle class="f-a" cx="358.3" cy="172.5" r="5"/>
+                <text class="b lg" x="350" y="18" text-anchor="middle">L1 penalty</text>
+                <text class="m" x="450.0" y="190.5" text-anchor="end">θ₁</text><text class="m" x="320.5" y="39.2">θ₂</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 7.3</b> The same loss (ellipses; the small dot is its unconstrained best point) with two budgets
+            of the same size. The amber ellipse is the first contour to touch each budget, and the amber dot
+            is the solution. With L2 (left), both weights are nonzero. With L1 (right), the contact is at
+            the corner, so $\theta_2 = 0$ exactly.</figcaption>
+          </figure>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
           <p class="codecap">L2 via <code>weight_decay</code>, L1 added to the loss by hand</p>
           <pre><code class="language-python">import torch
 import torch.nn as nn
 
+torch.manual_seed(0)
 model = nn.Linear(10, 1)
 criterion = nn.MSELoss()
 x = torch.randn(32, 10)
 y = torch.randn(32, 1)
 
-# L2 / ridge / "weight decay": built into the optimizer. Every step also
-# shrinks each weight by a factor of (1 - lr * weight_decay), pulling it toward 0.
+# L2 / ridge / "weight decay": built into the optimizer.
 optimizer = torch.optim.SGD(model.parameters(), lr=0.01, weight_decay=1e-4)
 loss = criterion(model(x), y)
 loss.backward()
 optimizer.step()
 
-# L1 / lasso: |w| has no clean gradient at w = 0, so there's no optimizer
-# flag for it -- add the penalty to the loss by hand instead.
+# L1 / lasso: no optimizer flag, so add the penalty to the loss by hand.
+lam = 1e-4
 optimizer.zero_grad()
-l1_penalty = sum(p.abs().sum() for p in model.parameters())
-loss = criterion(model(x), y) + 1e-4 * l1_penalty
+loss = criterion(model(x), y) + lam * model.weight.abs().sum()
 loss.backward()
 optimizer.step()</code></pre>
+          <p>Two details connect this code to the math. First, PyTorch’s <code>weight_decay</code> adds
+          <code>weight_decay * w</code> to each gradient, so each step multiplies the weight by
+          <code>(1 - lr * weight_decay)</code>. Our formula has $(1 - 2\alpha\lambda)$, so
+          <code>weight_decay</code> $= 2\lambda$. Second, <code>weight_decay</code> here applies to
+          <em>all</em> parameters, including the bias. The bias only shifts the output, so there is usually
+          no reason to penalize it. To exclude it, pass the weights and biases as separate parameter groups
+          with different <code>weight_decay</code> values. The L1 line above already penalizes only
+          <code>model.weight</code>.</p>
 
           <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">You train the same linear model twice, once with L1 and once with L2 regularization, at strengths tuned to give similar validation accuracy. The L1 model ends up with many weights at exactly 0.0000; the L2 model has no exact zeros, just many small values. Why?</span>
+                <span class="check__q">You fit a linear model with L1 using scikit-learn’s <code>Lasso</code>, and again with a hand-written PyTorch loop (penalty added to the loss, plain SGD). Lasso shows 12 weights at exactly 0.0. PyTorch shows none, only values like 0.0003. Is your PyTorch code wrong?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>L1's penalty gradient is a constant push toward zero regardless of the weight's size, so small
-                weights get driven straight through zero and stay there — geometrically, the diamond-shaped L1
-                constraint region has corners sitting exactly on the axes, and the loss contours tend to first
-                touch the constraint at one of those corners, which means some weight is exactly zero. L2's
-                penalty gradient is proportional to the weight's own size, so the push gets weaker and weaker as
-                the weight shrinks — it approaches zero but the constraint region is a smooth circle with no
-                corners to land on, so it never quite gets there. This is why L1 is used for feature selection and
-                L2 is used for general-purpose smoothing.</p>
+                <p>Probably not. Both minimize the same loss, and its minimum has those 12 weights at zero.
+                The difference is the solver. Plain gradient descent with the $\lambda\,\text{sign}(\theta)$
+                push overshoots zero on every step, so those weights move back and forth near zero. Lasso’s
+                coordinate descent uses soft-thresholding, which stops exactly at zero. To get exact zeros from PyTorch, add a soft-thresholding step after each update. Or set weights below a small threshold to zero at the end.</p>
               </div>
             </details>
           </div>
@@ -402,19 +637,17 @@ optimizer.step()</code></pre>
           <h2><span class="h-num">5</span>What to carry forward</h2>
           <ul>
             <li><strong>Generalization</strong> means doing well on unseen data. <strong>Overfitting</strong>
-            fits the training data's noise; <strong>underfitting</strong> is too simple to fit the real pattern.
-            <strong>Capacity</strong> is the dial between them.</li>
-            <li><strong>Train / validation / test</strong> have separate jobs: train learns the weights, validation
-            tunes decisions, test is touched exactly once for an honest final number. <strong>k-fold
-            cross-validation</strong> rotates the held-out slice so every example validates exactly once.</li>
-            <li>Test error decomposes into <strong>bias² + variance + irreducible noise</strong>. More capacity
-            usually trades bias for variance; the goal is the sweet spot that minimizes the sum.</li>
-            <li><strong>L2 (ridge)</strong> shrinks every weight smoothly by a fraction each step ("weight decay").
-            <strong>L1 (lasso)</strong> pushes by a constant amount and can drive weights to exactly zero, because
-            its constraint region is a diamond with corners on the axes rather than a smooth circle.</li>
+            fits the training data’s noise. <strong>Underfitting</strong> is too simple for the real pattern.
+            <strong>Capacity</strong> moves a model between them.</li>
+            <li><strong>Train / validation / test</strong> have separate jobs. Training learns the weights,
+            validation guides decisions, and the test set is used once for a final number. <strong>Cross-validation</strong> with $k$ folds rotates the held-out part so every example is validated once.</li>
+            <li>Test error = <strong>bias² + variance + irreducible noise</strong>. More capacity usually
+            lowers bias and raises variance. The goal is the capacity with the smallest sum.</li>
+            <li><strong>L2 (ridge)</strong> shrinks every weight by a fraction each step (“weight decay”).
+            <strong>L1 (lasso)</strong> pushes by a constant amount. Its best solution often has weights at exactly zero, because its budget is a diamond with corners on the axes. You need
+            soft-thresholding (or coordinate descent) to get those exact zeros.</li>
           </ul>
-          <p>Next, we zoom out from any single algorithm and take a broad tour of the classical models — kNN,
-          decision trees, ensembles, and SVMs — to build intuition for when and why each one is the right tool, in
+          <p>Next, we look beyond a single algorithm. We tour the classical models (kNN, decision trees, ensembles, and SVMs) and see when each one is the right tool, in
           <a href="08-classical-tour.html">Section 8</a>.</p>
 
           <div class="complete-bar" data-complete>

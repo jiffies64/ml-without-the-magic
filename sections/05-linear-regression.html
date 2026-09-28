@@ -38,7 +38,7 @@
         <header class="lesson-head">
           <p class="lesson-eyebrow">Part 2 · Classical ML <span class="dot"></span> Section 5</p>
           <h1 class="lesson-title">What Learning Means</h1>
-          <p class="lesson-standfirst">Every model you will ever train is secretly just three ingredients — a hypothesis, a loss, and an optimizer — and linear regression is the cleanest place to watch all three get solved by hand.</p>
+          <p class="lesson-standfirst">The models in this course share three ingredients: a hypothesis, a loss, and an optimizer. Linear regression is the clearest place to see all three, and we can solve it by hand.</p>
           <div class="lesson-meta">
             <span><b>30 min</b> read</span>
           </div>
@@ -54,80 +54,111 @@
         </header>
 
         <div class="prose">
-          <p class="lead">"Training a model" sounds mysterious until you break it into three
-          questions, none of which is mysterious at all: what kinds of guesses are we willing to
-          make, how do we score a guess as good or bad, and how do we search for the best one? Get
-          comfortable with those three questions and you can read the training loop of almost any
-          model in this course — including the giant ones later on.</p>
+          <p class="lead">“Training a model” sounds mysterious. It becomes clear when you split it
+          into three questions. What kinds of guesses do we allow? How do we score a guess? How do we
+          search for the best guess? When these three questions feel familiar, you can read the
+          training loop of almost any model in this course, including the large ones later on.</p>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> The one idea to hold onto</div>
-            <p>Learning is <strong>search</strong>. You fix a family of candidate functions, you fix a
-            number that measures how wrong each candidate is, and then you search that family for the
-            candidate with the lowest wrongness. Every algorithm in this course is a different way of
-            doing that search.</p>
+            <p>Learning is <strong>search</strong>. You fix a family of candidate functions. You fix a
+            number that measures how wrong each candidate is. Then you search the family for the
+            candidate with the lowest number. Every algorithm in this course is a different way to do
+            that search.</p>
           </div>
 
           <!-- ===================== THE TRIAD ===================== -->
           <h2><span class="h-num">1</span>The learning triad: hypothesis, loss, optimization</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>Three separate ingredients make up every learning algorithm you'll meet. First, a
-          <strong>hypothesis class</strong>: the family of functions you're willing to consider as
-          "the answer" — maybe only straight lines, maybe anything a neural network can express.
-          Second, a <strong>loss</strong>: a single number that says how wrong one particular
-          function's guesses are, computed by comparing its predictions to the real answers. Third,
-          <strong>optimization</strong>: the search procedure that tries different functions from the
-          hypothesis class and steers toward the one with the lowest loss. Learning, end to end, is
-          just those three things wired together.</p>
+          <p>Every learning algorithm in this course has three separate parts.</p>
+          <ul>
+            <li>A <strong>hypothesis class</strong>: the family of functions you allow as “the
+            answer”. It can be only straight lines, or anything a neural network can express.</li>
+            <li>A <strong>loss</strong>: one number that says how wrong one function’s guesses are.
+            You compute it by comparing its predictions with the real answers.</li>
+            <li><strong>Optimization</strong>: the search procedure. It tries functions from the
+            hypothesis class and moves toward the one with the lowest loss.</li>
+          </ul>
+          <p>Learning, from start to end, is these three parts working together.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>You're tuning a recipe for tomato soup. The <strong>hypothesis class</strong> is every
-            recipe you'd consider making — maybe you've decided it must be tomato, garlic, and cream
-            in some proportions, so "recipe" really means "the three numbers: how much tomato, how
-            much garlic, how much cream." The <strong>loss</strong> is a taste test: how far this
-            batch is from the flavor you're aiming for (too salty, not creamy enough — turned into one
-            "distance from perfect" score). <strong>Optimization</strong> is what you do next: taste,
-            adjust the ratios a little in the direction that helped last time, taste again. You never
-            see "the answer" printed anywhere — you find it by repeatedly tasting and nudging.</p>
+            <p>You adjust a shower with one knob. The <strong>hypothesis class</strong> is every
+            position the knob can take. The <strong>loss</strong> is how far the water is from the
+            temperature you like. <strong>Optimization</strong> is what you do next: feel the water,
+            turn the knob a little in the direction that helped, and feel again. Nobody tells you the
+            correct knob position. You find it by repeated small corrections.</p>
           </div>
 
           <div class="callout definition">
             <div class="callout__label">Definition</div>
-            <p>A <dfn>hypothesis class</dfn> is the set of candidate functions a model is allowed to
-            choose from. Restricting it is a choice you make before training even starts — e.g.
-            "only straight lines" is a much smaller, simpler hypothesis class than "any curve a deep
-            network can draw."</p>
+            <p>A <dfn>hypothesis class</dfn> is the set of candidate functions a model may choose
+            from. You choose it before training starts. For example, “only straight lines” is a much
+            smaller class than “any curve a deep network can draw”.</p>
           </div>
 
           <div class="callout definition">
             <div class="callout__label">Definition</div>
-            <p>A <dfn>loss function</dfn> takes one hypothesis's predictions and the true answers and
-            returns a single non-negative number: 0 means "perfect," and bigger means "worse." Every
-            training run is, underneath, minimizing some loss function.</p>
+            <p>A <dfn>loss function</dfn> takes one hypothesis’s predictions and the true answers and
+            returns a single number. Lower means better. Every training run minimizes some loss
+            function. (Many losses, such as the squared error below, are never negative and reach 0
+            for a perfect fit. This is not true of every loss. <a href="04-information-theory.html">Section 4</a>
+            showed that cross-entropy cannot go below the entropy of the data.)</p>
           </div>
 
           <div class="callout definition">
             <div class="callout__label">Definition</div>
             <p>An <dfn>optimization</dfn> procedure is the algorithm that searches the hypothesis
-            class for the member with the lowest loss. It never magically knows the answer; it only
-            knows how to take the current guess and produce a slightly better one.</p>
+            class for the member with the lowest loss. It does not know the answer in advance. It only
+            knows how to turn the current guess into a slightly better one.</p>
           </div>
+
+          <p class="beat beat--math">Now the math</p>
+          <p>Call the adjustable numbers of a model its <dfn>parameters</dfn> $\theta$ (theta). The
+          model with parameters $\theta$ is a function $f_\theta$. We have $N$ training examples
+          $(x_i, y_i)$. The three parts become three lines:</p>
+          $$
+          \begin{aligned}
+          & f_\theta \in \mathcal{H} \\
+          & L(\theta) = \frac{1}{N}\sum_{i=1}^{N} \ell\big(f_\theta(x_i),\, y_i\big) \\
+          & \theta^\star = \arg\min_\theta L(\theta)
+          \end{aligned}
+          $$
+          <p class="gloss"><b>In words:</b> the three lines are the hypothesis, the loss, and the optimization. $\mathcal{H}$ is the hypothesis class. $\ell$ scores
+          one prediction against one true answer, and $L$ averages that score over all $N$ examples.
+          $\arg\min_\theta$ means “the value of $\theta$ that makes $L$ smallest”. The optimizer is
+          the method that finds (or approaches) $\theta^\star$.</p>
+
+          <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">the three parts as three small functions</p>
+          <pre><code class="language-python">import torch
+
+def hypothesis(theta, x):          # which functions we allow: straight lines
+    return theta[0] * x + theta[1]
+
+def loss(theta, x, y):             # how we score a guess: mean squared error
+    return ((hypothesis(theta, x) - y) ** 2).mean()
+
+def optimize_step(theta, x, y, lr):   # how we search: one small downhill step
+    theta = theta.detach().requires_grad_(True)
+    loss(theta, x, y).backward()
+    return (theta - lr * theta.grad).detach()</code></pre>
+          <p>The rest of this lesson fills in each of these functions for linear regression.</p>
 
           <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">In the soup analogy, what plays the role of the loss function — and would "zero loss" ever really happen?</span>
+                <span class="check__q">Your shower knob only turns between “cold” and “warm”, but you like hot water. Can a better optimization strategy fix this?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>The taste test's "distance from the target flavor" score is the loss. In practice you
-                almost never hit exactly zero — there's always some noise (today's tomatoes are
-                slightly different from yesterday's), so the goal is realistically "as low as we can
-                get," not a mathematically perfect zero. The same is true of nearly every model you'll
-                train on real data.</p>
+                <p>No. The best position the knob allows is “warm”, so the loss can never reach the
+                value you want. The problem is the <strong>hypothesis class</strong>: it does not
+                contain a good answer. A better search only finds the best member of the class
+                faster. Models behave the same way. If a straight line cannot describe the data, no
+                optimizer will make a straight line fit it well.</p>
               </div>
             </details>
           </div>
@@ -136,55 +167,69 @@
           <h2><span class="h-num">2</span>The hypothesis class: linear regression</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>The simplest useful hypothesis class is: predictions are a <strong>straight-line
-          function</strong> of the input. Linear regression restricts itself to exactly that family
-          and nothing fancier — no curves, no bends.</p>
+          <p>The simplest useful hypothesis class says: the prediction is a <strong>straight-line
+          function</strong> of the input. Linear regression allows only this family. No curves, no
+          bends.</p>
+          <p>Our running example is predicting a house’s price from its floor area. Bigger houses tend
+          to cost more, roughly in proportion. Each extra square meter adds a roughly fixed amount of
+          money. That is the shape of a straight line: a starting price plus a rate per square
+          meter.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>Predicting a house's price from its size. Bigger houses tend to cost more, roughly in
-            proportion — add a square foot, add a roughly fixed number of dollars. That's exactly the
-            shape of a straight line: a starting price plus a rate per square foot.</p>
+            <p>A taxi fare works like a straight line. There is a fixed starting fee, and then a
+            fixed price for each kilometer. The starting fee is the bias $b$, and the price per
+            kilometer is the weight $w$. If you know both numbers, you can predict any fare from the
+            distance alone.</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>With a single input <b>x</b> (say, size in square feet), the hypothesis is:</p>
+          <p>With a single input $x$ (the size in m²), the hypothesis is:</p>
           $$ \hat{y} = wx + b $$
-          <p class="gloss"><b>In words:</b> <b>ŷ</b> ("y-hat") is the model's predicted price. <b>x</b>
-          is the house's size. <b>w</b> (the <em>weight</em>) is dollars added per extra square foot —
-          the slope. <b>b</b> (the <em>bias</em>) is the baseline price when size is zero — the
-          intercept. Learning this hypothesis means finding good numbers for <b>w</b> and <b>b</b>.</p>
+          <p class="gloss"><b>In words:</b> $\hat y$ (“y-hat”) is the model’s predicted price. $x$
+          is the house’s size. $w$ (the <em>weight</em>) is the money added per extra square meter:
+          the slope. $b$ (the <em>bias</em>) is the price the line gives at size zero: the intercept.
+          Learning this hypothesis means finding good numbers for $w$ and $b$.</p>
 
-          <p>Real houses have more than one useful feature — size, number of bedrooms, age, distance to
-          downtown. Stack those numbers into a vector <b>x</b> and give each one its own weight in a
-          vector <b>w</b>; the model is the same idea generalized:</p>
-          $$ \hat{y} = \mathbf{w}^\top\mathbf{x} + b = w_1x_1 + w_2x_2 + \dots + w_dx_d + b $$
-          <p class="gloss"><b>In words:</b> <b>wᵀx</b> is a dot product (Section 1) — multiply each
-          feature by its own weight and add up the results — then shift by the single bias number
-          <b>b</b>. One weight per feature, one shared bias for the whole prediction.</p>
+          <p>Real houses have more than one useful feature: size, number of bedrooms, age, distance
+          to the city center. Put these $d$ numbers in a vector $\mathbf{x}$. Give each one its own
+          weight in a vector $\mathbf{w}$. The model is the same idea with more inputs:</p>
+          $$
+          \begin{aligned}
+          \hat{y} &= \mathbf{w}^\top\mathbf{x} + b \\
+                  &= w_1x_1 + w_2x_2 + \dots + w_dx_d + b
+          \end{aligned}
+          $$
+          <p class="gloss"><b>In words:</b> $\mathbf{w}^\top\mathbf{x}$ is a dot product
+          (<a href="01-linear-algebra.html">Section 1</a>): multiply each feature by its own weight
+          and add the results. Then add the single bias number $b$. There is one weight per feature
+          and one shared bias.</p>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">one prediction from one house</p>
           <pre><code class="language-python">import torch
 
-w = torch.tensor([120.0])      # $ per extra sqft
-b = torch.tensor([10000.0])    # baseline price
-x = torch.tensor([1800.0])     # house size, sqft
+w = torch.tensor([1800.0])     # dollars per extra m²
+b = torch.tensor([48000.0])    # baseline price
+x = torch.tensor([100.0])      # house size, m²
 
 y_hat = x * w + b
-print(y_hat)                   # tensor([226000.])</code></pre>
+print(y_hat)                   # tensor([228000.])</code></pre>
 
           <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">With ŷ = 120x + 10000, what price does the model predict for a 1,800 sqft house, and what do w and b represent in plain words?</span>
+                <span class="check__q">You fit $\hat y = wx + b$ to some houses. Then every price in the data doubles (sizes stay the same). What are the new best $w$ and $b$?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>ŷ = 120 × 1800 + 10000 = <strong>226,000</strong>. Here <b>w = 120</b> means "each
-                extra square foot adds 120 dollars to the predicted price," and <b>b = 10000</b> means "a
-                hypothetical zero-square-foot house would be priced at 10,000 dollars" — a baseline that
-                mostly exists to shift the line up or down, not a literal claim about tiny houses.</p>
+                <p>Both double. Take any line $(w', b')$ and compare it with the doubled prices.
+                Its errors are exactly twice the errors of the line $(w'/2,\, b'/2)$ on the old
+                prices. So its loss is four times that line’s old loss. The new loss is smallest
+                when $(w'/2,\, b'/2)$ is the old best line, that is, when $w' = 2w$ and $b' = 2b$.
+                (Running the normal-equation code below with doubled <code>y</code> gives
+                <code>[3602.58] 95751.21</code>, twice the original.)</p>
               </div>
             </details>
           </div>
@@ -193,62 +238,123 @@ print(y_hat)                   # tensor([226000.])</code></pre>
           <h2><span class="h-num">3</span>The loss: Mean Squared Error</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>We need one number that says "across every house in our data, how wrong were this line's
-          guesses?" <strong>Mean Squared Error</strong> (MSE) does this: for each house, subtract the
-          true price from the predicted price, square that difference, and average the squares over
-          all houses.</p>
+          <p>We need one number that answers: “across every house in our data, how wrong were this
+          line’s guesses?” <strong>Mean Squared Error</strong> (MSE) does this. For each house,
+          subtract the true price from the predicted price. Square that difference. Then average the
+          squares over all houses.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>Imagine each data point is tied to the line by a vertical spring. A stretched spring
+            stores energy proportional to the <em>square</em> of its stretch. Let the line move
+            freely, and it settles where the total spring energy is lowest. That resting place is
+            the line with the smallest sum of squared errors.</p>
+          </div>
 
           <p class="beat beat--math">Now the math</p>
-          $$ L(w,b) = \frac{1}{n}\sum_{i=1}^{n}\left(\hat{y}_i - y_i\right)^2, \qquad \hat{y}_i = wx_i+b $$
-          <p class="gloss"><b>In words:</b> for each of the <b>n</b> houses, take (predicted price −
-          true price), square it, then average all <b>n</b> squared errors into one number. Squaring
-          does two jobs at once: it makes every error positive (so a 10-dollar over-guess and a 10-dollar
-          under-guess don't cancel out when summed), and it punishes large mistakes far more than
-          small ones.</p>
+          $$ L(w,b) = \frac{1}{N}\sum_{i=1}^{N}\left(\hat{y}_i - y_i\right)^2 $$
+          <p class="gloss"><b>In words:</b> here $\hat y_i = wx_i + b$ is the prediction for house $i$. For each of the $N$ houses, take (predicted price −
+          true price) and square it. Then average all $N$ squared errors into one number. Squaring
+          does two jobs. It makes every error positive, so an over-guess and an under-guess of the
+          same size do not cancel. It also punishes large mistakes much more than small ones.</p>
+
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 520 270" role="img" aria-labelledby="fig-05-1-t">
+                <title id="fig-05-1-t">Four houses plotted as price against size, with the best straight line and a square drawn on each vertical error</title>
+                <line class="ax" x1="70" y1="230" x2="505" y2="230"/><line class="ax" x1="70" y1="230" x2="70" y2="15"/>
+                <text class="sm" x="141.7" y="246" text-anchor="middle">60</text>
+                <text class="sm" x="213.3" y="246" text-anchor="middle">80</text>
+                <text class="sm" x="285.0" y="246" text-anchor="middle">100</text>
+                <text class="sm" x="356.7" y="246" text-anchor="middle">120</text>
+                <text class="sm" x="428.3" y="246" text-anchor="middle">140</text>
+                <text class="sm" x="500.0" y="246" text-anchor="middle">160</text>
+                <line class="grid" x1="70" x2="500" y1="186.2" y2="186.2"/><text class="sm" x="64" y="190.2" text-anchor="end">150k</text>
+                <line class="grid" x1="70" x2="500" y1="142.5" y2="142.5"/><text class="sm" x="64" y="146.5" text-anchor="end">200k</text>
+                <line class="grid" x1="70" x2="500" y1="98.8" y2="98.8"/><text class="sm" x="64" y="102.8" text-anchor="end">250k</text>
+                <line class="grid" x1="70" x2="500" y1="55.0" y2="55.0"/><text class="sm" x="64" y="59.0" text-anchor="end">300k</text>
+                <path class="ln s-v" d="M87.9,204.7 L500.0,23.4"/>
+                <rect class="f-as s-a thin" x="141.7" y="181.0" width="5.2" height="5.2"/>
+                <line class="ln thin s-a" x1="141.7" x2="141.7" y1="186.2" y2="181.0"/>
+                <circle class="f-i" cx="141.7" cy="186.2" r="4.5"/>
+                <rect class="f-as s-a thin" x="195.4" y="142.5" width="14.9" height="14.9"/>
+                <line class="ln thin s-a" x1="195.4" x2="195.4" y1="142.5" y2="157.4"/>
+                <circle class="f-i" cx="195.4" cy="142.5" r="4.5"/>
+                <rect class="f-as s-a thin" x="320.8" y="102.2" width="18.4" height="18.4"/>
+                <line class="ln thin s-a" x1="320.8" x2="320.8" y1="120.6" y2="102.2"/>
+                <circle class="f-i" cx="320.8" cy="120.6" r="4.5"/>
+                <rect class="f-as s-a thin" x="428.3" y="46.2" width="8.7" height="8.7"/>
+                <line class="ln thin s-a" x1="428.3" x2="428.3" y1="46.2" y2="55.0"/>
+                <circle class="f-i" cx="428.3" cy="46.2" r="4.5"/>
+                <text x="287" y="262" text-anchor="middle">size (m²)</text>
+                <text class="tv lg" x="363.8" y="117.3" text-anchor="start">ŷ = wx + b</text>
+                <text x="20" y="12">price</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 5.1</b> Four houses (dots) and the best-fit line. Each amber
+            square has a side equal to one error, so its area is that error squared. MSE is the
+            average area. The best line makes the total area as small as possible.</figcaption>
+          </figure>
 
           <div class="callout definition">
             <div class="callout__label">Why square, and not absolute value?</div>
-            <p>Absolute value |ŷ−y| would also make errors positive, but it isn't smooth: at exactly
-            zero its slope jumps abruptly, which is awkward for gradient-based optimization (Section
-            2). Squaring is smooth everywhere and — as the next box shows — falls directly out of a
-            simple assumption about noisy data, rather than being picked arbitrarily.</p>
+            <p>The absolute value $|\hat y - y|$ also makes errors positive. But it is not smooth:
+            at zero its slope jumps from −1 to +1. That is awkward for gradient-based optimization
+            (<a href="02-calculus.html">Section 2</a>). The square is smooth everywhere. Also, as the
+            next box shows, it follows from a simple assumption about noisy data. It is not an
+            arbitrary choice.</p>
           </div>
 
           <div class="callout keyidea">
-            <div class="callout__label"><span class="ic">◆</span> Where MSE actually comes from</div>
+            <div class="callout__label"><span class="ic">◆</span> Where MSE comes from</div>
             <p>Suppose the true price is a straight line plus random noise:
-            $y_i = wx_i + b + \varepsilon_i$, where each $\varepsilon_i$ is drawn from a Gaussian
-            (bell-curve) distribution with mean 0 (see <a href="03-probability.html">Section 3</a>).
-            Then the probability of seeing price $y_i$ given $x_i$ is the Gaussian density
-            centered at $\hat y_i = wx_i+b$:</p>
-            $$ p(y_i\mid x_i;w,b) = \frac{1}{\sqrt{2\pi\sigma^2}}\exp\!\left(-\frac{(y_i-\hat y_i)^2}{2\sigma^2}\right) $$
-            <p>Assuming the houses are independent, the likelihood of the <em>whole</em> dataset is the
-            product of these densities. Taking the log turns the product into a sum (logs turn
-            multiplication into addition) and the exponential into a plain term:</p>
-            $$ \log \mathcal{L}(w,b) = \sum_{i=1}^n \left[-\log\sqrt{2\pi\sigma^2} - \frac{(y_i-\hat y_i)^2}{2\sigma^2}\right]
-               = -n\log\sqrt{2\pi\sigma^2} - \frac{1}{2\sigma^2}\sum_{i=1}^n (y_i-\hat y_i)^2 $$
-            <p class="gloss"><b>In words:</b> the first term doesn't involve <b>w</b> or <b>b</b> at all,
-            and $\tfrac{1}{2\sigma^2}$ is just a positive constant. So <em>maximizing</em> this
-            log-likelihood over <b>w,b</b> is exactly the same job as <em>minimizing</em>
-            $\sum_i(y_i-\hat y_i)^2$ — which is Mean Squared Error, up to the constant $1/n$. Squared
-            error isn't an arbitrary convention; it's what falls out the moment you assume Gaussian
-            noise.</p>
+            $y_i = wx_i + b + \varepsilon_i$. Each noise value $\varepsilon_i$ comes from a Gaussian (bell-curve) distribution with mean 0. Its standard deviation $\sigma$ is the same for every house (see <a href="03-probability.html">Section 3</a>). Then the probability
+            <em>density</em> of price $y_i$, given $x_i$, is a Gaussian centered at
+            $\hat y_i = wx_i+b$:</p>
+            $$
+            \begin{aligned}
+            &p(y_i\mid x_i;w,b) \\
+            &\quad= \frac{1}{\sqrt{2\pi\sigma^2}}\exp\!\left(-\frac{(y_i-\hat y_i)^2}{2\sigma^2}\right)
+            \end{aligned}
+            $$
+            <p>(As Section 3 explained, a density is not a probability. It is a height, and higher
+            means “more likely near this value”. That is all we need here.) If the houses are
+            independent, the likelihood of the <em>whole</em> dataset is the product of these
+            densities. The log turns the product into a sum, and it turns the exponential into a
+            plain term. For one house:</p>
+            $$
+            \begin{aligned}
+            \log p(y_i\mid x_i) &= -\tfrac12\log(2\pi\sigma^2) \\
+                                &\quad - \frac{(y_i-\hat y_i)^2}{2\sigma^2}
+            \end{aligned}
+            $$
+            <p>Adding this over all $N$ houses gives the log-likelihood, which we write as $\ell$:</p>
+            $$
+            \begin{aligned}
+            \ell(w,b) &= -\tfrac{N}{2}\log(2\pi\sigma^2) \\
+                      &\quad - \frac{1}{2\sigma^2}\sum_{i=1}^N (y_i-\hat y_i)^2
+            \end{aligned}
+            $$
+            <p class="gloss"><b>In words:</b> the first term does not contain $w$ or $b$. The factor
+            $\tfrac{1}{2\sigma^2}$ is a positive constant. So <em>maximizing</em> this
+            log-likelihood over $w, b$ is the same job as <em>minimizing</em>
+            $\sum_i(y_i-\hat y_i)^2$. That is MSE, up to the constant $1/N$. Squared error is what
+            you get when you assume Gaussian noise.</p>
           </div>
 
           <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">Why does minimizing sum-of-squared-errors correspond to maximizing likelihood under Gaussian noise, rather than, say, minimizing it?</span>
+                <span class="check__q">One house in your data has a typo: its price is ten times too high. Which loss pulls the fitted line more toward that house, squared error or absolute error? Why?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>The log-likelihood is <code>−n·log(√2πσ²) − (1/2σ²)·Σ(y−ŷ)²</code>. The second term
-                is subtracted, and its size grows with the squared errors. So making the squared errors
-                <em>bigger</em> makes the log-likelihood <em>smaller</em>, and making them
-                <em>smaller</em> makes the log-likelihood <em>larger</em>. To maximize likelihood you
-                therefore have to minimize the sum of squared errors — the minus sign is what flips
-                "minimize error" into "maximize likelihood."</p>
+                <p>Squared error. If that house’s error is 1,000,000, its squared error is
+                $10^{12}$, far larger than all the other houses together. The line bends toward it to
+                shrink that one term. Absolute error only counts 1,000,000, so the other houses still
+                matter. This matches the Gaussian story: a Gaussian says huge errors almost never
+                happen, so one huge error must be “explained away” at great cost.</p>
               </div>
             </details>
           </div>
@@ -257,90 +363,109 @@ print(y_hat)                   # tensor([226000.])</code></pre>
           <h2><span class="h-num">4</span>Optimization, take one: solving directly</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>Because the MSE loss for a straight line is a smooth bowl shape (one single lowest point,
-          no bumps), we don't have to search for the bottom by trial and error — we can use calculus to
-          jump straight to it, the same way you'd find the minimum of a simple parabola by setting its
-          slope to zero and solving.</p>
+          <p>For a straight line, the MSE loss is a smooth bowl. When no feature is a copy of
+          another (see the check below), the bowl has a single lowest point and no other dips. So we
+          do not need to search by trial and error. We can use calculus to go straight to the
+          bottom: set the slope to zero and solve, as you would for a simple parabola.</p>
+
+          <div class="callout parallel">
+            <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
+            <p>A ball thrown upward follows a parabola. You do not need to film the whole flight to
+            find its highest point. Because you know the shape, a formula gives the top directly.
+            The normal equation below does the same for the MSE bowl: we know its shape, so a
+            formula gives the bottom.</p>
+          </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>First, a trick to handle the bias <b>b</b> without carrying it separately: glue a column of
-          1s onto the front of the data matrix, and glue <b>b</b> onto the front of the weight vector.
-          Call the augmented versions $\tilde{\mathbf{X}}$ (shape $n\times(d+1)$) and
-          $\tilde{\mathbf{w}}$ (length $d+1$, with $\tilde w_0=b$). Now $\tilde{\mathbf{X}}\tilde{\mathbf{w}}$
-          produces every prediction $\hat y_i = wx_i+b$ at once, and the loss is:</p>
-          $$ L(\tilde{\mathbf{w}}) = \frac{1}{n}\sum_{i=1}^n \left(\tilde{\mathbf{x}}_i\cdot\tilde{\mathbf{w}} - y_i\right)^2 $$
-          <p class="gloss"><b>In words:</b> $\tilde{\mathbf{x}}_i$ is row $i$ of $\tilde{\mathbf{X}}$ —
-          one house's (augmented) features. This is exactly the same MSE as before, just written with
-          the bias folded in.</p>
+          <p>Put all the houses in one table. The <dfn>data matrix</dfn> $\mathbf{X}$ has one row
+          per house and one column per feature, so its shape is $N\times d$. The true prices form a
+          vector $\mathbf{y}$ of length $N$.</p>
+          <p>A trick handles the bias $b$ without carrying it separately. Add a column of 1s to the
+          front of $\mathbf{X}$, and add $b$ to the front of the weight vector. Call the new versions
+          $\tilde{\mathbf{X}}$ (shape $N\times(d+1)$) and $\tilde{\mathbf{w}}$ (length $d+1$, with
+          $\tilde w_0=b$). Now $\tilde{\mathbf{X}}\tilde{\mathbf{w}}$ gives every prediction
+          $\hat y_i = \mathbf{w}^\top\mathbf{x}_i+b$ at once, and the loss is:</p>
+          $$ L(\tilde{\mathbf{w}}) = \frac{1}{N}\sum_{i=1}^N \left(\tilde{\mathbf{x}}_i\cdot\tilde{\mathbf{w}} - y_i\right)^2 $$
+          <p class="gloss"><b>In words:</b> $\tilde{\mathbf{x}}_i$ is row $i$ of
+          $\tilde{\mathbf{X}}$, one house’s features with a 1 in front. This is the same MSE as
+          before, with the bias folded in.</p>
 
-          <p>Differentiate with respect to one weight $\tilde w_k$ using the chain rule (derivative of a
-          square, times derivative of the inside):</p>
-          $$ \frac{\partial L}{\partial \tilde w_k} = \frac{1}{n}\sum_{i=1}^n 2\left(\tilde{\mathbf{x}}_i\cdot\tilde{\mathbf{w}} - y_i\right)\tilde x_{i,k} $$
-          <p class="gloss"><b>In words:</b> for every house, take its residual (predicted − actual) and
-          multiply by that house's <b>k</b>-th feature value, then average and double. Stacking this
-          expression over every <b>k</b> reassembles a vector, giving the full gradient in matrix
+          <p>Differentiate with respect to one weight $\tilde w_k$. Use the chain rule: the
+          derivative of a square, times the derivative of the inside. The inside
+          $\tilde{\mathbf{x}}_i\cdot\tilde{\mathbf{w}}$ changes by $\tilde x_{i,k}$ when
+          $\tilde w_k$ grows by 1:</p>
+          $$ \frac{\partial L}{\partial \tilde w_k} = \frac{1}{N}\sum_{i=1}^N 2\left(\tilde{\mathbf{x}}_i\cdot\tilde{\mathbf{w}} - y_i\right)\tilde x_{i,k} $$
+          <p class="gloss"><b>In words:</b> for every house, take its residual (predicted −
+          actual) and multiply it by that house’s $k$-th feature value. Then average and double.
+          Stack this over every $k$ to get a vector. That is the full gradient in matrix
           form:</p>
-          $$ \nabla_{\tilde{\mathbf{w}}} L = \frac{2}{n}\,\tilde{\mathbf{X}}^\top\!\left(\tilde{\mathbf{X}}\tilde{\mathbf{w}} - \mathbf{y}\right) $$
-          <p class="gloss"><b>In words:</b> compute every residual at once ($\tilde{\mathbf{X}}\tilde{\mathbf{w}}-\mathbf{y}$,
-          a length-<b>n</b> vector), then multiply by $\tilde{\mathbf{X}}^\top$, which — being a matrix —
-          does exactly the "multiply by each feature column and sum over houses" step from the line
-          above, for every weight simultaneously.</p>
+          $$ \nabla_{\tilde{\mathbf{w}}} L = \frac{2}{N}\,\tilde{\mathbf{X}}^\top\!\left(\tilde{\mathbf{X}}\tilde{\mathbf{w}} - \mathbf{y}\right) $$
+          <p class="gloss"><b>In words:</b> $\tilde{\mathbf{X}}\tilde{\mathbf{w}}-\mathbf{y}$ is
+          every residual at once, a vector of length $N$. Multiplying by $\tilde{\mathbf{X}}^\top$
+          does the step above (“multiply by each feature column and sum over houses”) for every
+          weight at the same time.</p>
 
-          <p>Now solve for the minimum by setting the gradient to the zero vector:</p>
+          <p>Now find the minimum: set the gradient to the zero vector and solve.</p>
           $$
           \begin{aligned}
-          \frac{2}{n}\,\tilde{\mathbf{X}}^\top\!\left(\tilde{\mathbf{X}}\tilde{\mathbf{w}} - \mathbf{y}\right) &= \mathbf{0} \\
+          \frac{2}{N}\,\tilde{\mathbf{X}}^\top\!\left(\tilde{\mathbf{X}}\tilde{\mathbf{w}} - \mathbf{y}\right) &= \mathbf{0} \\
           \tilde{\mathbf{X}}^\top\tilde{\mathbf{X}}\tilde{\mathbf{w}} - \tilde{\mathbf{X}}^\top\mathbf{y} &= \mathbf{0} \\
           \tilde{\mathbf{X}}^\top\tilde{\mathbf{X}}\tilde{\mathbf{w}} &= \tilde{\mathbf{X}}^\top\mathbf{y} \\
           \tilde{\mathbf{w}} &= \left(\tilde{\mathbf{X}}^\top\tilde{\mathbf{X}}\right)^{-1}\tilde{\mathbf{X}}^\top\mathbf{y}
           \end{aligned}
           $$
-          <p class="gloss"><b>In words:</b> multiply both sides by $n/2$ (drops out), move the constant
-          term to the other side, then multiply both sides by the inverse of
-          $\tilde{\mathbf{X}}^\top\tilde{\mathbf{X}}$ to isolate $\tilde{\mathbf{w}}$. This is the
-          <strong>normal equation</strong>: one formula that hands you the exact best-fit weights, no
-          searching required.</p>
+          <p class="gloss"><b>In words:</b> multiply both sides by $N/2$, so the constant goes
+          away. Move the $\mathbf{y}$ term to the other side. Then multiply both sides by the
+          inverse of $\tilde{\mathbf{X}}^\top\tilde{\mathbf{X}}$ to get $\tilde{\mathbf{w}}$ alone.
+          This is the <strong>normal equation</strong>: one formula that gives the exact best-fit
+          weights, with no search.</p>
 
           <div class="callout pitfall">
             <div class="callout__label"><span class="ic">▲</span> Watch out</div>
-            <p>The inverse $(\tilde{\mathbf{X}}^\top\tilde{\mathbf{X}})^{-1}$ only exists when
-            $\tilde{\mathbf{X}}^\top\tilde{\mathbf{X}}$ is non-singular — roughly, when no feature is an
-            exact linear combination of the others (e.g. one column being exactly twice another). In
-            practice, real code never calls an explicit matrix-inverse function; it calls a linear-solve
-            routine instead, which is faster and numerically safer for the same answer.</p>
+            <p>The inverse $(\tilde{\mathbf{X}}^\top\tilde{\mathbf{X}})^{-1}$ exists only when
+            $\tilde{\mathbf{X}}^\top\tilde{\mathbf{X}}$ is non-singular. Roughly, this means no
+            feature is an exact linear combination of the others (for example, one column exactly
+            twice another). Real code does not call a matrix-inverse function. It calls a
+            linear-solve routine, which gives the same answer faster and with smaller rounding
+            errors.</p>
           </div>
 
           <p class="beat beat--code">The same thing in NumPy</p>
+          <p class="codecap">fit the line with the normal equation</p>
           <pre><code class="language-python">import numpy as np
 
 def fit_normal_equation(X, y):
-    n = X.shape[0]
-    X_aug = np.hstack([np.ones((n, 1)), X])       # bias trick: prepend a column of 1s
-    w_aug = np.linalg.solve(X_aug.T @ X_aug, X_aug.T @ y)   # solve, don't explicitly invert
+    N = X.shape[0]
+    X_aug = np.hstack([np.ones((N, 1)), X])                  # bias trick: a column of 1s
+    w_aug = np.linalg.solve(X_aug.T @ X_aug, X_aug.T @ y)    # solve; do not invert
     b, w = w_aug[0], w_aug[1:]
     return w, b
 
-X = np.array([[650.0], [800.0], [1200.0], [1500.0]])   # house size, sqft
-y = np.array([150_000.0, 180_000.0, 240_000.0, 300_000.0])
+X = np.array([[60.0], [75.0], [110.0], [140.0]])   # house size, m²
+y = np.array([150_000.0, 200_000.0, 225_000.0, 310_000.0])
 
 w, b = fit_normal_equation(X, y)
-print(w, b)   # array([176.6...]), 22...   -- exact best-fit line, in one call</code></pre>
+print(w, b)   # [1801.29240711] 47875.60581583208</code></pre>
+          <p>So the best line is about $\hat y = 1801.29\,x + 47876$: roughly 1,800 dollars per
+          square meter on top of a base of about 48,000 dollars. Figure 5.1 shows this line.</p>
 
           <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">Suppose two of your features are "size in sqft" and "size in square meters" — one is just the other times a constant. What breaks in the normal equation, and why?</span>
+                <span class="check__q">Two of your features are “size in m²” and “size in cm²”. One is the other times 10,000. What goes wrong in the normal equation, and why?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>$\tilde{\mathbf{X}}^\top\tilde{\mathbf{X}}$ becomes singular (non-invertible), because
-                the two columns carry identical information — infinitely many combinations of their two
-                weights produce the exact same predictions, so there's no single "best" solution to land
-                on. Geometrically, the two features point in the same direction, so the loss bowl isn't a
-                bowl anymore along that direction — it's flat, like a valley floor rather than a single
-                pit. The usual fix, <em>ridge regularization</em>, adds a small penalty that makes the
-                matrix invertible again (a technique from <a href="07-overfitting.html">Section 7</a>).</p>
+                <p>$\tilde{\mathbf{X}}^\top\tilde{\mathbf{X}}$ becomes singular (it has no
+                inverse). The two columns carry the same information. You can raise one weight and
+                lower the other by the matching amount, and the predictions do not change. So
+                infinitely many weight pairs give the same lowest loss, and there is no single best
+                answer. In the picture of the loss, the bowl has a flat valley floor along that
+                direction instead of a single bottom. This is why the intuition above says “a single bottom
+                when no feature is a copy of another”. The usual fix is <em>ridge regularization</em>
+                (<a href="07-overfitting.html">Section 7</a>). It adds a small penalty that makes the
+                matrix invertible again.</p>
               </div>
             </details>
           </div>
@@ -349,53 +474,113 @@ print(w, b)   # array([176.6...]), 22...   -- exact best-fit line, in one call</
           <h2><span class="h-num">5</span>Optimization, take two: gradient descent</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>The normal equation is exact, but it needs to invert a $(d+1)\times(d+1)$ matrix, which
-          gets expensive — and sometimes impossible — as the number of features $d$ grows huge.
-          <strong>Gradient descent</strong> instead starts from any guess and repeatedly takes a small
-          step downhill on the loss surface, using the gradient (Section 2 of
-          <a href="02-calculus.html">this course</a>) as a compass that always points toward steepest
-          increase — so we step in the opposite direction.</p>
+          <p>The normal equation is exact, but it must solve a system with a $(d+1)\times(d+1)$
+          matrix. That becomes expensive when the number of features $d$ is very large.
+          <strong>Gradient descent</strong> works differently. It starts from any guess and takes
+          many small steps downhill on the loss surface. The gradient
+          (<a href="02-calculus.html">Section 2</a>) points toward the steepest increase, so each step
+          goes in the opposite direction.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>You're hiking down a mountain in thick fog. You can't see the valley floor, but you can
-            feel which way the ground slopes under your feet right now. So you take a step in the
-            steepest downhill direction, feel the new slope, take another step, and repeat. You never
-            need a map of the whole mountain — just the local slope, over and over. It's the same foggy
-            hillside from <a href="02-calculus.html">Section 2</a>; here we finally walk all the way down it.</p>
+            <p>Think of tuning a guitar string by ear. You hear that the note is too high, so you
+            turn the peg down a little. You listen again and correct again. When the note is far
+            off, you turn more. When it is close, you turn less. The size of the error sets the size
+            of the correction, and that is also true of the gradient. Turn the peg too far in one
+            go, and you overshoot to the other side. A learning rate that is too large does the same
+            thing.</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>We already derived the gradient above:
-          $\nabla_{\tilde{\mathbf{w}}} L = \tfrac{2}{n}\tilde{\mathbf{X}}^\top(\tilde{\mathbf{X}}\tilde{\mathbf{w}}-\mathbf{y})$.
-          Gradient descent uses it not to solve for zero directly, but to take a small step against
-          it:</p>
+          <p>We already derived the gradient above. Gradient descent does not set it to zero.
+          Instead it takes a small step against it:</p>
           $$ \tilde{\mathbf{w}} \leftarrow \tilde{\mathbf{w}} - \alpha\,\nabla_{\tilde{\mathbf{w}}} L $$
-          <p class="gloss"><b>In words:</b> the arrow means "replace the old value with this new one."
-          $\alpha$ (alpha) is the <dfn>learning rate</dfn>, a small positive number controlling step
-          size. We move a little bit in the direction <em>opposite</em> the gradient, because the
-          gradient points toward increasing loss and we want to decrease it. Repeat this update many
-          times and $\tilde{\mathbf{w}}$ slides down the loss bowl toward its bottom.</p>
+          <p class="gloss"><b>In words:</b> the arrow means “replace the old value with this new
+          one”. $\alpha$ (alpha) is the <dfn>learning rate</dfn>, a small positive number that sets
+          the step size. We move a little in the direction <em>opposite</em> the gradient, because
+          the gradient points toward higher loss. Repeat the update many times, and
+          $\tilde{\mathbf{w}}$ slides down the bowl toward its bottom.</p>
+
+          <div class="callout keyidea">
+            <div class="callout__label"><span class="ic">◆</span> Normalize the features first</div>
+            <p>Gradient descent is sensitive to the scale of the features. The fix is to
+            <dfn>normalize</dfn> each feature: subtract its mean $\mu$ and divide by its standard
+            deviation $s$. The new feature $x' = (x-\mu)/s$ has mean 0 and standard deviation 1.
+            Figure 5.2 shows why this helps. With a raw feature, the loss bowl is a long, narrow
+            valley. The gradient points mostly across the valley, not along it, so progress is
+            slow. After normalizing, the bowl is nearly round, and the gradient points almost
+            straight at the bottom.</p>
+            <p>After training on $x'$, you can convert the weights back to the original units. Put
+            $x' = (x-\mu)/s$ into the model and expand:</p>
+            $$
+            \begin{aligned}
+            \hat y &= w'\,\frac{x-\mu}{s} + b' \\
+                   &= \frac{w'}{s}\,x + \Big(b' - \frac{w'\mu}{s}\Big)
+            \end{aligned}
+            $$
+            <p class="gloss"><b>In words:</b> the weight in original units is $w'/s$. The bias in
+            original units is $b'$ minus the weight times the mean. The model is the same line; only
+            the units of its numbers change.</p>
+          </div>
+
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 480 280" role="img" aria-labelledby="fig-05-2-t">
+                <title id="fig-05-2-t">Loss contours in the w-b plane: long thin ellipses for a raw feature, where 30 gradient steps stop short of the minimum, and near-circles for a normalized feature, where the steps reach the minimum</title>
+                <rect class="f-k" x="30" y="30" width="200" height="200" rx="4"/>
+                <path class="ln thin s-f" d="M225.7,226.9 L224.8,227.5 L223.6,227.9 L222.1,228.0 L220.4,227.9 L218.4,227.5 L216.2,226.8 L213.7,225.8 L211.0,224.5 L208.1,223.0 L205.0,221.3 L201.6,219.3 L198.1,217.0 L194.4,214.5 L190.4,211.7 L186.4,208.8 L182.1,205.6 L177.7,202.2 L173.2,198.6 L168.6,194.8 L163.8,190.8 L159.0,186.7 L154.1,182.4 L149.1,177.9 L144.0,173.3 L139.0,168.6 L133.8,163.8 L128.7,158.9 L123.6,153.9 L118.5,148.9 L113.5,143.8 L108.4,138.6 L103.5,133.5 L98.6,128.3 L93.8,123.1 L89.1,118.0 L84.5,112.9 L80.1,107.8 L75.8,102.8 L71.6,97.8 L67.6,93.0 L63.8,88.3 L60.1,83.6 L56.7,79.1 L53.4,74.8 L50.4,70.6 L47.6,66.6 L45.0,62.7 L42.7,59.0 L40.6,55.6 L38.7,52.3 L37.1,49.2 L35.8,46.4 L34.7,43.8 L33.9,41.5 L33.4,39.4 L33.1,37.5 L33.1,35.9 L33.3,34.6 L33.9,33.5 L34.7,32.7 L35.8,32.2 L37.1,32.0 L38.7,32.0 L40.5,32.3 L42.6,32.8 L45.0,33.7 L47.6,34.8 L50.4,36.2 L53.4,37.8 L56.6,39.7 L60.1,41.8 L63.7,44.2 L67.5,46.8 L71.5,49.7 L75.7,52.8 L80.0,56.1 L84.5,59.6 L89.1,63.3 L93.7,67.2 L98.5,71.2 L103.4,75.4 L108.4,79.8 L113.4,84.3 L118.5,89.0 L123.6,93.7 L128.7,98.6 L133.8,103.5 L138.9,108.6 L144.0,113.6 L149.0,118.8 L154.0,123.9 L158.9,129.1 L163.8,134.3 L168.5,139.4 L173.2,144.6 L177.7,149.7 L182.1,154.7 L186.3,159.7 L190.4,164.6 L194.3,169.4 L198.1,174.0 L201.6,178.6 L205.0,183.0 L208.1,187.3 L211.0,191.4 L213.7,195.4 L216.2,199.1 L218.4,202.7 L220.4,206.1 L222.1,209.2 L223.6,212.2 L224.8,214.9 L225.7,217.4 L226.4,219.6 L226.8,221.6 L226.9,223.3 L226.8,224.7 L226.4,225.9 L225.7,226.9Z"/>
+                <path class="ln thin s-f" d="M186.6,187.3 L186.1,187.7 L185.3,187.9 L184.5,188.0 L183.5,187.9 L182.3,187.6 L181.0,187.2 L179.5,186.7 L177.9,185.9 L176.2,185.0 L174.4,184.0 L172.4,182.8 L170.3,181.5 L168.1,180.0 L165.8,178.4 L163.3,176.6 L160.8,174.7 L158.2,172.7 L155.6,170.6 L152.8,168.3 L150.0,166.0 L147.1,163.5 L144.2,161.0 L141.3,158.3 L138.3,155.6 L135.3,152.9 L132.3,150.0 L129.2,147.1 L126.2,144.2 L123.2,141.2 L120.2,138.2 L117.2,135.1 L114.3,132.1 L111.4,129.0 L108.6,125.9 L105.8,122.9 L103.1,119.9 L100.5,116.9 L97.9,113.9 L95.4,111.0 L93.1,108.1 L90.8,105.3 L88.6,102.6 L86.6,99.9 L84.7,97.3 L82.9,94.8 L81.2,92.5 L79.7,90.2 L78.3,88.0 L77.1,86.0 L76.0,84.0 L75.0,82.2 L74.2,80.5 L73.6,79.0 L73.1,77.6 L72.8,76.4 L72.7,75.3 L72.7,74.3 L72.8,73.6 L73.1,72.9 L73.6,72.5 L74.2,72.1 L75.0,72.0 L76.0,72.0 L77.1,72.2 L78.3,72.5 L79.7,73.0 L81.2,73.7 L82.9,74.5 L84.7,75.4 L86.6,76.6 L88.6,77.8 L90.8,79.2 L93.0,80.8 L95.4,82.5 L97.9,84.3 L100.4,86.3 L103.1,88.3 L105.8,90.5 L108.5,92.8 L111.4,95.2 L114.3,97.7 L117.2,100.3 L120.2,103.0 L123.2,105.7 L126.2,108.5 L129.2,111.4 L132.2,114.3 L135.3,117.3 L138.3,120.3 L141.2,123.3 L144.2,126.4 L147.1,129.5 L150.0,132.5 L152.8,135.6 L155.5,138.6 L158.2,141.6 L160.8,144.6 L163.3,147.6 L165.7,150.4 L168.0,153.3 L170.3,156.1 L172.4,158.7 L174.3,161.4 L176.2,163.9 L177.9,166.3 L179.5,168.7 L181.0,170.9 L182.3,173.0 L183.5,175.0 L184.5,176.9 L185.3,178.6 L186.1,180.2 L186.6,181.7 L187.0,183.0 L187.3,184.2 L187.3,185.2 L187.3,186.0 L187.0,186.8 L186.6,187.3Z"/>
+                <path class="ln thin s-f" d="M160.3,160.6 L160.0,160.8 L159.6,161.0 L159.1,161.0 L158.6,160.9 L157.9,160.8 L157.2,160.6 L156.5,160.3 L155.6,159.9 L154.7,159.4 L153.7,158.9 L152.6,158.2 L151.5,157.5 L150.3,156.7 L149.1,155.8 L147.8,154.9 L146.5,153.9 L145.1,152.8 L143.7,151.7 L142.2,150.5 L140.7,149.2 L139.2,147.9 L137.6,146.6 L136.0,145.1 L134.4,143.7 L132.8,142.2 L131.2,140.7 L129.6,139.1 L128.0,137.6 L126.4,136.0 L124.8,134.4 L123.2,132.7 L121.6,131.1 L120.1,129.5 L118.5,127.8 L117.1,126.2 L115.6,124.6 L114.2,123.0 L112.8,121.4 L111.5,119.8 L110.3,118.3 L109.0,116.8 L107.9,115.3 L106.8,113.9 L105.8,112.5 L104.8,111.2 L103.9,109.9 L103.1,108.7 L102.4,107.5 L101.7,106.4 L101.1,105.4 L100.6,104.5 L100.2,103.6 L99.9,102.7 L99.6,102.0 L99.4,101.3 L99.3,100.7 L99.3,100.2 L99.4,99.8 L99.6,99.5 L99.8,99.2 L100.2,99.1 L100.6,99.0 L101.1,99.0 L101.7,99.1 L102.4,99.3 L103.1,99.5 L103.9,99.9 L104.8,100.3 L105.8,100.8 L106.8,101.4 L107.9,102.1 L109.0,102.9 L110.2,103.7 L111.5,104.6 L112.8,105.6 L114.2,106.6 L115.6,107.7 L117.0,108.9 L118.5,110.1 L120.0,111.4 L121.6,112.7 L123.2,114.1 L124.7,115.5 L126.3,117.0 L128.0,118.5 L129.6,120.1 L131.2,121.6 L132.8,123.2 L134.4,124.8 L136.0,126.4 L137.6,128.1 L139.1,129.7 L140.7,131.3 L142.2,133.0 L143.6,134.6 L145.1,136.2 L146.5,137.8 L147.8,139.4 L149.1,140.9 L150.3,142.4 L151.5,143.9 L152.6,145.4 L153.7,146.8 L154.7,148.1 L155.6,149.4 L156.5,150.7 L157.2,151.9 L157.9,153.0 L158.6,154.1 L159.1,155.0 L159.6,156.0 L160.0,156.8 L160.3,157.6 L160.5,158.3 L160.6,158.9 L160.6,159.5 L160.6,160.0 L160.5,160.3 L160.3,160.6Z"/>
+                <path class="ln thin s-f" d="M143.5,143.7 L143.4,143.8 L143.2,143.8 L143.0,143.9 L142.8,143.8 L142.5,143.8 L142.2,143.7 L141.8,143.5 L141.4,143.4 L141.0,143.1 L140.6,142.9 L140.1,142.6 L139.6,142.3 L139.1,141.9 L138.5,141.6 L138.0,141.1 L137.4,140.7 L136.7,140.2 L136.1,139.7 L135.4,139.2 L134.8,138.6 L134.1,138.0 L133.4,137.4 L132.7,136.8 L132.0,136.1 L131.3,135.5 L130.5,134.8 L129.8,134.1 L129.1,133.4 L128.4,132.7 L127.6,131.9 L126.9,131.2 L126.2,130.5 L125.5,129.7 L124.9,129.0 L124.2,128.3 L123.6,127.6 L122.9,126.8 L122.3,126.1 L121.7,125.4 L121.2,124.8 L120.6,124.1 L120.1,123.4 L119.6,122.8 L119.2,122.2 L118.7,121.6 L118.3,121.0 L118.0,120.5 L117.6,120.0 L117.3,119.5 L117.1,119.0 L116.8,118.6 L116.7,118.2 L116.5,117.8 L116.4,117.5 L116.3,117.2 L116.3,116.9 L116.3,116.7 L116.3,116.5 L116.4,116.3 L116.5,116.2 L116.7,116.2 L116.8,116.1 L117.1,116.1 L117.3,116.2 L117.6,116.2 L118.0,116.4 L118.3,116.5 L118.7,116.7 L119.2,116.9 L119.6,117.2 L120.1,117.5 L120.6,117.9 L121.2,118.2 L121.7,118.6 L122.3,119.1 L122.9,119.5 L123.5,120.0 L124.2,120.6 L124.9,121.1 L125.5,121.7 L126.2,122.3 L126.9,122.9 L127.6,123.5 L128.4,124.2 L129.1,124.9 L129.8,125.5 L130.5,126.2 L131.2,127.0 L132.0,127.7 L132.7,128.4 L133.4,129.1 L134.1,129.9 L134.8,130.6 L135.4,131.3 L136.1,132.0 L136.7,132.8 L137.4,133.5 L138.0,134.2 L138.5,134.9 L139.1,135.6 L139.6,136.2 L140.1,136.9 L140.6,137.5 L141.0,138.1 L141.4,138.7 L141.8,139.2 L142.2,139.8 L142.5,140.3 L142.8,140.7 L143.0,141.2 L143.2,141.6 L143.4,142.0 L143.5,142.3 L143.6,142.7 L143.7,142.9 L143.7,143.2 L143.7,143.4 L143.6,143.6 L143.5,143.7Z"/>
+                <path class="ln s-a" d="M106.2,136.3 L130.5,112.9 L117.0,127.0 L125.3,119.4 L120.9,124.3 L123.9,121.9 L122.6,123.7 L123.8,123.1 L123.6,123.9 L124.1,123.8 L124.2,124.2 L124.5,124.3 L124.6,124.6 L124.9,124.8 L125.1,125.0 L125.3,125.2 L125.4,125.4 L125.6,125.6 L125.8,125.8 L126.0,125.9 L126.1,126.1 L126.3,126.2 L126.4,126.4 L126.6,126.5 L126.7,126.7 L126.8,126.8 L126.9,126.9 L127.1,127.0 L127.2,127.1 L127.3,127.3 L127.4,127.4"/>
+                <circle class="f-a" cx="106.2" cy="136.3" r="4"/>
+                <circle class="f-v" cx="130.0" cy="130.0" r="5"/>
+                <text class="b lg" x="130.0" y="20" text-anchor="middle">raw feature</text>
+                <text class="m" x="130.0" y="252" text-anchor="middle">w</text><text class="m" x="24" y="135" text-anchor="end">b</text>
+                <text x="130.0" y="270" text-anchor="middle">size in 100 m²</text>
+                <rect class="f-k" x="265" y="30" width="200" height="200" rx="4"/>
+                <path class="ln thin s-f" d="M463.0,130.0 L462.9,125.5 L462.5,121.0 L461.8,116.6 L460.9,112.2 L459.6,107.8 L458.2,103.5 L456.4,99.3 L454.4,95.2 L452.2,91.1 L449.7,87.2 L447.0,83.4 L444.0,79.7 L440.8,76.2 L437.4,72.8 L433.9,69.6 L430.1,66.5 L426.1,63.6 L422.0,60.9 L417.7,58.4 L413.3,56.1 L408.7,54.0 L404.0,52.1 L399.2,50.4 L394.3,49.0 L389.3,47.7 L384.3,46.7 L379.2,46.0 L374.0,45.4 L368.9,45.1 L363.7,45.1 L358.5,45.3 L353.4,45.7 L348.2,46.3 L343.2,47.2 L338.1,48.3 L333.2,49.7 L328.4,51.2 L323.6,53.0 L319.0,55.0 L314.5,57.2 L310.1,59.6 L305.9,62.2 L301.8,65.0 L298.0,68.0 L294.3,71.2 L290.8,74.5 L287.5,77.9 L284.5,81.5 L281.6,85.3 L279.0,89.2 L276.6,93.2 L274.5,97.2 L272.6,101.4 L271.0,105.7 L269.7,110.0 L268.6,114.4 L267.8,118.8 L267.2,123.3 L267.0,127.8 L267.0,132.2 L267.2,136.7 L267.8,141.2 L268.6,145.6 L269.7,150.0 L271.0,154.3 L272.6,158.6 L274.5,162.8 L276.6,166.8 L279.0,170.8 L281.6,174.7 L284.5,178.5 L287.5,182.1 L290.8,185.5 L294.3,188.8 L298.0,192.0 L301.8,195.0 L305.9,197.8 L310.1,200.4 L314.5,202.8 L319.0,205.0 L323.6,207.0 L328.4,208.8 L333.2,210.3 L338.1,211.7 L343.2,212.8 L348.2,213.7 L353.4,214.3 L358.5,214.7 L363.7,214.9 L368.9,214.9 L374.0,214.6 L379.2,214.0 L384.3,213.3 L389.3,212.3 L394.3,211.0 L399.2,209.6 L404.0,207.9 L408.7,206.0 L413.3,203.9 L417.7,201.6 L422.0,199.1 L426.1,196.4 L430.1,193.5 L433.9,190.4 L437.4,187.2 L440.8,183.8 L444.0,180.3 L447.0,176.6 L449.7,172.8 L452.2,168.9 L454.4,164.8 L456.4,160.7 L458.2,156.5 L459.6,152.2 L460.9,147.8 L461.8,143.4 L462.5,139.0 L462.9,134.5 L463.0,130.0Z"/>
+                <path class="ln thin s-f" d="M423.0,130.0 L422.9,127.3 L422.7,124.7 L422.3,122.1 L421.7,119.5 L421.0,116.9 L420.1,114.3 L419.1,111.9 L417.9,109.4 L416.6,107.0 L415.1,104.7 L413.5,102.4 L411.7,100.3 L409.9,98.2 L407.9,96.2 L405.7,94.2 L403.5,92.4 L401.2,90.7 L398.7,89.1 L396.2,87.6 L393.5,86.3 L390.8,85.0 L388.1,83.9 L385.2,82.9 L382.3,82.1 L379.4,81.3 L376.4,80.7 L373.4,80.3 L370.3,80.0 L367.3,79.8 L364.2,79.8 L361.2,79.9 L358.1,80.1 L355.1,80.5 L352.1,81.0 L349.1,81.7 L346.2,82.5 L343.3,83.4 L340.5,84.5 L337.8,85.6 L335.1,86.9 L332.5,88.4 L330.0,89.9 L327.6,91.6 L325.3,93.3 L323.2,95.2 L321.1,97.1 L319.2,99.2 L317.3,101.3 L315.7,103.6 L314.1,105.8 L312.7,108.2 L311.5,110.6 L310.4,113.1 L309.4,115.6 L308.6,118.2 L308.0,120.8 L307.5,123.4 L307.2,126.0 L307.0,128.7 L307.0,131.3 L307.2,134.0 L307.5,136.6 L308.0,139.2 L308.6,141.8 L309.4,144.4 L310.4,146.9 L311.5,149.4 L312.7,151.8 L314.1,154.2 L315.7,156.4 L317.3,158.7 L319.2,160.8 L321.1,162.9 L323.2,164.8 L325.3,166.7 L327.6,168.4 L330.0,170.1 L332.5,171.6 L335.1,173.1 L337.8,174.4 L340.5,175.5 L343.3,176.6 L346.2,177.5 L349.1,178.3 L352.1,179.0 L355.1,179.5 L358.1,179.9 L361.2,180.1 L364.2,180.2 L367.3,180.2 L370.3,180.0 L373.4,179.7 L376.4,179.3 L379.4,178.7 L382.3,177.9 L385.2,177.1 L388.1,176.1 L390.8,175.0 L393.5,173.7 L396.2,172.4 L398.7,170.9 L401.2,169.3 L403.5,167.6 L405.7,165.8 L407.9,163.8 L409.9,161.8 L411.7,159.7 L413.5,157.6 L415.1,155.3 L416.6,153.0 L417.9,150.6 L419.1,148.1 L420.1,145.7 L421.0,143.1 L421.7,140.5 L422.3,137.9 L422.7,135.3 L422.9,132.7 L423.0,130.0Z"/>
+                <path class="ln thin s-f" d="M396.0,130.0 L395.9,128.6 L395.8,127.2 L395.6,125.8 L395.3,124.4 L394.9,123.0 L394.4,121.6 L393.9,120.3 L393.3,119.0 L392.6,117.7 L391.8,116.5 L390.9,115.3 L390.0,114.1 L389.0,113.0 L387.9,111.9 L386.8,110.9 L385.6,109.9 L384.3,109.0 L383.0,108.2 L381.7,107.4 L380.3,106.6 L378.8,106.0 L377.3,105.4 L375.8,104.8 L374.3,104.4 L372.7,104.0 L371.1,103.7 L369.5,103.4 L367.8,103.3 L366.2,103.2 L364.6,103.1 L362.9,103.2 L361.3,103.3 L359.7,103.5 L358.1,103.8 L356.5,104.2 L354.9,104.6 L353.4,105.1 L351.9,105.7 L350.4,106.3 L349.0,107.0 L347.6,107.7 L346.3,108.6 L345.0,109.5 L343.8,110.4 L342.6,111.4 L341.5,112.4 L340.5,113.5 L339.5,114.7 L338.6,115.9 L337.8,117.1 L337.0,118.3 L336.4,119.6 L335.8,121.0 L335.3,122.3 L334.8,123.7 L334.5,125.1 L334.2,126.5 L334.1,127.9 L334.0,129.3 L334.0,130.7 L334.1,132.1 L334.2,133.5 L334.5,134.9 L334.8,136.3 L335.3,137.7 L335.8,139.0 L336.4,140.4 L337.0,141.7 L337.8,142.9 L338.6,144.1 L339.5,145.3 L340.5,146.5 L341.5,147.6 L342.6,148.6 L343.8,149.6 L345.0,150.5 L346.3,151.4 L347.6,152.3 L349.0,153.0 L350.4,153.7 L351.9,154.3 L353.4,154.9 L354.9,155.4 L356.5,155.8 L358.1,156.2 L359.7,156.5 L361.3,156.7 L362.9,156.8 L364.6,156.9 L366.2,156.8 L367.8,156.7 L369.5,156.6 L371.1,156.3 L372.7,156.0 L374.3,155.6 L375.8,155.2 L377.3,154.6 L378.8,154.0 L380.3,153.4 L381.7,152.6 L383.0,151.8 L384.3,151.0 L385.6,150.1 L386.8,149.1 L387.9,148.1 L389.0,147.0 L390.0,145.9 L390.9,144.7 L391.8,143.5 L392.6,142.3 L393.3,141.0 L393.9,139.7 L394.4,138.4 L394.9,137.0 L395.3,135.6 L395.6,134.2 L395.8,132.8 L395.9,131.4 L396.0,130.0Z"/>
+                <path class="ln thin s-f" d="M378.9,130.0 L378.8,129.4 L378.8,128.7 L378.7,128.1 L378.5,127.5 L378.4,126.9 L378.2,126.3 L377.9,125.7 L377.6,125.1 L377.3,124.5 L377.0,123.9 L376.6,123.4 L376.2,122.9 L375.7,122.4 L375.2,121.9 L374.7,121.5 L374.2,121.0 L373.6,120.6 L373.0,120.2 L372.4,119.9 L371.8,119.5 L371.2,119.2 L370.5,119.0 L369.8,118.7 L369.1,118.5 L368.4,118.4 L367.7,118.2 L367.0,118.1 L366.3,118.0 L365.5,118.0 L364.8,118.0 L364.1,118.0 L363.3,118.1 L362.6,118.2 L361.9,118.3 L361.2,118.4 L360.5,118.6 L359.8,118.9 L359.1,119.1 L358.5,119.4 L357.8,119.7 L357.2,120.0 L356.6,120.4 L356.1,120.8 L355.5,121.2 L355.0,121.7 L354.5,122.1 L354.0,122.6 L353.6,123.1 L353.2,123.7 L352.8,124.2 L352.5,124.8 L352.2,125.4 L351.9,126.0 L351.7,126.6 L351.5,127.2 L351.4,127.8 L351.2,128.4 L351.2,129.0 L351.1,129.7 L351.1,130.3 L351.2,131.0 L351.2,131.6 L351.4,132.2 L351.5,132.8 L351.7,133.4 L351.9,134.0 L352.2,134.6 L352.5,135.2 L352.8,135.8 L353.2,136.3 L353.6,136.9 L354.0,137.4 L354.5,137.9 L355.0,138.3 L355.5,138.8 L356.1,139.2 L356.6,139.6 L357.2,140.0 L357.8,140.3 L358.5,140.6 L359.1,140.9 L359.8,141.1 L360.5,141.4 L361.2,141.6 L361.9,141.7 L362.6,141.8 L363.3,141.9 L364.1,142.0 L364.8,142.0 L365.5,142.0 L366.3,142.0 L367.0,141.9 L367.7,141.8 L368.4,141.6 L369.1,141.5 L369.8,141.3 L370.5,141.0 L371.2,140.8 L371.8,140.5 L372.4,140.1 L373.0,139.8 L373.6,139.4 L374.2,139.0 L374.7,138.5 L375.2,138.1 L375.7,137.6 L376.2,137.1 L376.6,136.6 L377.0,136.1 L377.3,135.5 L377.6,134.9 L377.9,134.3 L378.2,133.7 L378.4,133.1 L378.5,132.5 L378.7,131.9 L378.8,131.3 L378.8,130.6 L378.9,130.0Z"/>
+                <path class="ln s-a" d="M340.9,212.3 L355.4,146.5 L361.1,133.3 L363.4,130.7 L364.4,130.1 L364.7,130.0 L364.9,130.0 L364.9,130.0 L365.0,130.0 L365.0,130.0 L365.0,130.0 L365.0,130.0 L365.0,130.0 L365.0,130.0 L365.0,130.0 L365.0,130.0 L365.0,130.0 L365.0,130.0 L365.0,130.0 L365.0,130.0 L365.0,130.0 L365.0,130.0 L365.0,130.0 L365.0,130.0 L365.0,130.0 L365.0,130.0 L365.0,130.0 L365.0,130.0 L365.0,130.0 L365.0,130.0 L365.0,130.0"/>
+                <circle class="f-a" cx="340.9" cy="212.3" r="4"/>
+                <circle class="f-v" cx="365.0" cy="130.0" r="5"/>
+                <text class="b lg" x="365.0" y="20" text-anchor="middle">normalized feature</text>
+                <text class="m" x="365.0" y="252" text-anchor="middle">w</text><text class="m" x="259" y="135" text-anchor="end">b</text>
+                <text x="365.0" y="270" text-anchor="middle">mean 0, std 1</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 5.2</b> MSE contours for our four houses, with 30 gradient-descent
+            steps (amber) from $w=b=0$ with the same learning rate. Left: size in hundreds of m², not
+            centered. The valley is long and thin, and the path stops far from the minimum (violet).
+            Right: normalized size. The contours are nearly circles, and the path reaches the
+            minimum.</figcaption>
+          </figure>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> When gradient descent beats the closed form</div>
-            <p>The normal equation costs roughly $O(d^3)$ to invert a $d\times d$ matrix — for
-            a dataset with a million features (e.g. a bag-of-words text representation), that's
-            completely infeasible, and such matrices are often sparse in a way that inversion destroys.
-            Gradient descent instead only needs cheap matrix–vector products at each step, can process
-            data in small batches instead of loading everything into memory at once, and works even when
-            $\tilde{\mathbf{X}}^\top\tilde{\mathbf{X}}$ isn't invertible at all. The trade: it gives an
-            approximate answer that improves gradually, instead of the closed form's exact answer in one
-            shot.</p>
+            <p>Solving the normal equation takes about $d^3$ arithmetic steps for $d$ features
+            (written $O(d^3)$, “order $d$ cubed”). Some datasets have a million features. An
+            example is a <dfn>bag-of-words</dfn> text representation, with one feature per word in
+            the vocabulary that counts how often the word appears. Then $d^3 = 10^{18}$, which is
+            far too much. Such data is also <dfn>sparse</dfn>: almost all entries are zero. Storing
+            only the nonzero entries saves memory, but $\tilde{\mathbf{X}}^\top\tilde{\mathbf{X}}$
+            is often dense and huge.</p>
+            <p>Gradient descent needs only matrix–vector products at each step, and these are cheap
+            for sparse data. It can also process the data in small batches, so the whole dataset
+            need not fit in memory. The cost: it gives an approximate answer that improves over many
+            steps, not an exact answer from one formula.</p>
           </div>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
+          <p class="codecap">gradient descent on normalized size, then back to dollars per m²</p>
           <pre><code class="language-python">import torch
 
-X = torch.tensor([[650.], [800.], [1200.], [1500.]])
-y = torch.tensor([150_000., 180_000., 240_000., 300_000.])
+X = torch.tensor([[60.], [75.], [110.], [140.]])   # house size, m²
+y = torch.tensor([150_000., 200_000., 225_000., 310_000.])
 
-# gradient descent is sensitive to feature scale -- normalize first
+# normalize the feature first (see the box above)
 X_mean, X_std = X.mean(), X.std()
 Xn = (X - X_mean) / X_std
 
@@ -407,30 +592,41 @@ for step in range(500):
     y_hat = Xn.squeeze() * w + b        # forward pass (the hypothesis)
     loss = ((y_hat - y) ** 2).mean()    # MSE
 
-    loss.backward()                     # autograd fills w.grad, b.grad
+    loss.backward()                     # autograd fills w.grad and b.grad
 
-    with torch.no_grad():               # the update step itself isn't part of the graph
+    with torch.no_grad():               # the update is not part of the graph
         w -= lr * w.grad
         b -= lr * b.grad
         w.grad.zero_()
         b.grad.zero_()
 
-print(w.item(), b.item(), loss.item())</code></pre>
+print(w.item(), b.item(), loss.item())
+# 64685.78125 221249.96875 216498320.0
+
+# undo the normalization: w = w'/s, b = b' - w'*mean/s
+w_orig = w.item() / X_std.item()
+b_orig = b.item() - w.item() * X_mean.item() / X_std.item()
+print(round(w_orig, 2), round(b_orig))
+# 1801.29 47876</code></pre>
+          <p>The first line prints the weights in normalized units, so they look very different
+          from the normal-equation answer. After we convert them back, they match it: about 1,801
+          dollars per m² and a base of about 47,876 dollars. Two different optimizers found the same
+          bottom of the same bowl.</p>
 
           <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">You're training on a bag-of-words dataset with 1,000,000 features. Why is gradient descent the practical choice over the normal equation here?</span>
+                <span class="check__q">In the code above, delete the normalization (use <code>Xn = X</code>) and keep <code>lr = 0.1</code>. Predict what happens.</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>The normal equation needs $(\tilde{\mathbf{X}}^\top\tilde{\mathbf{X}})^{-1}$, a
-                1,000,000 × 1,000,000 matrix inverse — roughly $10^{18}$ operations and enormous memory,
-                completely impractical. Gradient descent instead touches the data only through
-                matrix–vector products, which stay cheap and can even exploit the sparsity that
-                bag-of-words features usually have (most entries are zero). It trades an exact one-shot
-                answer for a sequence of cheap, scalable steps.</p>
+                <p>The weights blow up, and the printed values become <code>nan</code>. The size
+                of one gradient step on $w$ grows with $x^2$, which is about 10,000 here. With
+                $\alpha = 0.1$, each step overshoots the bottom by a huge amount, lands farther
+                away, and the next step is even larger. You would need a learning rate thousands of
+                times smaller, and then $b$ would move extremely slowly. Normalizing removes this
+                conflict.</p>
               </div>
             </details>
           </div>
@@ -439,19 +635,21 @@ print(w.item(), b.item(), loss.item())</code></pre>
 
           <h2><span class="h-num">6</span>What to carry forward</h2>
           <ul>
-            <li>Learning = <strong>hypothesis class</strong> (what functions we allow) +
+            <li>Learning = <strong>hypothesis class</strong> (which functions we allow) +
             <strong>loss</strong> (how we score wrongness) + <strong>optimization</strong> (how we
-            search) — every algorithm in this course is this triad in a different costume.</li>
-            <li>Linear regression's hypothesis is $\hat y = \mathbf{w}^\top\mathbf{x}+b$, a straight
+            search). The algorithms in this course use these three parts in different forms.</li>
+            <li>Linear regression’s hypothesis is $\hat y = \mathbf{w}^\top\mathbf{x}+b$: a straight
             line (or plane, or hyperplane) fit to the data.</li>
-            <li><strong>MSE</strong> squares and averages the errors — and isn't an arbitrary choice:
-            it's the maximum-likelihood loss when noise is Gaussian.</li>
-            <li>The <strong>normal equation</strong> $\tilde{\mathbf{w}} = (\tilde{\mathbf{X}}^\top\tilde{\mathbf{X}})^{-1}\tilde{\mathbf{X}}^\top\mathbf{y}$
-            solves for the exact minimum directly, by setting the gradient to zero.</li>
-            <li><strong>Gradient descent</strong> instead walks downhill step by step —
-            slower per problem, but the only option once the data is too large or too sparse to invert.</li>
+            <li><strong>MSE</strong> squares and averages the errors. It is the maximum-likelihood
+            loss when the noise is Gaussian.</li>
+            <li>The <strong>normal equation</strong>
+            $\tilde{\mathbf{w}} = (\tilde{\mathbf{X}}^\top\tilde{\mathbf{X}})^{-1}\tilde{\mathbf{X}}^\top\mathbf{y}$
+            finds the exact minimum by setting the gradient to zero.</li>
+            <li><strong>Gradient descent</strong> walks downhill step by step. It works best on
+            normalized features. Iterative methods like it are the usual choice when the data is
+            too large or too sparse for the normal equation.</li>
           </ul>
-          <p>Next we'll keep the same triad but swap the hypothesis and the loss: predicting a
+          <p>Next we keep the same triad but change the hypothesis and the loss. We will predict a
           category instead of a number, in <a href="06-logistic-regression.html">Logistic
           Regression</a>.</p>
 
