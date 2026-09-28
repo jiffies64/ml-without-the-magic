@@ -6,7 +6,7 @@
 ![Content: CC BY 4.0](https://img.shields.io/badge/content-CC%20BY%204.0-lightgrey)
 ![Dependencies: none](https://img.shields.io/badge/dependencies-none-brightgreen)
 ![Works offline](https://img.shields.io/badge/works-offline-success)
-![PDF: 317 pages](https://img.shields.io/badge/PDF-317%20pages-orange)
+![PDF: 317 pages](https://img.shields.io/badge/PDF-389%20pages-orange)
 
 If you've ever bounced off machine learning because every tutorial either hand-waves the math or
 drowns you in it, this course is built for you. It teaches **neural networks, backpropagation,
@@ -15,7 +15,7 @@ every time: a plain-English **analogy**, then the **math derived line by line wi
 defined**, then the **smallest PyTorch** that makes it real, then a **"check yourself"** question so
 you know it stuck. No equation is ever left as _"it can be shown that."_
 
-Read it online as a static site, or grab the whole thing as a single **317-page PDF**. No framework,
+Read it online as a static site, or grab the whole thing as a single **389-page PDF**. No framework,
 no build step, no account, no paywall.
 
 > **Topics:** `machine-learning` · `deep-learning` · `pytorch` · `neural-networks` ·
@@ -96,7 +96,7 @@ assets/course.js            Sidebar, search, progress + theme (both persisted), 
 assets/search-index.js      Generated client-side search index (titles + headings + keywords)
 assets/vendor/              Vendored KaTeX, highlight.js, and web fonts (fully offline)
 tools/                      Search index, study times, PDF build, and asset vendoring
-ML-Without-the-Magic.pdf    The entire course as a single 317-page PDF
+ML-Without-the-Magic.pdf    The entire course as a single 389-page PDF
 ```
 
 Features: sticky sidebar with **progress tracking that persists across visits** and a
