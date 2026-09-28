@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Attention &amp; Transformers · ML Without the Magic</title>
-  <meta name="description" content="Scaled dot-product attention derived from scratch, multi-head attention, positional encodings, and the full transformer block — every matrix shape spelled out. The architecture behind every modern LLM." />
+  <meta name="description" content="Scaled dot-product attention derived from scratch, multi-head attention, positional encodings, and the full transformer block, with the shape of every matrix written out. The architecture behind modern large language models." />
   <link rel="stylesheet" href="../assets/vendor/fonts/fonts.css" />
   <link rel="stylesheet" href="../assets/course.css" />
   <link rel="stylesheet" href="../assets/vendor/katex/katex.min.css" />
@@ -38,9 +38,9 @@
         <header class="lesson-head">
           <p class="lesson-eyebrow">Part 5 · Deep Learning Architectures <span class="dot"></span> Section 18</p>
           <h1 class="lesson-title">Attention &amp; Transformers</h1>
-          <p class="lesson-standfirst">The architecture behind every modern LLM — derived, not diagrammed, with every matrix shape spelled out. By the end you could rebuild the core of GPT from memory.</p>
+          <p class="lesson-standfirst">The architecture behind modern large language models, derived step by step, with the shape of every matrix written out.</p>
           <div class="lesson-meta">
-            <span><b>42 min</b> read</span>
+            <span><b>45 min</b> read</span>
           </div>
           <div class="objectives">
             <div class="objectives__label">You'll learn</div>
@@ -54,21 +54,20 @@
         </header>
 
         <div class="prose">
-          <p class="lead">Every large language model you have heard of — GPT, Claude, Llama, Gemini —
-          is a tall stack of one repeated part: the <strong>transformer block</strong>. And the beating
-          heart of that block is a single operation called <strong>attention</strong>. If you truly
-          understand attention, the rest of modern AI stops being magic and becomes engineering. So we
-          are going to build it here from nothing but the dot product you already know, and we will write
-          down the shape of every single matrix as we go — because in this subject, the shapes
-          <em>are</em> the understanding.</p>
+          <p class="lead">Most large language models you have heard of (GPT, Claude, Llama, Gemini) are
+          a tall stack of one repeated part: the <strong>transformer block</strong>. The central
+          operation inside that block is called <strong>attention</strong>. When you understand
+          attention, the rest of a modern language model becomes engineering, not magic. So we will
+          build it here from the dot product you already know. We will write down the shape of every
+          matrix as we go, because in this subject the shapes <em>are</em> the understanding.</p>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> The one idea to hold onto</div>
             <p>Attention lets <strong>every position in a sequence look directly at every other
-            position</strong> and pull in the information it needs — all at once, in parallel. That single
-            capability is what replaced the slow, forgetful recurrent networks of
-            <a href="17-sequence-models.html">Section 17</a> and unlocked models with billions of
-            parameters. Everything below is the detail of how that lookup is computed.</p>
+            position</strong> and take the information it needs. All positions do this at the same
+            time, in parallel. This is what replaced the slow, forgetful recurrent networks of <a
+            href="17-sequence-models.html">Section 17</a>. Everything below is the detail of how that
+            lookup is computed.</p>
           </div>
 
           <!-- ===================== MOTIVATION ===================== -->
@@ -76,46 +75,49 @@
 
           <p class="beat beat--intuition">Intuition first</p>
           <p>In <a href="17-sequence-models.html">Section 17</a> we met <strong>recurrent neural
-          networks</strong> (RNNs): models that read a sentence one word at a time, carrying a running
-          summary — a <dfn>hidden state</dfn> (a fixed-size memory vector) — from each word to the next.
-          They work, but they fight two problems at once.</p>
+          networks</strong> (RNNs). They read a sentence one word at a time and carry a running
+          summary, the <dfn>hidden state</dfn> (a fixed-size memory vector), from each word to the
+          next. They work, but they have two problems.</p>
           <ul>
             <li><strong>Long-range forgetting.</strong> To connect the last word of a paragraph to the
-            first, the information must survive being squeezed through every step in between. It fades —
-            the vanishing-gradient problem we previewed in <a href="01-linear-algebra.html">Section 1</a>.</li>
+            first, the information must survive every step in between. It fades. This is the
+            vanishing-gradient problem from <a href="17-sequence-models.html">Section 17</a>.</li>
             <li><strong>No parallelism.</strong> Word 50 cannot be processed until word 49 is done,
-            because it needs the hidden state coming out of word 49. Reading is strictly sequential, so
-            it cannot be spread across the thousands of cores in a modern GPU. Training is slow.</li>
+            because it needs the hidden state from word 49. So the work cannot be spread across the
+            thousands of cores in a modern GPU, and training is slow.</li>
           </ul>
-          <p>We want the impossible-sounding combination: <strong>direct connections between far-apart
-          words</strong> (so nothing has to survive a long relay) <strong>and</strong> the ability to
-          <strong>process every word at the same time</strong> (so training is fast). Attention delivers
-          both, and it does so with an idea that turns out to be surprisingly simple.</p>
+          <p>We want two things at once. First, <strong>direct connections between far-apart
+          words</strong>, so nothing has to survive a long relay. Second, the ability to
+          <strong>process every word at the same time</strong>, so training is fast. Attention gives
+          both, with an idea that is surprisingly simple.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>Imagine reading a mystery novel two ways. The <strong>RNN way</strong>: you may only keep
-            a single sticky-note of memory, and you must rewrite it after every sentence — by the last
-            chapter the early clues are smudged beyond reading. The <strong>attention way</strong>: the
-            whole book lies open on a huge table, and to understand any sentence you may glance directly
-            at any other sentence, however far back, instantly. No relay, no fading, and you can have a
-            room full of readers each studying a different sentence at the same moment.</p>
+            <p>Imagine reading a mystery novel in two ways. The <strong>RNN way</strong>: you may keep
+            only one small note of memory, and you must rewrite it after every sentence. By the last
+            chapter, the early clues are lost. The <strong>attention way</strong>: the whole book lies
+            open on a large table. To understand any sentence, you may look directly at any other
+            sentence, however far back. Nothing fades on the way. And a room full of readers can each
+            study a different sentence at the same time.</p>
           </div>
 
           <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">In the sentence “The trophy didn't fit in the suitcase because <b>it</b> was too big,” what does “it” refer to, and why is that hard for an RNN?</span>
+                <span class="check__q">In “The trophy didn't fit in the suitcase because <b>it</b> was too big,” what does “it” refer to? Is the hard part here the distance between the words, or something else?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>“It” means the <strong>trophy</strong> (change “big” to “small” and it flips to the
-                suitcase — the meaning depends on distant words). To resolve it, the model must link “it”
-                back to “trophy,” which sits many words earlier. An RNN can only reach that word through
-                the whole chain of hidden states in between, where the signal weakens. Attention lets “it”
-                look <em>straight at</em> “trophy” in one hop, no matter the distance. This exact example
-                is the classic test of long-range reference.</p>
+                <p>“It” means the <strong>trophy</strong>. Change “big” to “small” and it means the
+                suitcase. The distance is short: “trophy” is only 7 words before “it”. The hard part is
+                <em>knowledge</em>: you must know that a big thing does not fit into a smaller one.
+                Sentences like this are called <dfn>Winograd schemas</dfn>, and they test common sense,
+                not memory span. Attention helps in one way: “it” can compare itself with both
+                “trophy” and “suitcase” directly, in one step. Choosing the right one still depends on
+                what the model learned in training. For a truly long-range example, imagine the
+                trophy was named three paragraphs earlier. An RNN would have to carry it through
+                hundreds of steps; attention still reaches it in one.</p>
               </div>
             </details>
           </div>
@@ -125,248 +127,451 @@
 
           <p class="beat beat--intuition">Intuition first</p>
           <p>Here is the whole mechanism in one picture, and it is a picture of a
-          <strong>lookup</strong>. Every position asks a question, every position advertises what it is
-          about, and every position offers some content. A position collects its answer by taking a
-          <em>blend</em> of everyone's content, weighted by how well their advertisement matches its
-          question. That is attention. Three roles do all the work, and they have names:</p>
+          <strong>lookup</strong>. Every position asks a question. Every position also shows a label
+          that says what it is about, and every position offers some content. A position builds its
+          answer as a <em>blend</em> of everyone's content. The blend is weighted by how well each
+          label matches its question. That is attention. Three roles do all the work:</p>
           <ul>
-            <li>The <strong>query</strong> ($\mathbf{q}$) — what
-            this position is looking for. (“I'm a pronoun; I need the noun I refer to.”)</li>
-            <li>The <strong>key</strong> ($\mathbf{k}$) — a label
-            each position advertises about itself. (“I'm a concrete singular noun.”)</li>
-            <li>The <strong>value</strong> ($\mathbf{v}$) — the
-            actual content a position hands over once it is selected. (“Here is my meaning: <em>trophy</em>.”)</li>
+            <li>The <strong>query</strong> ($\mathbf{q}$): what this position is looking for. (“I'm a
+            pronoun; I need the noun I refer to.”)</li>
+            <li>The <strong>key</strong> ($\mathbf{k}$): a label each position shows about itself.
+            (“I'm a concrete singular noun.”)</li>
+            <li>The <strong>value</strong> ($\mathbf{v}$): the content a position hands over when it is
+            selected. (“Here is my meaning: <em>trophy</em>.”)</li>
           </ul>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>A library search. Your <strong>query</strong> is the phrase you type into the catalogue.
-            Each book on the shelf has a spine label — its <strong>key</strong> — and its actual pages —
-            its <strong>value</strong>. A normal computer picks the single book whose label matches best
-            and hands you exactly that one. Attention is the <em>soft</em> version: instead of one winner,
-            it returns a smooth blend — 70% of this book's pages, 20% of that one's, 10% of a third —
-            weighted by how well each spine label matched what you asked for. It is a <strong>soft
-            dictionary lookup</strong>: a dictionary returns one value for an exact key, attention returns
-            a weighted mixture of all values, graded by key similarity.</p>
+            <p>Think of a library search. Your <strong>query</strong> is the phrase you type into the
+            catalog. Each book has a spine label, its <strong>key</strong>, and its pages, its
+            <strong>value</strong>. A normal search picks the one book whose label matches best and
+            gives you that book. Attention is the <em>soft</em> version. It returns a blend: 70% of this
+            book's pages, 20% of that one's, 10% of a third. The shares depend on how well each label
+            matched your query. So attention is a <strong>soft dictionary lookup</strong>. A
+            dictionary returns one value for an exact key. Attention returns a weighted mix of all
+            values, graded by how similar each key is to the query.</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>We start from an input we already have: a sequence of vectors, one per position (per word),
-          stacked into a matrix. Call it $\mathbf{X}$.</p>
+          <p>We start from an input we already have: a sequence of vectors, one per position (per
+          word). We stack them as the rows of a matrix $\mathbf{X}$.</p>
           $$ \mathbf{X} \in \mathbb{R}^{T \times d_{\text{model}}} $$
-          <p class="gloss"><b>In words:</b> <b>X</b> has one row per position. <b>T</b> is the
-          <em>sequence length</em> — how many words (or tokens) we are processing. <b>d</b><sub>model</sub>
-          is the <em>model dimension</em> — the length of the vector we use to represent each word (in the
-          original transformer, 512). So <b>X</b> is <b>T</b> rows, each row a <b>d</b><sub>model</sub>-long
-          vector.</p>
+          <p class="gloss"><b>In words:</b> $\mathbf{X}$ has one row per position. $T$ is the
+          <em>sequence length</em>: how many words (or tokens) we process. $d_{\text{model}}$ is the
+          <em>model dimension</em>: the length of the vector for each word (512 in the original
+          transformer). So $\mathbf{X}$ has $T$ rows, and each row is a vector of length
+          $d_{\text{model}}$.</p>
 
-          <p>Now the one trick: we do not use $\mathbf{X}$
-          directly as query, key, and value. We <em>project</em> it into three different spaces with three
-          learned weight matrices. This lets the model decide, on its own, what makes a good question, a
-          good label, and good content — they need not be the same.</p>
-          $$ \mathbf{Q} = \mathbf{X}\mathbf{W}_Q, \qquad
-             \mathbf{K} = \mathbf{X}\mathbf{W}_K, \qquad
-             \mathbf{V} = \mathbf{X}\mathbf{W}_V $$
+          <p>Now the one trick. We do not use $\mathbf{X}$ directly as query, key and value. We
+          <em>project</em> it into three different spaces with three learned weight matrices. Then the
+          model can learn what makes a good question, a good label, and good content. The three need
+          not be the same.</p>
+          $$ \begin{aligned}
+             \mathbf{Q} &= \mathbf{X}\mathbf{W}_Q^{\top} \\
+             \mathbf{K} &= \mathbf{X}\mathbf{W}_K^{\top} \\
+             \mathbf{V} &= \mathbf{X}\mathbf{W}_V^{\top}
+             \end{aligned} $$
+          <p class="gloss"><b>In words:</b> as in the rest of this course, we store a weight matrix
+          with shape (out, in), like <code>nn.Linear</code>. For a stack of row vectors
+          $\mathbf{X}$, the layer is $\mathbf{X}\mathbf{W}^{\top}$ (see <a
+          href="14-nn-module.html">Section 14</a>). Each row of $\mathbf{Q}$ is one position's
+          query, and so on.</p>
           <p>Track every shape with the shape rule from <a href="01-linear-algebra.html">Section 1</a>
-          (inner dimensions cancel, outer survive):</p>
+          (inner dimensions cancel, outer dimensions stay):</p>
           <div class="scroll-x">
             <table>
               <thead>
                 <tr><th>Object</th><th>Shape</th><th>What it is</th></tr>
               </thead>
               <tbody>
-                <tr><td>$\mathbf{W}_Q$</td><td>$d_{\text{model}} \times d_k$</td><td>learned: how to build a query</td></tr>
-                <tr><td>$\mathbf{W}_K$</td><td>$d_{\text{model}} \times d_k$</td><td>learned: how to build a key</td></tr>
-                <tr><td>$\mathbf{W}_V$</td><td>$d_{\text{model}} \times d_v$</td><td>learned: how to build a value</td></tr>
-                <tr><td>$\mathbf{Q} = \mathbf{X}\mathbf{W}_Q$</td><td>$T \times d_k$</td><td>one query per position</td></tr>
-                <tr><td>$\mathbf{K} = \mathbf{X}\mathbf{W}_K$</td><td>$T \times d_k$</td><td>one key per position</td></tr>
-                <tr><td>$\mathbf{V} = \mathbf{X}\mathbf{W}_V$</td><td>$T \times d_v$</td><td>one value per position</td></tr>
+                <tr><td>$\mathbf{W}_Q$</td><td>$d_k \times d_{\text{model}}$</td><td>learned: how to build a query</td></tr>
+                <tr><td>$\mathbf{W}_K$</td><td>$d_k \times d_{\text{model}}$</td><td>learned: how to build a key</td></tr>
+                <tr><td>$\mathbf{W}_V$</td><td>$d_v \times d_{\text{model}}$</td><td>learned: how to build a value</td></tr>
+                <tr><td>$\mathbf{Q}$</td><td>$T \times d_k$</td><td>one query per position</td></tr>
+                <tr><td>$\mathbf{K}$</td><td>$T \times d_k$</td><td>one key per position</td></tr>
+                <tr><td>$\mathbf{V}$</td><td>$T \times d_v$</td><td>one value per position</td></tr>
               </tbody>
             </table>
           </div>
-          <p class="gloss"><b>In words:</b> <b>d</b><sub>k</sub> is the length of each query and key (they
-          must match, because we are about to compare them); <b>d</b><sub>v</sub> is the length of each
-          value. Query and key live in the same space so they can be measured against each other; the
-          value can be any size. Very often $d_k = d_v$, and we'll
-          assume that from now on to keep the picture clean.</p>
+          <p class="gloss"><b>In words:</b> $d_k$ is the length of each query and each key. They must
+          have the same length, because we are about to compare them. $d_v$ is the length of each
+          value, and it can be any size. Very often $d_k = d_v$, and we will assume that from now on
+          to keep the picture clean.</p>
 
-          <h3>Step 1 — scores: how well does each query match each key?</h3>
-          <p>To compare query $i$ with key
-          $j$ we use the <strong>dot product</strong> from
-          <a href="01-linear-algebra.html">Section 1</a> — our alignment meter. A big dot product means
-          “this query and this key point the same way; strong match.” We want <em>every</em> query against
-          <em>every</em> key, and that is exactly one matrix multiply:</p>
-          $$ \mathbf{S} = \mathbf{Q}\mathbf{K}^{\top}
-             \qquad \text{shape } (T \times d_k)(d_k \times T) = (T \times T) $$
-          <p class="gloss"><b>In words:</b> <b>K</b><sup>⊤</sup> is <b>K</b> transposed (rows and columns
-          swapped), so the shared <b>d</b><sub>k</sub> lines up and cancels. Entry
-          $S_{ij}$ is the dot product of query <b>i</b> with key
-          <b>j</b> — a single number saying “how much should position <b>i</b> attend to position <b>j</b>.”
-          The result is a square <b>L×L</b> table: every position scored against every position. This one
-          matrix is where the “look at everything at once” promise is kept.</p>
+          <h3>Step 1: scores (how well does each query match each key?)</h3>
+          <p>To compare query $i$ with key $j$, we use the <strong>dot product</strong> from <a
+          href="01-linear-algebra.html">Section 1</a>, our alignment meter. A large dot product means
+          “this query and this key point the same way: a strong match.” We want <em>every</em> query
+          against <em>every</em> key, and that is one matrix multiply:</p>
+          $$ \mathbf{S} = \mathbf{Q}\mathbf{K}^{\top} $$
+          $$ (T \times d_k)(d_k \times T) = (T \times T) $$
+          <p class="gloss"><b>In words:</b> $\mathbf{K}^{\top}$ is $\mathbf{K}$ transposed (rows and
+          columns swapped), so the shared $d_k$ lines up and cancels. Entry $S_{ij}$ is the dot product
+          of query $i$ with key $j$. It is one number that says how much position $i$ should attend to
+          position $j$. The result is a square $T \times T$ table: every position scored against
+          every position. This one matrix is where the promise “look at everything at once” is
+          kept.</p>
 
-          <h3>Step 2 — the scaling, and why it is not optional</h3>
-          <p>We do not use $\mathbf{S}$ raw. We divide it by
-          $\sqrt{d_k}$. This looks like a fudge factor; it is
-          actually forced on us by statistics. Let us derive it, because it is the kind of detail this
-          course refuses to hand-wave.</p>
-          <p>Suppose the entries of a query $\mathbf{q}$ and a key
-          $\mathbf{k}$ are independent random numbers, each with
-          mean $0$ and variance
-          $1$ (a fair starting assumption for freshly initialised
-          weights). Their dot product is a sum of $d_k$ products:</p>
+          <h3>Step 2: the scaling, and why we need it</h3>
+          <p>We do not use $\mathbf{S}$ as it is. We divide it by $\sqrt{d_k}$. This looks like a
+          fudge factor, but statistics forces it on us. Let's derive it.</p>
+          <p>Suppose the entries of a query $\mathbf{q}$ and a key $\mathbf{k}$ are independent random
+          numbers, each with mean $0$ and variance $1$. (This is a fair assumption for freshly
+          initialized weights.) Their dot product is a sum of $d_k$ products:</p>
           $$ \mathbf{q}\cdot\mathbf{k} = \sum_{i=1}^{d_k} q_i\,k_i $$
-          <p>Take one term $q_i k_i$. Because
-          $q_i$ and $k_i$
-          are independent with mean 0:</p>
+          <p>Take one term $q_i k_i$. Because $q_i$ and $k_i$ are independent with mean 0:</p>
           $$ \begin{aligned}
-             \mathbb{E}[q_i k_i] &= \mathbb{E}[q_i]\,\mathbb{E}[k_i] = 0 \cdot 0 = 0, \\
-             \operatorname{Var}(q_i k_i) &= \mathbb{E}[q_i^2 k_i^2] - \big(\mathbb{E}[q_i k_i]\big)^2
-               = \mathbb{E}[q_i^2]\,\mathbb{E}[k_i^2] - 0
-               = 1 \cdot 1 = 1 .
+             \mathbb{E}[q_i k_i] &= \mathbb{E}[q_i]\,\mathbb{E}[k_i] = 0 \\[4pt]
+             \operatorname{Var}(q_i k_i) &= \mathbb{E}[q_i^2 k_i^2] - \big(\mathbb{E}[q_i k_i]\big)^2 \\
+               &= \mathbb{E}[q_i^2]\,\mathbb{E}[k_i^2] - 0 = 1
              \end{aligned} $$
-          <p class="gloss"><b>In words:</b> each little product has average 0 and variance 1. (We used
-          $\mathbb{E}[q_i^2]=\operatorname{Var}(q_i)=1$, since the
-          mean is 0.) <b>𝔼</b> is “expected value” — the long-run average. <b>Var</b> is variance — how
-          spread out the values are.</p>
-          <p>Now add up $d_k$ of these independent terms. Variances
-          of independent things simply add:</p>
-          $$ \operatorname{Var}\!\big(\mathbf{q}\cdot\mathbf{k}\big)
-             = \sum_{i=1}^{d_k} \operatorname{Var}(q_i k_i) = d_k
-             \qquad\Longrightarrow\qquad
-             \text{typical size} \approx \sqrt{d_k}. $$
-          <p class="gloss"><b>In words:</b> the raw score has variance <b>d</b><sub>k</sub>, so its typical
-          magnitude grows like $\sqrt{d_k}$. With
-          $d_k = 64$ the scores swing by roughly ±8 instead of ±1 —
-          eight times too hot.</p>
-          <p>Why does an oversized score hurt? Because the next step is a <strong>softmax</strong> (defined
-          below), and softmax of large numbers <em>saturates</em>: one entry rockets to nearly 1, the rest
-          collapse to nearly 0. At that extreme the function is almost flat, so its
-          <strong>gradient</strong> (the slope the network learns from — see
-          <a href="02-calculus.html">Section 2</a>) is almost zero. A zero gradient means <em>no learning
-          signal</em>. Dividing by $\sqrt{d_k}$ rescales the
-          variance back to 1, keeping scores in the gentle, high-gradient middle of the softmax:</p>
+          <p class="gloss"><b>In words:</b> $\mathbb{E}$ is the expected value (the long-run average).
+          $\operatorname{Var}$ is the variance (how spread out the values are). Each small product has
+          average 0 and variance 1. We used $\mathbb{E}[q_i^2]=\operatorname{Var}(q_i)=1$, which holds
+          because the mean is 0.</p>
+          <p>Now add up $d_k$ of these independent terms. Variances of independent terms add:</p>
+          $$ \operatorname{Var}(\mathbf{q}\cdot\mathbf{k})
+             = \sum_{i=1}^{d_k} \operatorname{Var}(q_i k_i) = d_k $$
+          <p class="gloss"><b>In words:</b> the raw score has variance $d_k$, so its standard
+          deviation (typical size) is $\sqrt{d_k}$. With $d_k = 64$ the scores spread about ±8
+          instead of ±1: eight times too large.</p>
+          <p>Why does a large score hurt? The next step is a <strong>softmax</strong> (defined below).
+          Softmax of large numbers <em>saturates</em>: one weight goes to nearly 1 and the others go to
+          nearly 0. Look at the softmax derivative. With weights $a_j = \text{softmax}(\mathbf{z})_j$:</p>
+          $$ \frac{\partial a_j}{\partial z_m} = a_j\,\big(\delta_{jm} - a_m\big) $$
+          <p class="gloss"><b>In words:</b> $\delta_{jm}$ is 1 when $j = m$ and 0 otherwise. If one
+          weight is near 1 and all others are near 0, every term is near 0. For $j = m$ it is
+          $a_j(1-a_j)$, which is $1 \cdot 0$ or $0 \cdot 1$. For $j \ne m$ it is $-a_j a_m$, and at least
+          one factor is near 0. So the <strong>gradient</strong> (the slope the network learns from;
+          see <a href="02-calculus.html">Section 2</a>) is almost zero, and there is almost no learning
+          signal for the scores.</p>
+          <p>Dividing by $\sqrt{d_k}$ brings the variance back to 1. This keeps the scores in the
+          middle range of the softmax, where the gradient is large:</p>
           $$ \operatorname{Var}\!\left(\frac{\mathbf{q}\cdot\mathbf{k}}{\sqrt{d_k}}\right)
-             = \frac{1}{d_k}\operatorname{Var}(\mathbf{q}\cdot\mathbf{k}) = \frac{d_k}{d_k} = 1 . $$
-          <p class="gloss"><b>In words:</b> dividing a random quantity by a constant divides its variance by
-          that constant <em>squared</em>. So dividing by $\sqrt{d_k}$
-          divides the variance by <b>d</b><sub>k</sub>, pulling it from <b>d</b><sub>k</sub> back to 1. That
-          is the entire reason for the “scaled” in <em>scaled</em> dot-product attention.</p>
+             = \frac{\operatorname{Var}(\mathbf{q}\cdot\mathbf{k})}{d_k} = 1 $$
+          <p class="gloss"><b>In words:</b> dividing a random quantity by a constant divides its
+          variance by that constant <em>squared</em>. So dividing by $\sqrt{d_k}$ divides the variance
+          by $d_k$, from $d_k$ back to 1. That is the reason for the word “scaled” in <em>scaled</em>
+          dot-product attention.</p>
 
           <div class="callout pitfall">
             <div class="callout__label"><span class="ic">▲</span> Watch out</div>
-            <p>Drop the $\sqrt{d_k}$ and small models still train —
-            just worse. But scale up <b>d</b><sub>k</sub> and the unscaled version quietly stops learning:
-            the softmax locks into a near–one-hot spike from the first step, the gradient vanishes, and the
-            loss plateaus. It looks like a mysterious optimisation failure; it is really this missing
-            division.</p>
+            <p>If you drop the $\sqrt{d_k}$, a small model with small $d_k$ may still train, only
+            worse. The larger $d_k$ is, the larger the unscaled scores are at the start. Then the softmax
+            starts close to one-hot, its gradients are tiny, and training is slow or gets stuck. This
+            is the reason the original transformer paper (Vaswani et al., 2017) gives for the scaling.
+            The code at the end of this section measures the effect.</p>
           </div>
 
-          <h3>Step 3 — softmax: turn scores into a blend that sums to 1</h3>
-          <p>The scaled scores are still arbitrary real numbers — some negative, none adding up to
-          anything tidy. We want <em>weights</em>: all positive, summing to 1, so they describe a genuine
-          blend. The <strong>softmax</strong> function does exactly that, applied to each row independently.</p>
+          <h3>Step 3: softmax (turn scores into a blend that sums to 1)</h3>
+          <p>The scaled scores are still any real numbers. Some are negative, and they do not add up to
+          anything useful. We want <em>weights</em>: all positive and summing to 1, so they describe a
+          real blend. The <strong>softmax</strong> function does this. We apply it to each row
+          separately.</p>
           <div class="callout definition">
             <div class="callout__label">Definition</div>
-            <p>The <dfn>softmax</dfn> of a list of numbers exponentiates each (making it positive and
-            amplifying the largest), then divides by the total so the results sum to 1:
-            $\displaystyle \text{softmax}(z)_j = \frac{e^{z_j}}{\sum_m e^{z_m}}$.
-            It turns any list of scores into a set of probabilities. We met it in
-            <a href="04-information-theory.html">Section 4</a>; here it converts match-scores into
-            attention weights.</p>
+            <p>The <dfn>softmax</dfn> of a list of numbers $z_1, \dots, z_n$ takes the exponential of
+            each one (this makes it positive and makes the largest one stand out). Then it divides by
+            the total, so the results sum to 1:</p>
+            $$ \text{softmax}(\mathbf{z})_j = \frac{e^{z_j}}{\sum_m e^{z_m}} $$
+            <p>It turns any list of scores into probabilities. We met it in <a
+            href="04-information-theory.html">Section 4</a>. Here it turns match scores into attention
+            weights.</p>
           </div>
-          $$ \mathbf{A} = \text{softmax}\!\left(\frac{\mathbf{Q}\mathbf{K}^{\top}}{\sqrt{d_k}}\right)
-             \qquad \text{shape } (T \times T),\ \text{each row sums to } 1. $$
-          <p class="gloss"><b>In words:</b> row <b>i</b> of <b>A</b> is position <b>i</b>'s attention
-          distribution — how much of its answer it will draw from each of the <b>T</b> positions. “Softmax
-          <em>over each row</em>” matters: we normalise across the keys a single query is comparing itself
-          to, so each query spends a total attention budget of exactly 1.</p>
+          $$ \mathbf{A} = \text{softmax}\!\left(\frac{\mathbf{Q}\mathbf{K}^{\top}}{\sqrt{d_k}}\right) $$
+          <p class="gloss"><b>In words:</b> $\mathbf{A}$ has shape $T \times T$, and each row sums to 1.
+          Row $i$ of $\mathbf{A}$ is position $i$'s attention distribution: how much of its answer it
+          takes from each of the $T$ positions. “Softmax <em>over each row</em>” matters. We normalize
+          across the keys that one query is compared with, so each query spends a total attention
+          budget of exactly 1.</p>
 
-          <h3>Step 4 — the weighted blend of values</h3>
-          <p>Finally, each position builds its output by mixing all the values with its attention weights.
-          Another matrix multiply:</p>
+          <h3>Step 4: the weighted blend of values</h3>
+          <p>Finally, each position builds its output by mixing all the values with its attention
+          weights. This is another matrix multiply:</p>
           $$ \text{Attention}(\mathbf{Q},\mathbf{K},\mathbf{V})
-             = \underbrace{\text{softmax}\!\left(\frac{\mathbf{Q}\mathbf{K}^{\top}}{\sqrt{d_k}}\right)}_{\mathbf{A}\,:\,(L\times T)}
-               \underbrace{\vphantom{\frac{1}{1}}\mathbf{V}}_{(L\times d_v)}
-             \qquad \text{shape } (T \times d_v). $$
-          <p class="gloss"><b>In words:</b> multiply the <b>L×L</b> weight table by the <b>L×d</b><sub>v</sub>
-          value stack; the shared <b>T</b> cancels and out comes an <b>T×d</b><sub>v</sub> result — one new
-          vector per position. Row <b>i</b> of the output is $\sum_j A_{ij}\,\mathbf{v}_j$:
-          a weighted average of every value, using position <b>i</b>'s weights. Positions it matched
-          strongly contribute most; the rest barely register.</p>
+             = \underbrace{\mathbf{A}}_{T \times T}\;\underbrace{\mathbf{V}}_{T \times d_v} $$
+          <p class="gloss"><b>In words:</b> multiply the $T \times T$ weight table by the
+          $T \times d_v$ stack of values. The shared $T$ cancels, and the result is $T \times d_v$: one
+          new vector per position. Row $i$ of the output is $\sum_j A_{ij}\,\mathbf{v}_j$, a weighted
+          average of all the values, using position $i$'s weights. Positions it matched strongly
+          contribute most; the rest contribute little.</p>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> The whole formula in one line</div>
-            <p>$\displaystyle \text{Attention}(\mathbf{Q},\mathbf{K},\mathbf{V}) = \text{softmax}\!\left(\frac{\mathbf{Q}\mathbf{K}^{\top}}{\sqrt{d_k}}\right)\mathbf{V}$.
-            Read left to right it is: <em>compare every query to every key (QKᵀ), calm the numbers
-            (÷√d_k), turn them into a blend (softmax), then mix the values by that blend (×V)</em>. Four
-            steps, one line, and it is the engine of the entire field.</p>
+            $$ \begin{aligned}
+               &\text{Attention}(\mathbf{Q},\mathbf{K},\mathbf{V}) \\
+               &\quad = \text{softmax}\!\left(\frac{\mathbf{Q}\mathbf{K}^{\top}}{\sqrt{d_k}}\right)\mathbf{V}
+               \end{aligned} $$
+            <p>Read it left to right. Compare every query with every key ($\mathbf{Q}\mathbf{K}^{\top}$).
+            Bring the numbers back to a normal size (divide by $\sqrt{d_k}$). Turn them into a blend
+            (softmax). Then mix the values with that blend (multiply by $\mathbf{V}$). Four steps in one
+            line.</p>
           </div>
 
-          <h3>A concrete walk-through: seq = 3, d<sub>k</sub> = 4</h3>
-          <p>Let us make it real with tiny numbers. Three positions
-          ($L=3$), query/key/value length four
-          ($d_k=d_v=4$). Then:</p>
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 440 370" role="img" aria-labelledby="fig-tf-1-t">
+                <title id="fig-tf-1-t">An illustrative 12 by 12 attention map for the sentence "The trophy didn't fit in the suitcase because it was too big". The row for "it" puts most of its weight on "trophy" and some on "suitcase".</title>
+                <text x="86" y="38" text-anchor="end" class="sm">query ↓</text>
+                <text x="212.0" y="18" text-anchor="middle" class="sm">key (position looked at) →</text>
+                <rect class="f-v" x="92" y="96" width="20" height="20" fill-opacity="0.58"/>
+                <rect class="f-v" x="112" y="96" width="20" height="20" fill-opacity="0.24"/>
+                <rect class="f-v" x="132" y="96" width="20" height="20" fill-opacity="0.16"/>
+                <rect class="f-v" x="152" y="96" width="20" height="20" fill-opacity="0.16"/>
+                <rect class="f-v" x="172" y="96" width="20" height="20" fill-opacity="0.16"/>
+                <rect class="f-v" x="192" y="96" width="20" height="20" fill-opacity="0.16"/>
+                <rect class="f-v" x="212" y="96" width="20" height="20" fill-opacity="0.16"/>
+                <rect class="f-v" x="232" y="96" width="20" height="20" fill-opacity="0.16"/>
+                <rect class="f-v" x="252" y="96" width="20" height="20" fill-opacity="0.16"/>
+                <rect class="f-v" x="272" y="96" width="20" height="20" fill-opacity="0.16"/>
+                <rect class="f-v" x="292" y="96" width="20" height="20" fill-opacity="0.16"/>
+                <rect class="f-v" x="312" y="96" width="20" height="20" fill-opacity="0.16"/>
+                <rect class="f-v" x="92" y="116" width="20" height="20" fill-opacity="0.52"/>
+                <rect class="f-v" x="112" y="116" width="20" height="20" fill-opacity="0.48"/>
+                <rect class="f-v" x="132" y="116" width="20" height="20" fill-opacity="0.20"/>
+                <rect class="f-v" x="152" y="116" width="20" height="20" fill-opacity="0.13"/>
+                <rect class="f-v" x="172" y="116" width="20" height="20" fill-opacity="0.13"/>
+                <rect class="f-v" x="192" y="116" width="20" height="20" fill-opacity="0.13"/>
+                <rect class="f-v" x="212" y="116" width="20" height="20" fill-opacity="0.13"/>
+                <rect class="f-v" x="232" y="116" width="20" height="20" fill-opacity="0.13"/>
+                <rect class="f-v" x="252" y="116" width="20" height="20" fill-opacity="0.13"/>
+                <rect class="f-v" x="272" y="116" width="20" height="20" fill-opacity="0.13"/>
+                <rect class="f-v" x="292" y="116" width="20" height="20" fill-opacity="0.13"/>
+                <rect class="f-v" x="312" y="116" width="20" height="20" fill-opacity="0.13"/>
+                <rect class="f-v" x="92" y="136" width="20" height="20" fill-opacity="0.15"/>
+                <rect class="f-v" x="112" y="136" width="20" height="20" fill-opacity="0.31"/>
+                <rect class="f-v" x="132" y="136" width="20" height="20" fill-opacity="0.54"/>
+                <rect class="f-v" x="152" y="136" width="20" height="20" fill-opacity="0.23"/>
+                <rect class="f-v" x="172" y="136" width="20" height="20" fill-opacity="0.15"/>
+                <rect class="f-v" x="192" y="136" width="20" height="20" fill-opacity="0.15"/>
+                <rect class="f-v" x="212" y="136" width="20" height="20" fill-opacity="0.15"/>
+                <rect class="f-v" x="232" y="136" width="20" height="20" fill-opacity="0.15"/>
+                <rect class="f-v" x="252" y="136" width="20" height="20" fill-opacity="0.15"/>
+                <rect class="f-v" x="272" y="136" width="20" height="20" fill-opacity="0.15"/>
+                <rect class="f-v" x="292" y="136" width="20" height="20" fill-opacity="0.15"/>
+                <rect class="f-v" x="312" y="136" width="20" height="20" fill-opacity="0.15"/>
+                <rect class="f-v" x="92" y="156" width="20" height="20" fill-opacity="0.11"/>
+                <rect class="f-v" x="112" y="156" width="20" height="20" fill-opacity="0.46"/>
+                <rect class="f-v" x="132" y="156" width="20" height="20" fill-opacity="0.22"/>
+                <rect class="f-v" x="152" y="156" width="20" height="20" fill-opacity="0.39"/>
+                <rect class="f-v" x="172" y="156" width="20" height="20" fill-opacity="0.16"/>
+                <rect class="f-v" x="192" y="156" width="20" height="20" fill-opacity="0.11"/>
+                <rect class="f-v" x="212" y="156" width="20" height="20" fill-opacity="0.39"/>
+                <rect class="f-v" x="232" y="156" width="20" height="20" fill-opacity="0.11"/>
+                <rect class="f-v" x="252" y="156" width="20" height="20" fill-opacity="0.11"/>
+                <rect class="f-v" x="272" y="156" width="20" height="20" fill-opacity="0.11"/>
+                <rect class="f-v" x="292" y="156" width="20" height="20" fill-opacity="0.11"/>
+                <rect class="f-v" x="312" y="156" width="20" height="20" fill-opacity="0.11"/>
+                <rect class="f-v" x="92" y="176" width="20" height="20" fill-opacity="0.14"/>
+                <rect class="f-v" x="112" y="176" width="20" height="20" fill-opacity="0.14"/>
+                <rect class="f-v" x="132" y="176" width="20" height="20" fill-opacity="0.14"/>
+                <rect class="f-v" x="152" y="176" width="20" height="20" fill-opacity="0.28"/>
+                <rect class="f-v" x="172" y="176" width="20" height="20" fill-opacity="0.49"/>
+                <rect class="f-v" x="192" y="176" width="20" height="20" fill-opacity="0.20"/>
+                <rect class="f-v" x="212" y="176" width="20" height="20" fill-opacity="0.36"/>
+                <rect class="f-v" x="232" y="176" width="20" height="20" fill-opacity="0.14"/>
+                <rect class="f-v" x="252" y="176" width="20" height="20" fill-opacity="0.14"/>
+                <rect class="f-v" x="272" y="176" width="20" height="20" fill-opacity="0.14"/>
+                <rect class="f-v" x="292" y="176" width="20" height="20" fill-opacity="0.14"/>
+                <rect class="f-v" x="312" y="176" width="20" height="20" fill-opacity="0.14"/>
+                <rect class="f-v" x="92" y="196" width="20" height="20" fill-opacity="0.15"/>
+                <rect class="f-v" x="112" y="196" width="20" height="20" fill-opacity="0.15"/>
+                <rect class="f-v" x="132" y="196" width="20" height="20" fill-opacity="0.15"/>
+                <rect class="f-v" x="152" y="196" width="20" height="20" fill-opacity="0.15"/>
+                <rect class="f-v" x="172" y="196" width="20" height="20" fill-opacity="0.31"/>
+                <rect class="f-v" x="192" y="196" width="20" height="20" fill-opacity="0.54"/>
+                <rect class="f-v" x="212" y="196" width="20" height="20" fill-opacity="0.23"/>
+                <rect class="f-v" x="232" y="196" width="20" height="20" fill-opacity="0.15"/>
+                <rect class="f-v" x="252" y="196" width="20" height="20" fill-opacity="0.15"/>
+                <rect class="f-v" x="272" y="196" width="20" height="20" fill-opacity="0.15"/>
+                <rect class="f-v" x="292" y="196" width="20" height="20" fill-opacity="0.15"/>
+                <rect class="f-v" x="312" y="196" width="20" height="20" fill-opacity="0.15"/>
+                <rect class="f-v" x="92" y="216" width="20" height="20" fill-opacity="0.13"/>
+                <rect class="f-v" x="112" y="216" width="20" height="20" fill-opacity="0.13"/>
+                <rect class="f-v" x="132" y="216" width="20" height="20" fill-opacity="0.13"/>
+                <rect class="f-v" x="152" y="216" width="20" height="20" fill-opacity="0.13"/>
+                <rect class="f-v" x="172" y="216" width="20" height="20" fill-opacity="0.13"/>
+                <rect class="f-v" x="192" y="216" width="20" height="20" fill-opacity="0.52"/>
+                <rect class="f-v" x="212" y="216" width="20" height="20" fill-opacity="0.48"/>
+                <rect class="f-v" x="232" y="216" width="20" height="20" fill-opacity="0.20"/>
+                <rect class="f-v" x="252" y="216" width="20" height="20" fill-opacity="0.13"/>
+                <rect class="f-v" x="272" y="216" width="20" height="20" fill-opacity="0.13"/>
+                <rect class="f-v" x="292" y="216" width="20" height="20" fill-opacity="0.13"/>
+                <rect class="f-v" x="312" y="216" width="20" height="20" fill-opacity="0.13"/>
+                <rect class="f-v" x="92" y="236" width="20" height="20" fill-opacity="0.14"/>
+                <rect class="f-v" x="112" y="236" width="20" height="20" fill-opacity="0.14"/>
+                <rect class="f-v" x="132" y="236" width="20" height="20" fill-opacity="0.14"/>
+                <rect class="f-v" x="152" y="236" width="20" height="20" fill-opacity="0.31"/>
+                <rect class="f-v" x="172" y="236" width="20" height="20" fill-opacity="0.14"/>
+                <rect class="f-v" x="192" y="236" width="20" height="20" fill-opacity="0.14"/>
+                <rect class="f-v" x="212" y="236" width="20" height="20" fill-opacity="0.29"/>
+                <rect class="f-v" x="232" y="236" width="20" height="20" fill-opacity="0.51"/>
+                <rect class="f-v" x="252" y="236" width="20" height="20" fill-opacity="0.21"/>
+                <rect class="f-v" x="272" y="236" width="20" height="20" fill-opacity="0.14"/>
+                <rect class="f-v" x="292" y="236" width="20" height="20" fill-opacity="0.14"/>
+                <rect class="f-v" x="312" y="236" width="20" height="20" fill-opacity="0.14"/>
+                <rect class="f-v" x="92" y="256" width="20" height="20" fill-opacity="0.06"/>
+                <rect class="f-v" x="112" y="256" width="20" height="20" fill-opacity="0.93"/>
+                <rect class="f-v" x="132" y="256" width="20" height="20" fill-opacity="0.06"/>
+                <rect class="f-v" x="152" y="256" width="20" height="20" fill-opacity="0.06"/>
+                <rect class="f-v" x="172" y="256" width="20" height="20" fill-opacity="0.06"/>
+                <rect class="f-v" x="192" y="256" width="20" height="20" fill-opacity="0.06"/>
+                <rect class="f-v" x="212" y="256" width="20" height="20" fill-opacity="0.39"/>
+                <rect class="f-v" x="232" y="256" width="20" height="20" fill-opacity="0.13"/>
+                <rect class="f-v" x="252" y="256" width="20" height="20" fill-opacity="0.22"/>
+                <rect class="f-v" x="272" y="256" width="20" height="20" fill-opacity="0.09"/>
+                <rect class="f-v" x="292" y="256" width="20" height="20" fill-opacity="0.06"/>
+                <rect class="f-v" x="312" y="256" width="20" height="20" fill-opacity="0.06"/>
+                <rect class="f-v" x="92" y="276" width="20" height="20" fill-opacity="0.08"/>
+                <rect class="f-v" x="112" y="276" width="20" height="20" fill-opacity="0.08"/>
+                <rect class="f-v" x="132" y="276" width="20" height="20" fill-opacity="0.08"/>
+                <rect class="f-v" x="152" y="276" width="20" height="20" fill-opacity="0.08"/>
+                <rect class="f-v" x="172" y="276" width="20" height="20" fill-opacity="0.08"/>
+                <rect class="f-v" x="192" y="276" width="20" height="20" fill-opacity="0.08"/>
+                <rect class="f-v" x="212" y="276" width="20" height="20" fill-opacity="0.08"/>
+                <rect class="f-v" x="232" y="276" width="20" height="20" fill-opacity="0.08"/>
+                <rect class="f-v" x="252" y="276" width="20" height="20" fill-opacity="1.00"/>
+                <rect class="f-v" x="272" y="276" width="20" height="20" fill-opacity="0.30"/>
+                <rect class="f-v" x="292" y="276" width="20" height="20" fill-opacity="0.12"/>
+                <rect class="f-v" x="312" y="276" width="20" height="20" fill-opacity="0.08"/>
+                <rect class="f-v" x="92" y="296" width="20" height="20" fill-opacity="0.15"/>
+                <rect class="f-v" x="112" y="296" width="20" height="20" fill-opacity="0.15"/>
+                <rect class="f-v" x="132" y="296" width="20" height="20" fill-opacity="0.15"/>
+                <rect class="f-v" x="152" y="296" width="20" height="20" fill-opacity="0.15"/>
+                <rect class="f-v" x="172" y="296" width="20" height="20" fill-opacity="0.15"/>
+                <rect class="f-v" x="192" y="296" width="20" height="20" fill-opacity="0.15"/>
+                <rect class="f-v" x="212" y="296" width="20" height="20" fill-opacity="0.15"/>
+                <rect class="f-v" x="232" y="296" width="20" height="20" fill-opacity="0.15"/>
+                <rect class="f-v" x="252" y="296" width="20" height="20" fill-opacity="0.15"/>
+                <rect class="f-v" x="272" y="296" width="20" height="20" fill-opacity="0.31"/>
+                <rect class="f-v" x="292" y="296" width="20" height="20" fill-opacity="0.54"/>
+                <rect class="f-v" x="312" y="296" width="20" height="20" fill-opacity="0.23"/>
+                <rect class="f-v" x="92" y="316" width="20" height="20" fill-opacity="0.08"/>
+                <rect class="f-v" x="112" y="316" width="20" height="20" fill-opacity="0.55"/>
+                <rect class="f-v" x="132" y="316" width="20" height="20" fill-opacity="0.08"/>
+                <rect class="f-v" x="152" y="316" width="20" height="20" fill-opacity="0.08"/>
+                <rect class="f-v" x="172" y="316" width="20" height="20" fill-opacity="0.08"/>
+                <rect class="f-v" x="192" y="316" width="20" height="20" fill-opacity="0.08"/>
+                <rect class="f-v" x="212" y="316" width="20" height="20" fill-opacity="0.08"/>
+                <rect class="f-v" x="232" y="316" width="20" height="20" fill-opacity="0.08"/>
+                <rect class="f-v" x="252" y="316" width="20" height="20" fill-opacity="0.40"/>
+                <rect class="f-v" x="272" y="316" width="20" height="20" fill-opacity="0.08"/>
+                <rect class="f-v" x="292" y="316" width="20" height="20" fill-opacity="0.43"/>
+                <rect class="f-v" x="312" y="316" width="20" height="20" fill-opacity="0.29"/>
+                <path class="grid" d="M92,96H332M92,116H332M92,136H332M92,156H332M92,176H332M92,196H332M92,216H332M92,236H332M92,256H332M92,276H332M92,296H332M92,316H332M92,336H332M92,96V336M112,96V336M132,96V336M152,96V336M172,96V336M192,96V336M212,96V336M232,96V336M252,96V336M272,96V336M292,96V336M312,96V336M332,96V336"/>
+                <rect class="ln s-r thin" x="92" y="256" width="240" height="20"/>
+                <text class="lg" x="86" y="110" text-anchor="end">The</text><text class="lg" x="86" y="130" text-anchor="end">trophy</text><text class="lg" x="86" y="150" text-anchor="end">didn't</text><text class="lg" x="86" y="170" text-anchor="end">fit</text><text class="lg" x="86" y="190" text-anchor="end">in</text><text class="lg" x="86" y="210" text-anchor="end">the</text><text class="lg" x="86" y="230" text-anchor="end">suitcase</text><text class="lg" x="86" y="250" text-anchor="end">because</text><text x="86" y="270" text-anchor="end" class="tr b">it</text><text class="lg" x="86" y="290" text-anchor="end">was</text><text class="lg" x="86" y="310" text-anchor="end">too</text><text class="lg" x="86" y="330" text-anchor="end">big</text>
+                <text class="lg" transform="translate(106,90) rotate(-55)">The</text><text transform="translate(126,90) rotate(-55)" class="tr b">trophy</text><text class="lg" transform="translate(146,90) rotate(-55)">didn't</text><text class="lg" transform="translate(166,90) rotate(-55)">fit</text><text class="lg" transform="translate(186,90) rotate(-55)">in</text><text class="lg" transform="translate(206,90) rotate(-55)">the</text><text class="lg" transform="translate(226,90) rotate(-55)">suitcase</text><text class="lg" transform="translate(246,90) rotate(-55)">because</text><text class="lg" transform="translate(266,90) rotate(-55)">it</text><text class="lg" transform="translate(286,90) rotate(-55)">was</text><text class="lg" transform="translate(306,90) rotate(-55)">too</text><text class="lg" transform="translate(326,90) rotate(-55)">big</text>
+                <rect class="f-v" x="372" y="136" width="16" height="16" fill-opacity="1"/><rect class="f-v" x="372" y="152" width="16" height="16" fill-opacity="0.7"/><rect class="f-v" x="372" y="168" width="16" height="16" fill-opacity="0.45"/><rect class="f-v" x="372" y="184" width="16" height="16" fill-opacity="0.25"/><rect class="f-v" x="372" y="200" width="16" height="16" fill-opacity="0.1"/>
+                <path class="ax" d="M372,136h16v80h-16z"/>
+                <text x="394" y="148" class="sm">high</text>
+                <text x="394" y="212" class="sm">low</text>
+                <text x="364" y="126" class="sm">weight</text>
+                <text x="212.0" y="362" text-anchor="middle" class="sm">each row sums to 1 · hand-made example, not a trained model</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 18.1</b> What a matrix $\mathbf{A}$ can look like. Each row is one
+            query position and shows how it spreads its weight over the keys. A stronger color means more weight.
+            The row for “it” (outlined) puts 0.54 on “trophy” and 0.18 on “suitcase”. <em>These numbers
+            are made by hand to show the idea; they are not from a trained model.</em> Real heads
+            often put much weight on the token itself, on neighbors, or on the first token.</figcaption>
+          </figure>
+
+          <h3>A worked example: T = 3, d<sub>k</sub> = 4</h3>
+          <p>Let's make it concrete with small numbers. Take three positions ($T=3$) and queries, keys
+          and values of length four ($d_k=d_v=4$). Then:</p>
           <ul>
-            <li>$\mathbf{Q},\mathbf{K},\mathbf{V}$ are each
-            $3 \times 4$ — three rows, four numbers per row.</li>
-            <li>$\mathbf{Q}\mathbf{K}^{\top}$ is
-            $(3\times 4)(4\times 3) = 3 \times 3$ — the shared 4
-            cancels. Nine scores: every position against every position.</li>
+            <li>$\mathbf{Q}$, $\mathbf{K}$ and $\mathbf{V}$ are each $3 \times 4$: three rows, four
+            numbers per row.</li>
+            <li>$\mathbf{Q}\mathbf{K}^{\top}$ is $(3\times 4)(4\times 3) = 3 \times 3$. The shared 4
+            cancels. That gives nine scores: every position against every position.</li>
             <li>Divide all nine by $\sqrt{4}=2$.</li>
-            <li>Softmax each of the 3 rows → a $3\times 3$ table
-            whose rows each sum to 1. Say position 1's row comes out
-            $[\,0.7,\ 0.2,\ 0.1\,]$: it will take 70% of its answer
-            from position 1, 20% from position 2, 10% from position 3.</li>
-            <li>Multiply $(3\times 3)(3\times 4) = 3 \times 4$. The
-            shared 3 cancels; out come three new 4-long vectors — one refreshed representation per
-            position. Position 1's output is
+            <li>Softmax each of the 3 rows. The result is a $3\times 3$ table whose rows each sum to 1.
+            Say row 1 is $[\,0.7,\ 0.2,\ 0.1\,]$. Then position 1 takes 70% of its answer from
+            position 1, 20% from position 2, and 10% from position 3.</li>
+            <li>Multiply: $(3\times 3)(3\times 4) = 3 \times 4$. The shared 3 cancels, and we get
+            three new vectors of length 4, one for each position. Position 1's output is
             $0.7\,\mathbf{v}_1 + 0.2\,\mathbf{v}_2 + 0.1\,\mathbf{v}_3$.</li>
           </ul>
-          <p>Notice the output has the <em>same shape</em> as the value input
-          ($3\times 4$). Attention refreshes each position's vector
-          by letting it gather context from the others; it does not change how many positions there are.
-          That shape-preserving property is what lets us stack these blocks dozens deep.</p>
+          <p>Notice that the output has the <em>same shape</em> as the value input ($3\times 4$).
+          Attention updates each position's vector with context from the other positions. It does not
+          change the number of positions. This is what lets us stack these blocks dozens deep.</p>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
-          <p class="codecap">scaled dot-product attention — the four steps, verbatim</p>
+          <p class="codecap">scaled dot-product attention in four lines, and a test of the √d_k argument</p>
           <pre><code class="language-python">import torch
 import torch.nn.functional as F
 
 def scaled_dot_product_attention(Q, K, V):
-    # Q, K, V: [..., seq, d_k]   (the leading dims can be batch, heads, etc.)
-    d_k = Q.size(-1)                                  # length of each query/key
-    scores  = Q @ K.transpose(-2, -1)                 # [..., seq, seq]  QKᵀ: every query · every key
-    scores  = scores / d_k ** 0.5                     # [..., seq, seq]  the √d_k scaling
-    weights = F.softmax(scores, dim=-1)               # [..., seq, seq]  each ROW sums to 1
-    return weights @ V                                # [..., seq, d_v]  blend the values
+    # Q, K: [..., T, d_k]   V: [..., T, d_v]   (leading dims can be batch, heads, ...)
+    d_k = Q.size(-1)                         # length of each query/key
+    scores  = Q @ K.transpose(-2, -1)        # [..., T, T]    QKᵀ: every query · every key
+    scores  = scores / d_k ** 0.5            # [..., T, T]    the √d_k scaling
+    weights = F.softmax(scores, dim=-1)      # [..., T, T]    each ROW sums to 1
+    return weights @ V                       # [..., T, d_v]  blend the values
 
-# tiny sanity check: seq = 3, d_k = 4
-Q = torch.randn(3, 4)
-K = torch.randn(3, 4)
-V = torch.randn(3, 4)
+torch.manual_seed(0)
+Q, K, V = torch.randn(3, 4), torch.randn(3, 4), torch.randn(3, 4)   # T = 3, d_k = d_v = 4
 out = scaled_dot_product_attention(Q, K, V)
-print(out.shape)                                      # torch.Size([3, 4])  -> same as V</code></pre>
-          <p class="gloss"><b>In words:</b> <code>transpose(-2, -1)</code> swaps the last two axes to form
-          <b>K</b><sup>⊤</sup>. <code>dim=-1</code> makes softmax normalise across keys (the last axis),
-          which is exactly “over each row.” The leading <code>...</code> is deliberate — the same function
-          will handle batches and heads untouched in a moment.</p>
+print(out.shape)                                                    # torch.Size([3, 4])
+print(torch.allclose(out, F.scaled_dot_product_attention(Q, K, V), atol=1e-6))  # True
+
+# test the √d_k argument: random unit-variance q, k with d_k = 512
+d_k = 512
+q, k = torch.randn(10_000, d_k), torch.randn(10_000, d_k)
+print((q * k).sum(-1).var().item())                   # 517.6...  about d_k
+print(((q * k).sum(-1) / d_k ** 0.5).var().item())    # 1.01...   about 1
+
+# what that does to softmax: one query against 10 keys
+z = torch.randn(10, d_k) @ torch.randn(d_k)            # 10 raw scores, spread about ±22
+J = torch.autograd.functional.jacobian
+for name, s in [("unscaled", z), ("scaled", z / d_k ** 0.5)]:
+    w = F.softmax(s, dim=-1)
+    g = J(lambda t: F.softmax(t, dim=-1), s).norm()     # size of all ∂w_j/∂s_m
+    print(f"{name:8s} largest weight {w.max():.3f}   Jacobian norm {g:.1e}")
+# unscaled largest weight 1.000   Jacobian norm 9.1e-10
+# scaled   largest weight 0.368   Jacobian norm 3.4e-01</code></pre>
+          <p class="gloss"><b>In words:</b> <code>transpose(-2, -1)</code> swaps the last two axes to
+          form $\mathbf{K}^{\top}$. <code>dim=-1</code> makes softmax normalize across the keys (the
+          last axis), which is “over each row”. The leading <code>...</code> is on purpose: the same
+          function will handle batches and heads later. Our function gives the same result as
+          PyTorch's built-in <code>F.scaled_dot_product_attention</code>. In the last experiment, the
+          unscaled softmax is one-hot and its derivative is almost zero. The exact numbers change with
+          the seed, but in our runs the unscaled Jacobian was always the smaller one, often by many
+          orders of magnitude.</p>
 
           <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">If a query's scaled scores against three keys are <code>[5, 5, 5]</code> (a perfect tie), what attention weights does softmax give, and what is the resulting output?</span>
+                <span class="check__q">A query's scaled scores against three keys are $[5, 5, 5]$ (a perfect tie). What weights does softmax give, and what is the output? What changes if the scores are $[5, 5, 9]$?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>Softmax of three equal numbers is uniform: <code>[1/3, 1/3, 1/3]</code> (the constant
-                cancels top and bottom). The output is the plain average of the three values,
-                $\tfrac13(\mathbf{v}_1+\mathbf{v}_2+\mathbf{v}_3)$.
-                This is the honest behaviour when a query has no reason to prefer anyone: it listens to
-                everyone equally. Attention only becomes selective when the scores actually differ — which
-                is why the learned $\mathbf{W}_Q, \mathbf{W}_K$
-                matter so much.</p>
+                <p>Softmax of three equal numbers is uniform: $[1/3, 1/3, 1/3]$. (The factor $e^5$
+                cancels above and below the line.) The output is the plain average of the three values,
+                $\tfrac13(\mathbf{v}_1+\mathbf{v}_2+\mathbf{v}_3)$. A query with no reason to prefer any
+                position listens to all of them equally. With $[5, 5, 9]$, only the differences matter:
+                the weights are $e^0 : e^0 : e^4 = 1 : 1 : 54.6$, so about $[0.018, 0.018, 0.965]$. The
+                output is almost $\mathbf{v}_3$. Attention becomes selective only when the scores differ,
+                which is why the learned $\mathbf{W}_Q$ and $\mathbf{W}_K$ matter so much.</p>
+              </div>
+            </details>
+          </div>
+
+          <div class="check-wrap">
+            <details class="check">
+              <summary>
+                <span class="check__tag">Check yourself</span>
+                <span class="check__q">A model uses $d_k = 256$ and forgets the scaling. At the start of training, what is the typical size of a score? Predict what the attention rows look like.</span>
+                <span class="check__reveal">Reveal</span>
+              </summary>
+              <div class="check__answer">
+                <p>The variance of a raw score is $d_k = 256$, so the typical size is
+                $\sqrt{256} = 16$. Two scores in the same row often differ by 10 or more, and
+                $e^{10} \approx 22{,}000$. So most rows are close to one-hot: nearly all the weight on
+                one key. The softmax derivative is then close to zero, and the scores get almost no
+                gradient. With the scaling, the typical size is 1 and the rows are smooth blends.</p>
               </div>
             </details>
           </div>
@@ -375,83 +580,124 @@ print(out.shape)                                      # torch.Size([3, 4])  -> s
           <h2><span class="h-num">3</span>Multi-head attention: several lookups at once</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>One attention operation produces one blend per position — one kind of relationship. But a
-          word relates to its neighbours in many ways at once: grammar (which noun does this verb agree
-          with?), position (what came just before?), meaning (what does this pronoun refer to?). Asking a
-          <em>single</em> query to capture all of those at once is asking too much. So we run several
-          attentions in parallel — each called a <strong>head</strong> — each with its own
-          $\mathbf{W}_Q, \mathbf{W}_K, \mathbf{W}_V$, and let each
-          specialise in a different kind of relationship. Then we stitch their answers back together.</p>
+          <p>One attention operation gives one blend per position, so it captures one kind of
+          relationship. But a word relates to its neighbors in many ways at once. There is grammar
+          (which noun does this verb agree with?), position (what came just before?), and meaning
+          (what does this pronoun refer to?). One query cannot capture all of these at once. So we run
+          several attentions in parallel. Each one is called a <strong>head</strong>, and each has its
+          own $\mathbf{W}_Q$, $\mathbf{W}_K$ and $\mathbf{W}_V$. Each head can specialize in a
+          different kind of relationship. Then we join their answers back together.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>A panel of experts reviewing the same job application. The grammar expert checks one thing,
-            the experience expert another, the culture-fit expert a third. Each reads the <em>same</em>
-            application but attends to different parts of it. Afterwards a manager collects all their notes
-            and merges them into one decision. Multi-head attention is that panel: several specialists
-            looking at the same sentence through different lenses, then a final matrix combining their
-            findings.</p>
+            <p>Think of marking up a text with several colored pens, one reading at a time. On the first
+            reading you mark only which verb goes with which subject. On the second, you mark only which
+            pronoun points to which name. On the third, you mark only dates and places. Each reading
+            looks at the same text but asks a different question. At the end you combine all the marks
+            into one set of notes. Each head is one reading with its own question
+            ($\mathbf{W}_Q$, $\mathbf{W}_K$, $\mathbf{W}_V$). Combining the notes is the final matrix
+            $\mathbf{W}_O$.</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>We fix a total budget $d_{\text{model}}$ and split it
-          across $h$ heads. Each head gets a slice of size:</p>
+          <p>We fix a total width $d_{\text{model}}$ and split it across $h$ heads. Each head gets a
+          slice of size:</p>
           $$ d_k = \frac{d_{\text{model}}}{h} $$
-          <p class="gloss"><b>In words:</b> with $d_{\text{model}}=512$
-          and $h=8$ heads, each head works in a small
-          $d_k=64$-dimensional space. Eight cheap 64-wide lookups
-          cost about the same as one expensive 512-wide lookup — we get variety <em>for free</em>, not at
-          extra cost.</p>
-          <p>For each head $i = 1 \dots h$ we run ordinary
-          scaled dot-product attention in its slice:</p>
-          $$ \text{head}_i = \text{Attention}\big(\mathbf{X}\mathbf{W}_Q^{(i)},\ \mathbf{X}\mathbf{W}_K^{(i)},\ \mathbf{X}\mathbf{W}_V^{(i)}\big)
-             \qquad \text{shape } (T \times d_k). $$
-          <p>Each head's own projection matrices
-          $\mathbf{W}_Q^{(i)},\mathbf{W}_K^{(i)},\mathbf{W}_V^{(i)}$
-          have shape $d_{\text{model}} \times d_k$. So each head
-          outputs an $T \times d_k$ matrix. We lay all
-          $h$ of them side by side
-          (<strong>concatenate</strong> — glue along the width):</p>
-          $$ \text{concat}(\text{head}_1, \dots, \text{head}_h)
-             \qquad \text{shape } (T \times h\,d_k) = (T \times d_{\text{model}}). $$
-          <p class="gloss"><b>In words:</b> because $h \cdot d_k = d_{\text{model}}$
-          by construction, gluing the heads back together restores the full width. We are exactly where we
-          started, size-wise — but the vector now carries <b>h</b> different views blended in.</p>
-          <p>One last step. The concatenated heads sit in separate lanes; nothing has yet let a discovery
-          in head 3 talk to a discovery in head 7. A final learned matrix
-          $\mathbf{W}_O$ mixes them:</p>
-          $$ \text{MultiHead}(\mathbf{X}) = \text{concat}(\text{head}_1,\dots,\text{head}_h)\,\mathbf{W}_O,
-             \qquad \mathbf{W}_O \in \mathbb{R}^{d_{\text{model}} \times d_{\text{model}}}. $$
-          <p class="gloss"><b>In words:</b> $\mathbf{W}_O$ takes the
-          stacked-up head outputs and blends them into one coherent <b>d</b><sub>model</sub>-wide vector per
-          position. It is the “manager” in the panel analogy — the layer that turns separate expert notes
-          into a single decision. Final output shape:
-          $(T \times d_{\text{model}})$, same as the input, so the
-          block stacks cleanly.</p>
+          <p class="gloss"><b>In words:</b> with $d_{\text{model}}=512$ and $h=8$ heads, each head works
+          in a small space of size $d_k=64$. Eight 64-wide lookups cost about the same as one 512-wide
+          lookup. So we get several kinds of relationship at about the same cost as one.</p>
+          <p>For each head $i = 1, \dots, h$, we run ordinary scaled dot-product attention in its own
+          slice:</p>
+          $$ \begin{aligned}
+             \text{head}_i &= \text{Attention}(\mathbf{Q}_i, \mathbf{K}_i, \mathbf{V}_i) \\[4pt]
+             \mathbf{Q}_i &= \mathbf{X}\big(\mathbf{W}_Q^{(i)}\big)^{\!\top}, \ \text{etc.}
+             \end{aligned} $$
+          <p class="gloss"><b>In words:</b> each head has its own projection matrices
+          $\mathbf{W}_Q^{(i)}$, $\mathbf{W}_K^{(i)}$ and $\mathbf{W}_V^{(i)}$, each of shape
+          $d_k \times d_{\text{model}}$. So each head outputs a $T \times d_k$ matrix.</p>
+          <p>We lay all $h$ head outputs side by side. This is called <strong>concatenation</strong>:
+          joining matrices along their width.</p>
+          $$ \text{concat}(\text{head}_1, \dots, \text{head}_h) $$
+          $$ \text{shape: } (T \times h\,d_k) = (T \times d_{\text{model}}) $$
+          <p class="gloss"><b>In words:</b> because $h \cdot d_k = d_{\text{model}}$ by construction,
+          joining the heads gives back the full width. Size-wise, we are where we started. But each
+          vector now holds $h$ different views.</p>
+          <p>One last step. After concatenation, each head's result is in its own separate lanes.
+          Nothing has yet let a finding of head 3 combine with a finding of head 7. A final learned
+          matrix $\mathbf{W}_O$ mixes them:</p>
+          $$ \begin{aligned}
+             &\text{MultiHead}(\mathbf{X}) \\
+             &\quad = \text{concat}(\text{head}_1,\dots,\text{head}_h)\,\mathbf{W}_O^{\top}
+             \end{aligned} $$
+          <p class="gloss"><b>In words:</b> $\mathbf{W}_O$ has shape $d_{\text{model}} \times
+          d_{\text{model}}$. It takes the joined head outputs and blends them into one
+          $d_{\text{model}}$-wide vector per position. In the colored-pen picture, it combines the
+          separate sets of marks into one set of notes. The final output shape is
+          $T \times d_{\text{model}}$, the same as the input, so blocks can be stacked.</p>
+
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 440 480" role="img" aria-labelledby="fig-tf-2-t">
+                <title id="fig-tf-2-t">Data flow of multi-head attention: X is projected to Q, K and V; Q times K transpose over root d_k gives a T by T score table; softmax gives weights A; A times V gives one head's output; h heads are concatenated and mixed by W_O.</title>
+                <defs>
+                  <marker id="ah18b" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9" orient="auto"><path class="f-i" d="M0,0L10,5L0,10z"/></marker>
+                </defs>
+                <rect class="f-p ax" x="36" y="86" width="384" height="298" rx="12"/>
+                <rect class="f-p ax" x="28" y="80" width="384" height="298" rx="12"/>
+                <rect class="f-k" x="20" y="74" width="384" height="298" rx="12"/><rect class="ax" x="20" y="74" width="384" height="298" rx="12"/>
+                <text x="32" y="364" class="sm">one head · h copies behind</text>
+                <rect class="f-p" x="150" y="10" width="120" height="44" rx="6"/><text x="210" y="32" text-anchor="middle" class="lg b">X</text><text x="210" y="47" text-anchor="middle" class="sm">T × d_model</text><rect class="ax" x="150" y="10" width="120" height="44" rx="6"/>
+                <path class="ln s-i thin" d="M180,54L86,114" marker-end="url(#ah18b)"/><path class="ln s-i thin" d="M210,54L210,114" marker-end="url(#ah18b)"/><path class="ln s-i thin" d="M240,54L334,114" marker-end="url(#ah18b)"/>
+                <text x="104" y="96" class="tv lg" text-anchor="end">W_Q</text>
+                <text x="216" y="100" class="tv lg">W_K</text>
+                <text x="300" y="96" class="tv lg">W_V</text>
+                <rect class="f-vs" x="50" y="118" width="72" height="44" rx="6"/><text x="86" y="140" text-anchor="middle" class="lg b">Q</text><text x="86" y="155" text-anchor="middle" class="sm">T × d_k</text>
+                <rect class="f-vs" x="174" y="118" width="72" height="44" rx="6"/><text x="210" y="140" text-anchor="middle" class="lg b">K</text><text x="210" y="155" text-anchor="middle" class="sm">T × d_k</text>
+                <rect class="f-gs" x="298" y="118" width="72" height="44" rx="6"/><text x="334" y="140" text-anchor="middle" class="lg b">V</text><text x="334" y="155" text-anchor="middle" class="sm">T × d_v</text>
+                <path class="ln s-i thin" d="M86,162L126,194" marker-end="url(#ah18b)"/><path class="ln s-i thin" d="M210,162L172,194" marker-end="url(#ah18b)"/>
+                <rect class="f-as" x="84" y="198" width="132" height="44" rx="6"/><text x="150" y="220" text-anchor="middle" class="lg">QKᵀ / √d_k</text><text x="150" y="235" text-anchor="middle" class="sm">T × T</text>
+                <path class="ln s-i thin" d="M150,242L150,260" marker-end="url(#ah18b)"/>
+                <rect class="f-as" x="84" y="264" width="132" height="44" rx="6"/><text x="150" y="286" text-anchor="middle" class="lg">softmax → A</text><text x="150" y="301" text-anchor="middle" class="sm">T × T</text>
+                <path class="ln s-i thin" d="M150,308L188,324" marker-end="url(#ah18b)"/><path class="ln s-i thin" d="M334,162L262,324" marker-end="url(#ah18b)"/>
+                <rect class="f-gs" x="176" y="326" width="100" height="40" rx="6"/><text x="226" y="346" text-anchor="middle" class="lg">A V</text><text x="226" y="361" text-anchor="middle" class="sm">T × d_v</text>
+                <path class="ln s-i thin" d="M226,366L226,398" marker-end="url(#ah18b)"/>
+                <text x="236" y="390" class="sm">join the h heads</text>
+                <rect class="f-p" x="122" y="402" width="208" height="44" rx="6"/><text x="226" y="424" text-anchor="middle" class="lg">concat, then × W_Oᵀ</text><text x="226" y="439" text-anchor="middle" class="sm">T × d_model</text><rect class="ax" x="122" y="402" width="208" height="44" rx="6"/>
+                <path class="ln s-i thin" d="M226,446L226,466" marker-end="url(#ah18b)"/>
+                <text x="236" y="474" class="sm">output: T × d_model</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 18.2</b> The data flow of multi-head attention, with the shape at
+            each step. Inside the shaded frame is one head; there are $h$ copies, each with its own
+            $\mathbf{W}_Q$, $\mathbf{W}_K$, $\mathbf{W}_V$. The only $T \times T$ objects are the scores
+            and the weights $\mathbf{A}$. Everything else keeps one row per position.</figcaption>
+          </figure>
 
           <div class="callout keyidea">
-            <div class="callout__label"><span class="ic">◆</span> Why heads earn their keep</div>
-            <p>When researchers inspect trained transformers, different heads really do specialise: some
-            track the previous word, some link verbs to their subjects, some connect a pronoun to the noun
-            it refers to. No one programmed these roles — the split into heads simply gave the model
-            <em>room</em> to discover several relationship types instead of averaging them all into one
-            muddy signal.</p>
+            <div class="callout__label"><span class="ic">◆</span> Why heads are worth it</div>
+            <p>When researchers inspect trained transformers, some heads do show clear roles. Some
+            track the previous word. Some link verbs to their subjects. Some connect a pronoun to the
+            noun it refers to. No one programmed these roles. The split into heads gave the model room
+            to learn several kinds of relationship, instead of averaging them all into one unclear
+            signal. (Many other heads have no role that is easy to name.)</p>
           </div>
 
           <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">A model has <code>d_model = 768</code> and <code>h = 12</code> heads. What is <code>d_k</code>? And what shape is each head's output for a sequence of length 100?</span>
+                <span class="check__q">A model has $d_{\text{model}} = 768$ and $h = 12$ heads. What is $d_k$, and what shape is one head's output for 100 tokens? Then: how many parameters does the attention layer have (the four matrices with biases)? Does that number change if you use 24 heads instead?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>$d_k = 768 / 12 = 64$. Each head runs attention in
-                a 64-wide space and outputs shape <strong>(100, 64)</strong>. Concatenating all 12 heads
-                gives $(100, 12\times 64) = (100, 768)$, and
-                $\mathbf{W}_O$ of shape (768, 768) maps that back to
-                (100, 768). These are the actual numbers inside BERT-base and GPT-2 small (two landmark early transformers) — you just sized
-                a real model.</p>
+                <p>$d_k = 768 / 12 = 64$, and each head outputs shape (100, 64). Joining the 12 heads
+                gives (100, 768), and $\mathbf{W}_O$ maps that to (100, 768). These are the sizes inside
+                BERT-base and GPT-2 small, two well-known early transformers. The four matrices
+                ($\mathbf{W}_Q$, $\mathbf{W}_K$, $\mathbf{W}_V$, $\mathbf{W}_O$) are each 768 × 768 plus
+                a bias of 768, so the layer has $4 \times (768^2 + 768) = 2{,}362{,}368$ parameters.
+                With 24 heads the count is <em>the same</em>. The heads only split the same width into
+                narrower slices ($d_k = 32$). The number of heads changes how the width is used, not how
+                many weights there are.</p>
               </div>
             </details>
           </div>
@@ -460,106 +706,167 @@ print(out.shape)                                      # torch.Size([3, 4])  -> s
           <h2><span class="h-num">4</span>Positional encodings: attention can't tell order</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>Attention has a hidden flaw, and it is a big one. Look again at how a position builds its
-          output: $\sum_j A_{ij}\,\mathbf{v}_j$ — a sum over the
-          other positions. Addition doesn't care about order. Shuffle the input words and you get the same
-          set of outputs, just shuffled the same way. Attention treats a sentence as a <em>bag</em> of
-          words. But “dog bites man” and “man bites dog” are very different sentences. We must hand the
-          model some sense of position, because the mechanism itself has none.</p>
+          <p>Attention has a hidden weakness. Look again at how a position builds its output:
+          $\sum_j A_{ij}\,\mathbf{v}_j$, a sum over the other positions. A sum does not care about
+          order. Shuffle the input words, and you get the same outputs, shuffled in the same way. So
+          attention treats a sentence as a <em>bag</em> of words. But “dog bites man” and “man bites
+          dog” are very different sentences. We must give the model some sense of position, because
+          the mechanism itself has none.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>Hand a chef a basket of loose ingredients with no recipe steps and no order — flour, eggs,
-            sugar, heat. They can see <em>what</em> they have but not <em>in what sequence</em> to use it,
-            and sequence is the whole difference between a cake and a mess. Positional encodings are the
-            little numbered stickers we put on each ingredient — “I'm step 1, I'm step 2” — so order is no
-            longer lost.</p>
+            <p>Think of loose book pages that fell on the floor. To keep their order, a printer can
+            print a faint page-number watermark into the paper of each page. The watermark takes no
+            extra space: it is blended into the page, on top of the text. A careful reader can still
+            read both. Positional encodings work like this. We <em>add</em> a position pattern to each
+            word vector, in the same space, instead of attaching extra numbers at the end.</p>
           </div>
 
-          <p class="beat beat--math">Now the math — first, the flaw, precisely</p>
-          <p>Let $\mathbf{P}$ be a <strong>permutation matrix</strong>
-          — an identity matrix with its rows shuffled — so $\mathbf{P}\mathbf{X}$
-          reorders the input positions. Because attention computes
-          $\mathbf{Q}, \mathbf{K}, \mathbf{V}$ row by row and then
-          softmax-blends, feeding it $\mathbf{P}\mathbf{X}$ gives:</p>
-          $$ \text{Attention}(\mathbf{P}\mathbf{X}) = \mathbf{P}\,\text{Attention}(\mathbf{X}). $$
-          <p class="gloss"><b>In words:</b> reorder the inputs and you get <em>exactly</em> the same
-          outputs, in the reordered order — nothing else changes. This property is called
-          <dfn>permutation invariance</dfn> (a <dfn>permutation</dfn> is just a reshuffle). It is perfect
-          for a set of items with no natural order, and disastrous for language, where order is meaning.
-          The fix is not to change attention — it is to make each word's vector <em>already contain</em>
-          its position before attention ever sees it.</p>
-
-          <p>So we build a position vector $\mathbf{PE}_{\text{pos}}$
-          for each slot $\text{pos} = 0, 1, 2, \dots$ and simply add
-          it to the word's vector. The original transformer uses a fixed pattern of sines and cosines at
-          many frequencies:</p>
+          <p class="beat beat--math">Now the math</p>
+          <p>Let $\mathbf{P}$ be a <strong>permutation matrix</strong>: an identity matrix with its
+          rows shuffled. Then $\mathbf{P}\mathbf{X}$ reorders the input positions. Let's follow
+          $\mathbf{P}\mathbf{X}$ through attention. Each projection acts on each row separately, so
+          it keeps the shuffle: $(\mathbf{P}\mathbf{X})\mathbf{W}_Q^{\top} = \mathbf{P}\mathbf{Q}$,
+          and the same for $\mathbf{K}$ and $\mathbf{V}$. Then:</p>
           $$ \begin{aligned}
-             \mathbf{PE}_{(\text{pos},\,2i)} &= \sin\!\left(\frac{\text{pos}}{10000^{\,2i/d_{\text{model}}}}\right), \\[4pt]
-             \mathbf{PE}_{(\text{pos},\,2i+1)} &= \cos\!\left(\frac{\text{pos}}{10000^{\,2i/d_{\text{model}}}}\right).
+             (\mathbf{P}\mathbf{Q})(\mathbf{P}\mathbf{K})^{\top} &= \mathbf{P}\,\mathbf{Q}\mathbf{K}^{\top}\mathbf{P}^{\top} \\[4pt]
+             \text{softmax}\big(\mathbf{P}\mathbf{S}\mathbf{P}^{\top}\big) &= \mathbf{P}\,\mathbf{A}\,\mathbf{P}^{\top} \\[4pt]
+             \mathbf{P}\mathbf{A}\mathbf{P}^{\top}\,\mathbf{P}\mathbf{V} &= \mathbf{P}\,\mathbf{A}\mathbf{V}
              \end{aligned} $$
-          <p class="gloss"><b>In words:</b> <b>pos</b> is which slot in the sentence (0, 1, 2, …); <b>i</b>
-          indexes the dimension inside the vector. Even dimensions use a sine, odd dimensions the matching
-          cosine. The $10000^{\,2i/d_{\text{model}}}$ in the
-          denominator makes the wavelength stretch as <b>i</b> grows: early dimensions wiggle fast, later
-          dimensions wiggle slowly.</p>
+          <p class="gloss"><b>In words:</b> the scores are shuffled in both rows and columns. Softmax
+          works on each row, and shuffling the entries of a row only shuffles its softmax, so the
+          weights are shuffled in the same way. In the last line, $\mathbf{P}^{\top}\mathbf{P} =
+          \mathbf{I}$, because shuffling and then unshuffling changes nothing. So:</p>
+          $$ \text{Attention}(\mathbf{P}\mathbf{X}) = \mathbf{P}\,\text{Attention}(\mathbf{X}) $$
+          <p class="gloss"><b>In words:</b> reorder the inputs, and you get the same outputs in the new
+          order. Nothing else changes. This property is called <dfn>permutation equivariance</dfn>. (A
+          <dfn>permutation</dfn> is a reordering. “Equivariant” means the output moves with the input;
+          “invariant” would mean the output does not change at all.) It is right for a set of items
+          with no natural order. It is wrong for language, where order carries meaning. The fix is
+          not to change attention. The fix is to put each word's position <em>into</em> its vector
+          before attention sees it.</p>
+
+          <p>So we build a position vector $\mathbf{PE}_{\text{pos}}$ for each slot
+          $\text{pos} = 0, 1, 2, \dots$ and add it to the word's vector. The original transformer uses
+          a fixed pattern of sines and cosines at many frequencies:</p>
+          $$ \begin{aligned}
+             \mathbf{PE}_{(\text{pos},\,2i)} &= \sin\!\left(\frac{\text{pos}}{10000^{\,2i/d_{\text{model}}}}\right) \\[4pt]
+             \mathbf{PE}_{(\text{pos},\,2i+1)} &= \cos\!\left(\frac{\text{pos}}{10000^{\,2i/d_{\text{model}}}}\right)
+             \end{aligned} $$
+          <p class="gloss"><b>In words:</b> $\text{pos}$ is the slot in the sentence (0, 1, 2, …), and
+          $i$ numbers the pairs of dimensions inside the vector. Even dimensions use a sine; the odd
+          dimension next to it uses the matching cosine. The term $10000^{\,2i/d_{\text{model}}}$
+          makes the wavelength longer as $i$ grows. The first dimensions change quickly from one
+          position to the next; the last dimensions change slowly.</p>
+
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 440 300" role="img" aria-labelledby="fig-tf-3-t">
+                <title id="fig-tf-3-t">Heatmap of the sinusoidal positional encoding for positions 0 to 39 and the 64 dimensions of a 64-wide model. Left columns alternate quickly down the page; right columns barely change.</title>
+                <path class="f-a" fill-opacity="0.3" d="M60,70h5v5h-5zM60,120h5v5h-5zM65,125h5v5h-5zM65,175h5v5h-5zM70,80h5v5h-5zM70,105h5v5h-5zM70,205h5v5h-5zM70,230h5v5h-5zM75,70h5v5h-5zM75,95h5v5h-5zM75,195h5v5h-5zM75,220h5v5h-5zM80,70h5v5h-5zM80,205h5v5h-5zM85,80h5v5h-5zM85,135h5v5h-5zM85,190h5v5h-5zM85,225h5v5h-5zM90,80h5v5h-5zM90,110h5v5h-5zM90,155h5v5h-5zM90,185h5v5h-5zM90,230h5v5h-5zM100,95h5v5h-5zM100,135h5v5h-5zM100,195h5v5h-5zM100,235h5v5h-5zM105,70h5v5h-5zM105,110h5v5h-5zM105,170h5v5h-5zM105,210h5v5h-5zM110,165h5v5h-5zM115,80h5v5h-5zM115,135h5v5h-5zM115,210h5v5h-5zM120,135h5v5h-5zM120,210h5v5h-5zM125,90h5v10h-5zM125,165h5v5h-5zM130,170h5v5h-5zM135,110h5v5h-5zM135,205h5v5h-5zM140,210h5v10h-5zM145,130h5v10h-5zM155,160h5v15h-5zM165,200h5v20h-5z"/>
+                <path class="f-a" fill-opacity="0.5" d="M60,90h5v5h-5zM60,100h5v5h-5zM60,195h5v5h-5zM60,215h5v5h-5zM65,50h5v5h-5zM65,145h5v5h-5zM65,155h5v5h-5zM70,65h5v5h-5zM70,120h5v5h-5zM70,190h5v5h-5zM75,110h5v5h-5zM75,180h5v5h-5zM75,235h5v5h-5zM80,185h5v5h-5zM85,115h5v5h-5zM85,170h5v5h-5zM95,65h5v5h-5zM95,90h5v5h-5zM95,140h5v5h-5zM95,165h5v5h-5zM95,215h5v5h-5zM100,130h5v5h-5zM100,230h5v5h-5zM105,75h5v5h-5zM105,105h5v5h-5zM105,205h5v5h-5zM110,115h5v5h-5zM110,160h5v5h-5zM115,85h5v5h-5zM115,130h5v5h-5zM115,215h5v5h-5zM120,140h5v10h-5zM120,200h5v10h-5zM125,100h5v5h-5zM125,155h5v10h-5zM130,175h5v10h-5zM135,115h5v10h-5zM135,195h5v10h-5zM140,220h5v10h-5zM145,140h5v15h-5zM155,175h5v15h-5zM165,220h5v20h-5z"/>
+                <path class="f-a" fill-opacity="0.7" d="M60,60h5v5h-5zM60,130h5v5h-5zM60,185h5v5h-5zM60,225h5v5h-5zM65,60h5v5h-5zM65,115h5v5h-5zM65,185h5v5h-5zM70,150h5v5h-5zM70,160h5v5h-5zM75,55h5v5h-5zM75,140h5v5h-5zM75,150h5v5h-5zM80,75h5v5h-5zM80,90h5v5h-5zM80,130h5v5h-5zM80,145h5v5h-5zM80,200h5v5h-5zM85,60h5v5h-5zM85,75h5v5h-5zM85,130h5v5h-5zM90,85h5v5h-5zM90,105h5v5h-5zM90,160h5v5h-5zM90,180h5v5h-5zM90,235h5v5h-5zM95,85h5v5h-5zM95,160h5v5h-5zM95,235h5v5h-5zM100,100h5v5h-5zM100,125h5v5h-5zM100,200h5v5h-5zM100,225h5v5h-5zM105,100h5v5h-5zM105,175h5v5h-5zM105,200h5v5h-5zM110,120h5v10h-5zM110,155h5v5h-5zM115,90h5v5h-5zM115,120h5v10h-5zM115,220h5v10h-5zM120,150h5v5h-5zM120,195h5v5h-5zM125,105h5v10h-5zM125,150h5v5h-5zM130,185h5v10h-5zM135,125h5v10h-5zM135,185h5v10h-5zM140,230h5v10h-5zM145,155h5v10h-5zM145,230h5v10h-5zM155,190h5v20h-5z"/>
+                <path class="f-a" fill-opacity="0.9" d="M60,65h5v5h-5zM60,95h5v5h-5zM60,125h5v5h-5zM60,155h5v10h-5zM60,190h5v5h-5zM60,220h5v5h-5zM65,55h5v5h-5zM65,85h5v10h-5zM65,120h5v5h-5zM65,150h5v5h-5zM65,180h5v5h-5zM65,210h5v10h-5zM70,70h5v10h-5zM70,110h5v10h-5zM70,155h5v5h-5zM70,195h5v10h-5zM70,235h5v5h-5zM75,60h5v10h-5zM75,100h5v10h-5zM75,145h5v5h-5zM75,185h5v10h-5zM75,225h5v10h-5zM80,80h5v10h-5zM80,135h5v10h-5zM80,190h5v10h-5zM85,65h5v10h-5zM85,120h5v10h-5zM85,175h5v15h-5zM85,230h5v10h-5zM90,90h5v15h-5zM90,165h5v15h-5zM95,70h5v15h-5zM95,145h5v15h-5zM95,220h5v15h-5zM100,105h5v20h-5zM100,205h5v20h-5zM105,80h5v20h-5zM105,180h5v20h-5zM110,130h5v25h-5zM115,95h5v25h-5zM115,230h5v10h-5zM120,155h5v40h-5zM125,115h5v35h-5zM130,195h5v45h-5zM135,135h5v50h-5zM145,165h5v65h-5zM155,210h5v30h-5z"/>
+                <path class="f-v" fill-opacity="0.3" d="M60,180h5v5h-5zM60,230h5v5h-5zM65,65h5v5h-5zM65,235h5v5h-5zM70,185h5v5h-5zM70,210h5v5h-5zM75,90h5v5h-5zM75,115h5v5h-5zM80,65h5v5h-5zM80,155h5v5h-5zM80,210h5v5h-5zM85,85h5v5h-5zM85,140h5v5h-5zM95,55h5v5h-5zM95,100h5v5h-5zM95,130h5v5h-5zM95,175h5v5h-5zM95,205h5v5h-5zM100,45h5v5h-5zM100,85h5v5h-5zM100,145h5v5h-5zM100,185h5v5h-5zM105,60h5v5h-5zM105,120h5v5h-5zM105,160h5v5h-5zM105,220h5v5h-5zM110,45h5v5h-5zM110,100h5v5h-5zM110,180h5v5h-5zM115,65h5v5h-5zM115,145h5v5h-5zM115,200h5v5h-5zM120,50h5v5h-5zM120,120h5v5h-5zM120,225h5v5h-5zM125,75h5v5h-5zM125,180h5v5h-5zM130,50h5v10h-5zM130,145h5v10h-5zM135,85h5v10h-5zM135,225h5v10h-5zM140,55h5v10h-5zM140,180h5v10h-5zM145,100h5v10h-5zM150,55h5v15h-5zM150,225h5v15h-5zM155,120h5v15h-5zM160,60h5v20h-5zM165,145h5v20h-5zM170,65h5v25h-5zM175,180h5v25h-5zM180,75h5v35h-5zM185,225h5v15h-5zM190,85h5v45h-5zM200,100h5v60h-5zM210,120h5v75h-5zM220,145h5v95h-5zM230,175h5v65h-5zM240,220h5v20h-5z"/>
+                <path class="f-v" fill-opacity="0.5" d="M60,85h5v5h-5zM60,105h5v5h-5zM60,200h5v5h-5zM60,210h5v5h-5zM65,45h5v5h-5zM65,140h5v5h-5zM65,160h5v5h-5zM70,85h5v5h-5zM70,100h5v5h-5zM70,225h5v5h-5zM75,75h5v5h-5zM75,130h5v5h-5zM75,200h5v5h-5zM75,215h5v5h-5zM80,45h5v5h-5zM80,100h5v5h-5zM80,120h5v5h-5zM80,175h5v5h-5zM80,230h5v5h-5zM85,50h5v5h-5zM85,105h5v5h-5zM85,160h5v5h-5zM90,45h5v5h-5zM90,70h5v5h-5zM90,120h5v5h-5zM90,145h5v5h-5zM90,195h5v5h-5zM90,220h5v5h-5zM95,200h5v5h-5zM100,50h5v5h-5zM100,80h5v5h-5zM100,180h5v5h-5zM105,55h5v5h-5zM105,155h5v5h-5zM110,50h5v5h-5zM110,95h5v5h-5zM110,185h5v5h-5zM110,230h5v5h-5zM115,60h5v5h-5zM115,150h5v5h-5zM115,195h5v5h-5zM120,55h5v5h-5zM120,115h5v5h-5zM120,230h5v5h-5zM125,70h5v5h-5zM125,185h5v10h-5zM130,60h5v5h-5zM130,135h5v10h-5zM135,75h5v10h-5zM135,235h5v5h-5zM140,65h5v10h-5zM140,165h5v15h-5zM145,90h5v10h-5zM150,70h5v15h-5zM150,210h5v15h-5zM155,105h5v15h-5zM160,80h5v20h-5zM165,125h5v20h-5zM170,90h5v30h-5zM175,150h5v30h-5zM180,110h5v35h-5zM185,190h5v35h-5zM190,130h5v50h-5zM200,160h5v65h-5zM210,195h5v45h-5z"/>
+                <path class="f-v" fill-opacity="0.7" d="M60,75h5v5h-5zM60,115h5v5h-5zM60,170h5v5h-5zM65,75h5v5h-5zM65,130h5v5h-5zM65,170h5v5h-5zM65,225h5v5h-5zM70,45h5v5h-5zM70,55h5v5h-5zM70,140h5v5h-5zM70,170h5v5h-5zM75,45h5v5h-5zM75,160h5v5h-5zM75,170h5v5h-5zM80,60h5v5h-5zM80,215h5v5h-5zM85,90h5v5h-5zM85,145h5v5h-5zM85,200h5v5h-5zM85,215h5v5h-5zM90,50h5v5h-5zM90,125h5v5h-5zM95,50h5v5h-5zM95,105h5v5h-5zM95,125h5v5h-5zM95,180h5v5h-5zM100,150h5v5h-5zM100,175h5v5h-5zM105,125h5v5h-5zM105,150h5v5h-5zM105,225h5v5h-5zM110,55h5v5h-5zM110,90h5v5h-5zM110,190h5v5h-5zM110,220h5v10h-5zM115,55h5v5h-5zM115,155h5v5h-5zM115,190h5v5h-5zM120,60h5v10h-5zM120,105h5v10h-5zM120,235h5v5h-5zM125,60h5v10h-5zM125,195h5v5h-5zM125,235h5v5h-5zM130,65h5v10h-5zM130,125h5v10h-5zM135,65h5v10h-5zM140,75h5v15h-5zM140,155h5v10h-5zM145,75h5v15h-5zM150,85h5v20h-5zM150,190h5v20h-5zM155,85h5v20h-5zM160,100h5v25h-5zM165,100h5v25h-5zM170,120h5v30h-5zM175,120h5v30h-5zM180,145h5v45h-5zM185,145h5v45h-5zM190,180h5v60h-5zM195,180h5v60h-5zM200,225h5v15h-5zM205,225h5v15h-5z"/>
+                <path class="f-v" fill-opacity="0.9" d="M60,45h5v10h-5zM60,80h5v5h-5zM60,110h5v5h-5zM60,140h5v10h-5zM60,175h5v5h-5zM60,205h5v5h-5zM60,235h5v5h-5zM65,40h5v5h-5zM65,70h5v5h-5zM65,100h5v10h-5zM65,135h5v5h-5zM65,165h5v5h-5zM65,195h5v10h-5zM65,230h5v5h-5zM70,50h5v5h-5zM70,90h5v10h-5zM70,130h5v10h-5zM70,175h5v10h-5zM70,215h5v10h-5zM75,40h5v5h-5zM75,80h5v10h-5zM75,120h5v10h-5zM75,165h5v5h-5zM75,205h5v10h-5zM80,50h5v10h-5zM80,105h5v15h-5zM80,160h5v15h-5zM80,220h5v10h-5zM85,40h5v10h-5zM85,95h5v10h-5zM85,150h5v10h-5zM85,205h5v10h-5zM90,55h5v15h-5zM90,130h5v15h-5zM90,200h5v20h-5zM95,40h5v10h-5zM95,110h5v15h-5zM95,185h5v15h-5zM100,55h5v25h-5zM100,155h5v20h-5zM105,40h5v15h-5zM105,130h5v20h-5zM105,230h5v10h-5zM110,60h5v30h-5zM110,195h5v25h-5zM115,40h5v15h-5zM115,160h5v30h-5zM120,70h5v35h-5zM125,40h5v20h-5zM125,200h5v35h-5zM130,75h5v50h-5zM135,40h5v25h-5zM140,90h5v65h-5zM145,40h5v35h-5zM150,105h5v85h-5zM155,40h5v45h-5zM160,125h5v115h-5zM165,40h5v60h-5zM170,150h5v90h-5zM175,40h5v80h-5zM180,190h5v50h-5zM185,40h5v105h-5zM195,40h5v140h-5zM205,40h5v185h-5zM215,40h5v200h-5zM225,40h5v200h-5zM235,40h5v200h-5zM245,40h5v200h-5zM255,40h5v200h-5zM265,40h5v200h-5zM275,40h5v200h-5zM285,40h5v200h-5zM295,40h5v200h-5zM305,40h5v200h-5zM315,40h5v200h-5zM325,40h5v200h-5zM335,40h5v200h-5zM345,40h5v200h-5zM355,40h5v200h-5zM365,40h5v200h-5zM375,40h5v200h-5z"/>
+                <rect class="ax" x="60" y="40" width="320" height="200"/>
+                <text x="62.5" y="256" text-anchor="middle" class="sm">0</text><text x="142.5" y="256" text-anchor="middle" class="sm">16</text><text x="222.5" y="256" text-anchor="middle" class="sm">32</text><text x="302.5" y="256" text-anchor="middle" class="sm">48</text><text x="377.5" y="256" text-anchor="middle" class="sm">63</text><text x="54" y="46.5" text-anchor="end" class="sm">0</text><text x="54" y="96.5" text-anchor="end" class="sm">10</text><text x="54" y="146.5" text-anchor="end" class="sm">20</text><text x="54" y="196.5" text-anchor="end" class="sm">30</text><text x="54" y="241.5" text-anchor="end" class="sm">39</text>
+                <text class="lg" x="220.0" y="274" text-anchor="middle">dimension (d_model = 64)</text>
+                <text class="lg" x="52" y="28" text-anchor="middle">position</text>
+                <text x="60" y="28" dx="44" class="sm">fast clocks</text>
+                <text x="380" y="28" text-anchor="end" class="sm">slow clocks</text>
+                <rect class="f-v" x="396" y="60" width="14" height="14"/><text x="396" y="90" class="sm">+1</text>
+                <rect class="f-a" x="396" y="110" width="14" height="14"/><text x="396" y="140" class="sm">−1</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 18.3</b> The real sinusoidal encoding for positions 0–39 in a model
+            with $d_{\text{model}} = 64$ (violet: positive, amber: negative, stronger color: larger size). Read one
+            row to get one position's vector. The left columns change sign every few positions; the
+            right columns hardly change over 40 positions. Together, the columns give every position a
+            different pattern.</figcaption>
+          </figure>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> Why sines at many frequencies</div>
-            <p>Think of a bank of clocks with different hand speeds — seconds, minutes, hours, days. Read
-            all their hands together and you can pin down a unique moment in time. The fast hand
-            distinguishes nearby moments; the slow hand distinguishes far-apart ones. The sinusoidal
-            encoding is exactly this: each pair of dimensions is a clock at its own speed, and a position's
-            full set of hand-readings is a fingerprint no other position shares. A bonus falls out of the
-            trig: the code for position $\text{pos}+k$ is a fixed
-            linear function of the code for $\text{pos}$, so the
-            model can learn to reason about <em>relative</em> offsets like “three words back.”</p>
+            <p>Think of a set of clocks whose hands turn at different speeds: seconds, minutes, hours,
+            days. Read all the hands together and you can identify one exact moment. The fast hand
+            separates nearby moments; the slow hand separates moments far apart. The sinusoidal
+            encoding works like this. Each pair of dimensions is a clock at its own speed. The set of all
+            hand positions is a pattern that no other position shares (over the lengths used in
+            practice).</p>
+            <p>There is also a bonus. Write $\omega$ for the frequency of one pair. Moving from
+            position $p$ to $p+k$ turns that pair's “hand” by a fixed angle $\theta = \omega k$. With
+            $s_p = \sin \omega p$ and $c_p = \cos \omega p$:</p>
+            $$ \begin{bmatrix} s_{p+k} \\ c_{p+k} \end{bmatrix}
+               = \begin{bmatrix} \cos\theta & \sin\theta \\ -\sin\theta & \cos\theta \end{bmatrix}
+                 \begin{bmatrix} s_p \\ c_p \end{bmatrix} $$
+            <p>This follows from the sum formulas for sine and cosine. The matrix depends only on the
+            offset $k$, not on $p$. So the code for “$k$ positions later” is a fixed linear function of
+            the current code. This makes it easier for the model to learn <em>relative</em> offsets such
+            as “three words back.”</p>
           </div>
 
-          <p>A common alternative is the <strong>learned positional embedding</strong>: instead of the
-          fixed sine formula, keep a lookup table with one trainable vector per position and let training
-          decide what each should be. GPT and BERT use this. It is simpler and works as well over the
-          lengths seen in training; the sinusoidal version has the edge that it extends smoothly to
-          positions longer than any seen during training, since the formula is defined for every
-          $\text{pos}$. Either way the shape is the same
-          ($T \times d_{\text{model}}$) and the move is the same:
-          add it to the input.</p>
+          <p>Other ways to give position are common:</p>
+          <ul>
+            <li><strong>Learned positional embeddings.</strong> Keep a table with one trainable vector
+            per position, and let training decide what each should be. GPT-2 and BERT use this. It
+            works well for the lengths seen in training, but it has no vector for longer
+            positions.</li>
+            <li><strong>Rotary position embeddings (RoPE).</strong> Instead of adding a vector to the
+            input, RoPE rotates each query and key, pair by pair, by an angle proportional to the
+            position. It uses the rotation above directly. The dot product of a query at $p$ and a key
+            at $p'$ then depends only on the offset $p - p'$. Most recent open models, such as Llama,
+            use RoPE.</li>
+          </ul>
+          <p>The sine formula is defined for every $\text{pos}$, so it gives a vector even for positions
+          longer than any seen in training. But in practice, models with sinusoidal encodings do
+          <em>not</em> work well on sequences much longer than their training sequences (Press et al.,
+          2021). Handling longer sequences needs other methods. For the additive methods the shape is
+          the same ($T \times d_{\text{model}}$) and the step is the same: add it to the input.</p>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
           <p class="codecap">sinusoidal positional encodings, added to the input</p>
-          <pre><code class="language-python">import torch, math
+          <pre><code class="language-python">import torch
 
-def positional_encoding(seq_len, d_model):
-    pos = torch.arange(seq_len).unsqueeze(1)              # [L, 1]  slot index 0,1,2,...
-    i   = torch.arange(0, d_model, 2)                     # [d/2]   even dimension indices
-    freq = 1.0 / (10000 ** (i / d_model))                # [d/2]   one frequency per dim-pair
-    pe = torch.zeros(seq_len, d_model)                   # [L, d_model]
+def positional_encoding(T, d_model):
+    pos  = torch.arange(T).unsqueeze(1)                  # [T, 1]      slot index 0, 1, 2, ...
+    i    = torch.arange(0, d_model, 2)                   # [d/2]       even dimension indices 2i
+    freq = 1.0 / (10000 ** (i / d_model))                # [d/2]       one frequency per pair
+    pe = torch.zeros(T, d_model)                         # [T, d_model]
     pe[:, 0::2] = torch.sin(pos * freq)                  # even dims -> sine
     pe[:, 1::2] = torch.cos(pos * freq)                  # odd  dims -> cosine
-    return pe                                            # [L, d_model]
+    return pe                                            # [T, d_model]
 
-X  = torch.randn(10, 512)                                # 10 word vectors, d_model = 512
-X  = X + positional_encoding(10, 512)                    # [10, 512]  position now baked in
-print(X.shape)                                           # torch.Size([10, 512])</code></pre>
-          <p class="gloss"><b>In words:</b> we add, not concatenate — the position rides along inside the
-          existing <b>d</b><sub>model</sub> width, so nothing downstream changes shape. After this line,
-          two identical words in different slots have different vectors, and permutation invariance is
-          broken exactly where we wanted it broken.</p>
+torch.manual_seed(0)
+X = torch.randn(10, 512)                                 # 10 token vectors, d_model = 512
+X = X + positional_encoding(10, 512)                     # [10, 512]  position now added in
+print(X.shape)                                           # torch.Size([10, 512])
+print(positional_encoding(10, 512)[1, :4])               # tensor([0.8415, 0.5403, 0.8219, 0.5697])</code></pre>
+          <p class="gloss"><b>In words:</b> we add; we do not concatenate. The position travels inside
+          the existing $d_{\text{model}}$ width, so nothing later changes shape. The last line shows
+          position 1: $\sin 1 = 0.8415$ and $\cos 1 = 0.5403$ for the fastest pair, then a slightly
+          slower pair. After the addition, the same word in two different slots has two different
+          vectors. The permutation equivariance is broken, which is what we want.</p>
 
           <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">Without positional encodings, would a transformer give different outputs for “dog bites man” and “man bites dog”?</span>
+                <span class="check__q">Without positional encodings, feed the block “dog bites man” and then “man bites dog”. Compare the output vector for “dog” in the two runs. Are they the same or different? Why?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>No — and that is the whole problem. With the same three word-vectors in a different
-                order, permutation invariance guarantees the <em>same set</em> of output vectors, merely
-                reordered. The model literally could not tell who bit whom. Adding positional encodings
-                gives “dog” in slot 0 a different vector from “dog” in slot 2, so the two sentences finally
-                produce genuinely different representations. Position is not a nice-to-have here; it is
-                what makes language modelling possible at all.</p>
+                <p>They are exactly the same. The second input is a reordering of the first, so by
+                permutation equivariance the outputs are the same vectors, reordered. “Dog” gets the same
+                vector whether it is the biter or the one bitten, so the model cannot tell who bit whom.
+                The code in Section 5 checks this property on a full block. Adding positional encodings
+                gives “dog” in slot 0 a different input vector from “dog” in slot 2, so the two sentences
+                now give different results. One nuance: the text-generating models of <a
+                href="19-language-modeling.html">Section 19</a> use a causal mask, which already breaks
+                the symmetry. Such models can learn some position information even without positional
+                encodings (Haviv et al., 2022). The block in this lesson, with no mask, cannot.</p>
               </div>
             </details>
           </div>
@@ -568,89 +875,143 @@ print(X.shape)                                           # torch.Size([10, 512])
           <h2><span class="h-num">5</span>The full transformer block, dimension by dimension</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>We now have the two moving parts. <strong>Multi-head attention</strong> lets positions share
-          information across the sequence — the “mixing across words” step. But it is mostly a weighted
-          average; it does no heavy per-word computation on its own. So each block pairs it with a
-          <strong>feed-forward network</strong> (FFN) — a small two-layer network applied to each position
-          separately — that does the “think hard about this one word” step. Wrap both in two safety
-          devices — <strong>residual connections</strong> and <strong>LayerNorm</strong> — and you have the
-          complete transformer block. Stack it $N$ times and you
-          have a transformer.</p>
+          <p>We now have the two main parts. <strong>Multi-head attention</strong> lets positions share
+          information across the sequence: the “mixing across words” step. But it is mostly a weighted
+          average, and it does little computation on each word by itself. So each block pairs it with a
+          <strong>feed-forward network</strong> (FFN). This is a small two-layer network applied to
+          each position separately: the “think hard about this one word” step. Around both, we add
+          two support devices: <strong>residual connections</strong> and <strong>LayerNorm</strong>.
+          That is the complete transformer block. Stack it $N$ times and you have a transformer.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>A team working a problem in rounds. Each round has two phases: a <strong>meeting</strong>,
-            where everyone shares what they know and updates their view (that's attention — mixing
-            information between people), and <strong>desk work</strong>, where each person goes off alone
-            and processes what they just heard (that's the FFN — per-position computation). Do many such
-            rounds and a rich shared understanding builds up. A transformer is that team; the block is one
-            round.</p>
+            <p>Think of a team working on a problem in rounds. Each round has two phases. First, a
+            <strong>meeting</strong>: everyone shares what they know and updates their view. That is
+            attention, mixing information between people. Second, <strong>desk work</strong>: each person
+            works alone on what they just heard. That is the FFN, computation for each position. After
+            many rounds, the team shares a rich understanding. A transformer is that team, and one block
+            is one round.</p>
           </div>
 
-          <p class="beat beat--math">Now the math — the two support devices</p>
-          <p><strong>Residual connections.</strong> Instead of replacing the input with a sub-layer's
-          output, we <em>add</em> the output back to the input:
-          $\mathbf{x} + \text{Sublayer}(\mathbf{x})$. This is the
-          same skip-connection trick that made very deep image networks trainable in
-          <a href="16-cnns.html">Section 16</a>. Two reasons it matters here: it gives each sub-layer an
-          easy “do nothing” option (output zero and the input passes straight through), and it hands the
-          gradient a clean shortcut straight back through the addition — so signal reaches the earliest
-          layers without fading. Shapes must match for the add, which is why every sub-layer preserves
-          $d_{\text{model}}$.</p>
-          <p><strong>LayerNorm.</strong> Before each sub-layer we <dfn>normalise</dfn> each position's
-          vector: subtract its mean, divide by its standard deviation, then rescale with two learned
-          numbers. This keeps the numbers flowing through the network at a steady scale — not exploding,
-          not vanishing — which is the difference between training that converges and training that
-          diverges. We treat it properly in <a href="20-training-at-scale.html">Section 20</a>; here just
-          hold that it is a per-position “volume normaliser” that keeps every layer's input well-behaved.</p>
+          <p class="beat beat--math">Now the math</p>
+          <p><strong>Residual connections.</strong> We do not replace the input with a sub-layer's
+          output. We <em>add</em> the output to the input: $\mathbf{x} + \text{Sublayer}(\mathbf{x})$.
+          This is the skip connection that made very deep image networks trainable in <a
+          href="16-cnns.html">Section 16</a>. It helps here for two reasons. It gives each sub-layer an
+          easy “do nothing” option: output zero, and the input passes through. And it gives the
+          gradient a direct path back through the addition, so the signal reaches the first layers
+          without fading. The two sides of the addition must have the same shape. That is why every
+          sub-layer keeps the width $d_{\text{model}}$.</p>
+          <p><strong>LayerNorm.</strong> Before each sub-layer we <dfn>normalize</dfn> each position's
+          vector. We subtract its mean and divide by its standard deviation. Then we rescale and shift
+          with two learned vectors, $\boldsymbol{\gamma}$ and $\boldsymbol{\beta}$, each of length
+          $d_{\text{model}}$:</p>
+          $$ \text{LayerNorm}(\mathbf{x}) = \boldsymbol{\gamma} \odot \frac{\mathbf{x} - \mu}{\sqrt{\sigma^2 + \epsilon}} + \boldsymbol{\beta} $$
+          <p class="gloss"><b>In words:</b> $\mu$ and $\sigma^2$ are the mean and the variance of the
+          $d_{\text{model}}$ numbers in this one vector. $\epsilon$ is a small constant (such as
+          $10^{-5}$) that prevents division by zero. $\odot$ is element-by-element multiplication.
+          This keeps the numbers that flow through the network at a steady size, so they do not grow
+          or shrink from layer to layer. <a href="20-training-at-scale.html">Section 20</a> treats
+          normalization properly.</p>
 
-          <p><strong>The feed-forward network.</strong> Two linear layers with a nonlinearity between,
-          applied identically to every position:</p>
-          $$ \text{FFN}(\mathbf{x}) = \max(0,\ \mathbf{x}\mathbf{W}_1 + \mathbf{b}_1)\,\mathbf{W}_2 + \mathbf{b}_2 $$
-          <p>with the deliberate widen-then-shrink shape:</p>
+          <p><strong>The feed-forward network.</strong> Two linear layers with a nonlinearity between
+          them, applied in the same way to every position. For one position's vector $\mathbf{x}$
+          (a column vector of length $d_{\text{model}}$):</p>
+          $$ \text{FFN}(\mathbf{x}) = \mathbf{W}_2\,\text{ReLU}(\mathbf{W}_1\mathbf{x} + \mathbf{b}_1) + \mathbf{b}_2 $$
+          <p>The shape widens and then narrows on purpose:</p>
           <div class="scroll-x">
             <table>
               <thead>
                 <tr><th>Step</th><th>Shape in → out</th><th>Matrix</th></tr>
               </thead>
               <tbody>
-                <tr><td>expand</td><td>$d_{\text{model}} \to 4\,d_{\text{model}}$</td><td>$\mathbf{W}_1 : d_{\text{model}} \times 4d_{\text{model}}$</td></tr>
-                <tr><td>nonlinearity</td><td>$4\,d_{\text{model}} \to 4\,d_{\text{model}}$</td><td>ReLU / GELU (no weights)</td></tr>
-                <tr><td>project back</td><td>$4\,d_{\text{model}} \to d_{\text{model}}$</td><td>$\mathbf{W}_2 : 4d_{\text{model}} \times d_{\text{model}}$</td></tr>
+                <tr><td>expand</td><td>$d \to 4d$</td><td>$\mathbf{W}_1$: $4d \times d$</td></tr>
+                <tr><td>nonlinearity</td><td>$4d \to 4d$</td><td>ReLU / GELU (no weights)</td></tr>
+                <tr><td>project back</td><td>$4d \to d$</td><td>$\mathbf{W}_2$: $d \times 4d$</td></tr>
               </tbody>
             </table>
           </div>
-          <p class="gloss"><b>In words:</b> the FFN blows each position's vector up to four times the width,
-          runs a nonlinearity ($\max(0,\cdot)$ is ReLU — “keep
-          positives, zero out negatives”), then squeezes it back down. The wide middle gives the network
-          room to compute richer features per word; the factor of 4 is the standard choice from the
-          original paper. Crucially the FFN acts on each position <em>independently</em> — it does no
-          mixing between positions. All the cross-word talking already happened in attention.</p>
+          <p class="gloss"><b>In words:</b> here $d$ is short for $d_{\text{model}}$. The FFN makes each
+          position's vector four times wider. It applies a nonlinearity: $\text{ReLU}(z) = \max(0, z)$
+          keeps positive numbers and sets negative ones to zero. Then it makes the vector narrow
+          again. The wide middle gives the network room to compute richer features for each word. The
+          factor 4 is the standard choice from the original paper. Importantly, the FFN acts on each
+          position <em>independently</em>. It does no mixing between positions; all of that happened
+          in attention.</p>
 
           <h3>Assembling the block (pre-norm order)</h3>
-          <p>Modern transformers put the LayerNorm <em>before</em> each sub-layer (“pre-norm” — it trains
-          more stably than the original “post-norm”). The full block is four lines:</p>
+          <p>Most modern transformers put the LayerNorm <em>before</em> each sub-layer. This is called
+          “pre-norm”, and it trains more stably than the original “post-norm” order, which normalized
+          after the addition. The full block is two lines:</p>
           $$ \begin{aligned}
              \mathbf{x} &\leftarrow \mathbf{x} + \text{MultiHead}\big(\text{LayerNorm}(\mathbf{x})\big) \\
              \mathbf{x} &\leftarrow \mathbf{x} + \text{FFN}\big(\text{LayerNorm}(\mathbf{x})\big)
              \end{aligned} $$
-          <p class="gloss"><b>In words:</b> normalise, mix across words with attention, add the result back
-          in. Then normalise again, think per word with the FFN, add that back in. Input shape
-          $(T \times d_{\text{model}})$; output shape
-          $(T \times d_{\text{model}})$ — identical, on purpose, so
-          the next block can consume it with no adjustment.</p>
+          <p class="gloss"><b>In words:</b> normalize, mix across words with attention, and add the
+          result to the input. Then normalize again, process each word with the FFN, and add that
+          result too. The input shape is $T \times d_{\text{model}}$, and the output shape is the same.
+          This is on purpose, so the next block can take the output directly.</p>
+
+          <figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 440 440" role="img" aria-labelledby="fig-tf-4-t">
+                <title id="fig-tf-4-t">A pre-norm transformer block: x goes through LayerNorm and multi-head attention and is added back to x; the result goes through LayerNorm and the feed-forward network and is added back again.</title>
+                <defs>
+                  <marker id="ah18d" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9" orient="auto"><path class="f-i" d="M0,0L10,5L0,10z"/></marker>
+                </defs>
+                <defs><marker id="ah18g" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9" orient="auto"><path class="f-g" d="M0,0L10,5L0,10z"/></marker></defs>
+                <text x="180" y="430" text-anchor="middle" class="b">input x: T × d_model</text>
+                <path class="ln s-i thin" d="M180,414L180,392" marker-end="url(#ah18d)"/>
+                <rect class="f-k" x="120" y="352" width="120" height="36" rx="6"/><text class="lg" x="180.0" y="375" text-anchor="middle">LayerNorm</text>
+                <path class="ln s-i thin" d="M180,352L180,330" marker-end="url(#ah18d)"/>
+                <rect class="f-vs" x="100" y="284" width="160" height="44" rx="6"/><text class="lg" x="180.0" y="306" text-anchor="middle">multi-head attention</text><text x="180.0" y="321" text-anchor="middle" class="sm">mixes across positions</text>
+                <path class="ln s-i thin" d="M180,284L180,262" marker-end="url(#ah18d)"/>
+                <circle class="f-p" cx="180" cy="248" r="13"/><circle class="ln s-i thin" cx="180" cy="248" r="13"/>
+                <text x="180" y="253" text-anchor="middle" class="lg b">+</text>
+                <path class="ln s-g" d="M180,402H320V248H198" marker-end="url(#ah18g)"/>
+                <path class="ln s-i thin" d="M180,235L180,212" marker-end="url(#ah18d)"/>
+                <rect class="f-k" x="120" y="172" width="120" height="36" rx="6"/><text class="lg" x="180.0" y="195" text-anchor="middle">LayerNorm</text>
+                <path class="ln s-i thin" d="M180,172L180,150" marker-end="url(#ah18d)"/>
+                <rect class="f-as" x="100" y="104" width="160" height="44" rx="6"/><text class="lg" x="180.0" y="126" text-anchor="middle">FFN</text><text x="180.0" y="141" text-anchor="middle" class="sm">d → 4d → d, per position</text>
+                <path class="ln s-i thin" d="M180,104L180,82" marker-end="url(#ah18d)"/>
+                <circle class="f-p" cx="180" cy="68" r="13"/><circle class="ln s-i thin" cx="180" cy="68" r="13"/>
+                <text x="180" y="73" text-anchor="middle" class="lg b">+</text>
+                <path class="ln s-g" d="M180,222H320V68H198" marker-end="url(#ah18g)"/>
+                <path class="ln s-i thin" d="M180,55L180,30" marker-end="url(#ah18d)"/>
+                <text x="180" y="20" text-anchor="middle" class="b">output: T × d_model</text>
+                <text x="330" y="330" class="tg lg">residual</text>
+                <text x="330" y="150" class="tg lg">residual</text>
+                <text x="36" y="306" class="sm">sub-layer 1</text>
+                <text x="36" y="126" class="sm">sub-layer 2</text>
+                <path class="grid dash" d="M20,228H420"/>
+              </svg>
+            </div>
+            <figcaption><b>Figure 18.4</b> One pre-norm transformer block, read from bottom to top. Each
+            sub-layer works on a normalized copy of $\mathbf{x}$, and its result is added back to the
+            unnormalized $\mathbf{x}$ (green paths). The green residual path from input to output never
+            passes through a LayerNorm or a weight matrix.</figcaption>
+          </figure>
 
           <div class="callout keyidea">
-            <div class="callout__label"><span class="ic">◆</span> The shape never changes — that's the point</div>
-            <p>Every sub-layer takes $(T \times d_{\text{model}})$
-            in and returns $(T \times d_{\text{model}})$ out.
-            Attention preserves it, the FFN preserves it, the residual add requires it, LayerNorm preserves
-            it. That invariance is what lets you stack 12, 48, or 96 identical blocks like LEGO bricks —
-            the entire depth of a large model is this one shape, repeated.</p>
+            <div class="callout__label"><span class="ic">◆</span> The shape never changes, and that is the point</div>
+            <p>Every sub-layer takes $T \times d_{\text{model}}$ in and gives
+            $T \times d_{\text{model}}$ out. Attention keeps it, the FFN keeps it, LayerNorm keeps it,
+            and the residual addition requires it. Because of this, you can stack 12, 48 or 96
+            identical blocks. The whole depth of a large model is this one shape, repeated.</p>
+          </div>
+
+          <div class="callout pitfall">
+            <div class="callout__label"><span class="ic">▲</span> Watch out</div>
+            <p>The block in this lesson is the classic design. Recent large models change some parts.
+            Many use <strong>RMSNorm</strong> instead of LayerNorm: it only divides by the root mean
+            square and does not subtract the mean. Many replace the ReLU/GELU FFN with
+            <strong>SwiGLU</strong>, which multiplies two linear projections, one passed through a
+            smooth gate, before projecting back. And most use RoPE for position (Section 4 above). The
+            structure is the same: pre-norm, attention, residual, pre-norm, FFN, residual.</p>
           </div>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
-          <p class="codecap">multi-head attention and a full transformer block — shapes on every line</p>
+          <p class="codecap">multi-head attention and a full transformer block, with shapes on every line</p>
           <pre><code class="language-python">import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -667,20 +1028,20 @@ class MultiHeadAttention(nn.Module):
         self.W_v = nn.Linear(d_model, d_model)
         self.W_o = nn.Linear(d_model, d_model)           # the final mixing matrix W_O
 
-    def forward(self, x):                                # x: [B, L, d_model]
-        B, L, _ = x.shape
-        # project, then split the width into heads: [B, L, d_model] -> [B, n_heads, L, d_k]
+    def forward(self, x):                                # x: [B, T, d_model]
+        B, T, _ = x.shape
+        # project, then split the width into heads: [B, T, d_model] -> [B, n_heads, T, d_k]
         def split(t):
-            return t.view(B, L, self.n_heads, self.d_k).transpose(1, 2)
-        Q, K, V = split(self.W_q(x)), split(self.W_k(x)), split(self.W_v(x))   # [B, n_heads, L, d_k]
+            return t.view(B, T, self.n_heads, self.d_k).transpose(1, 2)
+        Q, K, V = split(self.W_q(x)), split(self.W_k(x)), split(self.W_v(x))
 
-        scores  = Q @ K.transpose(-2, -1) / self.d_k ** 0.5   # [B, n_heads, L, L]
-        weights = F.softmax(scores, dim=-1)                   # [B, n_heads, L, L]  rows sum to 1
-        out     = weights @ V                                 # [B, n_heads, L, d_k]
+        scores  = Q @ K.transpose(-2, -1) / self.d_k ** 0.5   # [B, n_heads, T, T]
+        weights = F.softmax(scores, dim=-1)                   # [B, n_heads, T, T]  rows sum to 1
+        out     = weights @ V                                 # [B, n_heads, T, d_k]
 
-        # concat heads back together: [B, n_heads, L, d_k] -> [B, L, d_model]
-        out = out.transpose(1, 2).contiguous().view(B, L, self.n_heads * self.d_k)
-        return self.W_o(out)                                  # [B, L, d_model]
+        # concat heads back together: [B, n_heads, T, d_k] -> [B, T, d_model]
+        out = out.transpose(1, 2).contiguous().view(B, T, self.n_heads * self.d_k)
+        return self.W_o(out)                                  # [B, T, d_model]
 
 
 class TransformerBlock(nn.Module):
@@ -691,53 +1052,63 @@ class TransformerBlock(nn.Module):
         self.norm1 = nn.LayerNorm(d_model)
         self.norm2 = nn.LayerNorm(d_model)
         self.ffn = nn.Sequential(
-            nn.Linear(d_model, d_ff),                    # [B, L, d_model] -> [B, L, d_ff]
-            nn.GELU(),                                   # smooth cousin of ReLU
-            nn.Linear(d_ff, d_model),                    # [B, L, d_ff] -> [B, L, d_model]
+            nn.Linear(d_model, d_ff),                    # [B, T, d_model] -> [B, T, d_ff]
+            nn.GELU(),                                   # smooth relative of ReLU
+            nn.Linear(d_ff, d_model),                    # [B, T, d_ff] -> [B, T, d_model]
         )
 
-    def forward(self, x):                                # x: [B, L, d_model]
+    def forward(self, x):                                # x: [B, T, d_model]
         x = x + self.attn(self.norm1(x))                 # pre-norm attention + residual add
         x = x + self.ffn(self.norm2(x))                  # pre-norm FFN + residual add
-        return x                                         # [B, L, d_model]  -> same shape in and out
+        return x                                         # [B, T, d_model]  same shape in and out
 
 
-# smoke test: batch 2, sequence 10, width 512, 8 heads
-block = TransformerBlock(d_model=512, n_heads=8)
+torch.manual_seed(0)
+block = TransformerBlock(d_model=512, n_heads=8)         # batch 2, sequence 10, width 512, 8 heads
 x = torch.randn(2, 10, 512)
-print(block(x).shape)                                    # torch.Size([2, 10, 512])</code></pre>
-          <p class="gloss"><b>In words:</b> the batch dimension <b>B</b> rides along in front the whole way
-          — our earlier <code>scaled_dot_product_attention</code> used a leading <code>...</code> for
-          exactly this reason. Notice the code contains no loop over heads: reshaping to
-          <code>[B, n_heads, L, d_k]</code> lets one batched matrix multiply do all heads at once. That is
-          the parallelism we promised at the start of this section, cashed out.</p>
+print(block(x).shape)                                    # torch.Size([2, 10, 512])
+print(sum(p.numel() for p in block.parameters()))        # 3152384
+
+# permutation equivariance: shuffle the 10 positions, outputs shuffle the same way
+perm = torch.randperm(10)
+print(torch.allclose(block(x[:, perm]), block(x)[:, perm], atol=1e-5))   # True</code></pre>
+          <p class="gloss"><b>In words:</b> the batch dimension <code>B</code> travels in front the
+          whole way. That is why our earlier <code>scaled_dot_product_attention</code> used a leading
+          <code>...</code>. The code has no loop over heads. Reshaping to
+          <code>[B, n_heads, T, d_k]</code> lets one batched matrix multiply do all heads at once: this
+          is the parallelism promised at the start of the lesson. The parameter count is 1,050,624 for
+          attention (four 512 × 512 matrices with biases), 2,099,712 for the FFN, and 2,048 for the
+          two LayerNorms. The last line checks the equivariance from Section 4 on a whole block.</p>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> Where this goes next</div>
-            <p>This block is the <em>encoder</em> form: every position may look at every other. To turn a
-            transformer into a text <em>generator</em>, we add one line — a <strong>causal mask</strong>
-            that stops each position from peeking at words it hasn't produced yet. That single change is the
-            subject of <a href="19-language-modeling.html">Section 19</a>. And when models grow huge, the
-            FFN is often replaced by a <strong>mixture of experts</strong> — many FFNs with a router
-            picking a few per token — which is <a href="22-moe.html">Section 22</a>. Only the feed-forward
-            sub-layer changes there; the masked self-attention works exactly as it does here.</p>
+            <p>This block is the <em>encoder</em> form: every position may look at every other. To turn
+            a transformer into a text <em>generator</em>, we add one thing: a <strong>causal
+            mask</strong> that stops each position from looking at words that come after it. That
+            change is the subject of <a href="19-language-modeling.html">Section 19</a>. In very large
+            models, the FFN is often replaced by a <strong>mixture of experts</strong>. This is many
+            FFNs, with a router that picks a few of them for each token. That is <a href="22-moe.html">Section
+            22</a>. There, only the feed-forward sub-layer changes; the masked self-attention works as
+            it does here.</p>
           </div>
 
           <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">In the block, why must every sub-layer output the shape <code>[B, L, d_model]</code> — what specifically breaks if the FFN returned <code>[B, L, 2*d_model]</code> instead?</span>
+                <span class="check__q">Find the bug: someone changes the FFN's last layer to <code>nn.Linear(d_ff, 2 * d_model)</code>. What error do you get, on which line, and why?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>The <strong>residual add</strong> <code>x = x + ffn(...)</code> requires both sides to
-                have the same shape — you cannot add a <code>[B, L, d_model]</code> tensor to a
-                <code>[B, L, 2*d_model]</code> one; PyTorch would raise a shape error. More broadly, the
-                <em>next</em> block also expects <code>d_model</code> width, so a changed width would break
-                the whole stack. That is why the FFN widens to <code>4*d_model</code> in the middle but must
-                project back to <code>d_model</code> at the end — the residual pathway keeps the width
-                pinned from input to output.</p>
+                <p>The error comes from the <strong>residual addition</strong>
+                <code>x = x + self.ffn(self.norm2(x))</code>. The left side is
+                <code>[B, T, d_model]</code> and the right side is <code>[B, T, 2*d_model]</code>. The
+                last dimensions (512 and 1024) are different and neither is 1, so broadcasting fails and
+                PyTorch raises a <code>RuntimeError</code> about the sizes. Even if the addition were
+                allowed, the <em>next</em> block expects width <code>d_model</code>, so the stack would
+                break there. This is why the FFN can widen to <code>4*d_model</code> in the middle but
+                must project back to <code>d_model</code> at the end. The residual path fixes the width
+                from input to output.</p>
               </div>
             </details>
           </div>
@@ -747,31 +1118,30 @@ print(block(x).shape)                                    # torch.Size([2, 10, 51
           <!-- ===================== CARRY FORWARD ===================== -->
           <h2><span class="h-num">6</span>What to carry forward</h2>
           <ul>
-            <li><strong>Attention is a soft lookup.</strong> Queries ask, keys advertise, values are the
-            content; each position gets a weighted blend of all values, graded by query–key match.</li>
-            <li><strong>The formula:</strong>
-            $\text{softmax}\!\big(\mathbf{Q}\mathbf{K}^{\top}/\sqrt{d_k}\big)\mathbf{V}$
-            — compare, calm, blend, mix. Shapes:
-            $(L\times d_k)(d_k\times T)\to(L\times T)$, then
-            $(L\times T)(L\times d_v)\to(L\times d_v)$.</li>
-            <li><strong>The $\sqrt{d_k}$ is derived, not decorative:</strong>
-            raw scores have variance $d_k$; dividing by
-            $\sqrt{d_k}$ restores variance 1 and keeps softmax out
-            of its flat, no-gradient zone.</li>
-            <li><strong>Multi-head</strong> splits $d_{\text{model}}$
-            into $h$ heads of size
-            $d_{\text{model}}/h$, runs attention in each, concatenates,
-            and mixes with $\mathbf{W}_O$ — many relationship types
-            for the price of one.</li>
-            <li><strong>Attention is permutation-invariant,</strong> so we add <strong>positional
-            encodings</strong> (sinusoidal or learned) to inject order.</li>
-            <li><strong>The block</strong> is: LayerNorm → multi-head attention → residual add → LayerNorm
-            → FFN ($d_{\text{model}}\to 4d_{\text{model}}\to d_{\text{model}}$)
-            → residual add. Shape in equals shape out, so blocks stack without limit.</li>
+            <li><strong>Attention is a soft lookup.</strong> Queries ask, keys label, values are the
+            content. Each position gets a weighted blend of all values, graded by how well its query
+            matches each key.</li>
+            <li><strong>The formula</strong> is
+            $\text{softmax}\big(\mathbf{Q}\mathbf{K}^{\top}/\sqrt{d_k}\big)\mathbf{V}$: compare,
+            rescale, blend, mix. Shapes: $(T\times d_k)(d_k\times T)\to(T\times T)$, then
+            $(T\times T)(T\times d_v)\to(T\times d_v)$.</li>
+            <li><strong>The $\sqrt{d_k}$ is derived, not decoration.</strong> Raw scores have variance
+            $d_k$. Dividing by $\sqrt{d_k}$ brings the variance back to 1 and keeps the softmax away
+            from its flat, near-zero-gradient region.</li>
+            <li><strong>Multi-head</strong> attention splits $d_{\text{model}}$ into $h$ heads of size
+            $d_{\text{model}}/h$. It runs attention in each head, concatenates the results, and mixes
+            them with $\mathbf{W}_O$. You get several kinds of relationship for the parameter count of
+            one.</li>
+            <li><strong>Attention is permutation-equivariant,</strong> so we give it position:
+            sinusoidal or learned vectors added to the input, or rotations of queries and keys
+            (RoPE).</li>
+            <li><strong>The block</strong> is: LayerNorm → multi-head attention → residual add →
+            LayerNorm → FFN ($d_{\text{model}}\to 4d_{\text{model}}\to d_{\text{model}}$) → residual add.
+            The shape in equals the shape out, so blocks stack.</li>
           </ul>
-          <p>You now hold the complete core of every modern LLM. Next we add a causal mask and turn this
-          machine into something that <em>writes</em> — that's <a href="19-language-modeling.html">Section
-          19</a>, language modelling.</p>
+          <p>You now know the core of a modern language model. Next we add a causal mask and turn this
+          machine into something that <em>writes</em>. That is <a
+          href="19-language-modeling.html">Section 19</a>, language modeling.</p>
 
           <div class="complete-bar" data-complete>
             <span class="complete-bar__text">Finished this section? Mark it done to fill your progress bar.</span>
