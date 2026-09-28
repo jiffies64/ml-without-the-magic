@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Information Theory · ML Without the Magic</title>
-  <meta name="description" content="Surprise, entropy, cross-entropy, and KL divergence — building up from why a rare event carries more information to a full derivation of why cross-entropy is the loss function for classification." />
+  <meta name="description" content="Surprise, entropy, cross-entropy, and KL divergence: from why a rare event carries more information to a full derivation of why cross-entropy is the loss function for classification." />
   <link rel="stylesheet" href="../assets/vendor/fonts/fonts.css" />
   <link rel="stylesheet" href="../assets/course.css" />
   <link rel="stylesheet" href="../assets/vendor/katex/katex.min.css" />
@@ -38,7 +38,7 @@
         <header class="lesson-head">
           <p class="lesson-eyebrow">Part 1 · Math Foundations <span class="dot"></span> Section 4</p>
           <h1 class="lesson-title">Information Theory</h1>
-          <p class="lesson-standfirst">By the end of this page you will have <em>derived</em>, not been told, why cross-entropy is the loss function for classification. Every step is shown; nothing is asserted.</p>
+          <p class="lesson-standfirst">By the end of this page you will have <em>derived</em>, not been told, why cross-entropy is the loss function for classification. Every step is shown, and where we skip a proof, we say so.</p>
           <div class="lesson-meta">
             <span><b>26 min</b> read</span>
           </div>
@@ -55,107 +55,152 @@
         </header>
 
         <div class="prose">
-          <p class="lead">Every time a model makes a prediction, we need a single number that says
-          <strong>how wrong it was</strong>. That number is the loss, and for classification the loss
-          is almost always <em>cross-entropy</em>. Most courses hand you the formula and move on. We are
-          going to build it from nothing — starting with a question a child could ask, <em>“why is some
-          news surprising and other news boring?”</em> — and end up, honestly and step by step, at the
-          exact loss function that trains every image classifier and every language model on Earth.</p>
+          <p class="lead">Every time a model makes a prediction, we need one number that says <strong>how
+          wrong it was</strong>. That number is the loss. For classification, the loss is almost always
+          <em>cross-entropy</em>. Many courses give you the formula and move on. We will build it from
+          nothing. We start with a question a child could ask: <em>“why is some news surprising and other
+          news boring?”</em> Step by step, we arrive at the loss function that trains most image
+          classifiers and language models today.</p>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> The one idea to hold onto</div>
-            <p>Information is <strong>surprise</strong>, and surprise is <strong>measured in the length
-            of the message you'd need to announce an event</strong>. Entropy is your average surprise,
-            cross-entropy is your average surprise when you trained on the wrong beliefs, and the gap
-            between them — the wasted effort — is exactly what a classifier learns to shrink.</p>
+            <p>Information is <strong>surprise</strong>, and surprise can be measured as <strong>the
+            length of the message you need to report an event</strong>. Entropy is your average surprise.
+            Cross-entropy is your average surprise when you hold the wrong beliefs. The gap between them,
+            the wasted message length, is what a classifier learns to shrink.</p>
           </div>
 
           <!-- ===================== INFORMATION / SURPRISE ===================== -->
           <h2><span class="h-num">1</span>Information: surprise, measured</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>Start with a plain observation about the news. A headline is “big news” exactly when it tells
-          you something you did <em>not</em> expect. “Dog bites man” is not a story — dogs bite, it happens
-          all the time, you learned almost nothing. “Man bites dog” is a story — it is rare, and precisely
-          because it is rare it carries a lot of <strong>information</strong>. So information is not about
-          how important an event feels; it is about how <em>unlikely</em> it was. The rarer the event, the
-          more you learn when it happens.</p>
+          <p>Start with a plain observation about the news. A headline is big news when it tells you
+          something you did <em>not</em> expect. “Dog bites man” is not a story: it happens often, so you
+          learn almost nothing. “Man bites dog” is a story. It is rare, and because it is rare, it carries
+          a lot of <strong>information</strong>. So information is not about how important an event feels.
+          It is about how <em>unlikely</em> the event was. The rarer the event, the more you learn when it
+          happens.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>A friend who says “the sun rose this morning” has told you nothing — probability ≈ 1, zero
-            surprise. A friend who says “it snowed in the desert” has told you a lot — tiny probability,
-            huge surprise. Same number of words spoken, wildly different amount of information delivered.
-            Information is the <em>gap between what you expected and what happened.</em></p>
+            <p>A friend who says “the sun rose this morning” has told you nothing: probability close to 1,
+            no surprise. A friend who says “it snowed in the desert” has told you a lot: tiny probability,
+            large surprise. Both used a few words, but they delivered very different amounts of
+            information. Information is the <em>gap between what you expected and what happened.</em></p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>We want a number — call it <strong>information content</strong>, or <dfn>surprise</dfn> — that
-          takes the probability $p(x)$ of an event $x$ and grows as that probability shrinks. Let's not pull a formula out of a
-          hat; let's demand the properties any honest measure of surprise <em>must</em> have, then see what
-          function is forced on us.</p>
+          <p>We want a number, called <strong>information content</strong> or <dfn>surprise</dfn>. It
+          takes the probability $p(x)$ of an event $x$ and grows as that probability shrinks. Instead of
+          guessing a formula, let's list the properties any sensible measure of surprise
+          <em>must</em> have. Then we see which function they lead to.</p>
           <ol>
-            <li><strong>Certain events are boring.</strong> If $p(x)=1$, the surprise must be exactly 0. You learn nothing from what was guaranteed.</li>
-            <li><strong>Rarer means more surprising.</strong> As $p(x)$ goes down, surprise must go up. The measure decreases with probability.</li>
-            <li><strong>Independent surprises add up.</strong> If two unrelated things happen — a coin lands
-            heads <em>and</em> a die rolls a six — the total surprise should be the surprise of the first
-            <em>plus</em> the surprise of the second. (Two independent events. “Independent” means the
-            outcome of one tells you nothing about the other.)</li>
+            <li><strong>Certain events are not surprising.</strong> If $p(x)=1$, the surprise must be 0. You learn nothing from something that was guaranteed.</li>
+            <li><strong>Rarer means more surprising.</strong> As $p(x)$ goes down, surprise must go up.</li>
+            <li><strong>Surprises from independent events add up.</strong> Suppose a coin lands heads
+            <em>and</em> a die rolls a six. The total surprise should be the surprise of the first plus the
+            surprise of the second. (“Independent” means that the outcome of one tells you nothing about the
+            other.)</li>
           </ol>
-          <p>That third rule is the strict one. For independent events, probabilities <em>multiply</em>:
-          $p(\text{both}) = p(x)\,p(y)$. But we want the surprises to
-          <em>add</em>. We need a function that turns multiplication on the inside into addition on the
-          outside. There is exactly one family of functions that does that — the <strong>logarithm</strong>,
-          because $\log(ab)=\log a+\log b$. So the surprise must be a
-          log of the probability. To make it <em>decrease</em> as probability rises (rule 2) and be
-          non-negative, we put a minus sign in front:</p>
+          <p>The third rule is the strict one. For independent events, probabilities <em>multiply</em>:
+          $p(\text{both}) = p(x)\,p(y)$. But we want the surprises to <em>add</em>. So we need a function
+          that turns multiplication inside into addition outside. The <strong>logarithm</strong> does
+          this, because $\log(ab)=\log a+\log b$. In fact, it is the only choice: every continuous
+          function with this property is a constant times a logarithm. (We will not prove that here.) So
+          surprise must be a log of the probability. To make it <em>decrease</em> as probability rises
+          (rule 2), we put a minus sign in front:</p>
           $$ I(x) \;=\; -\log p(x) \;=\; \log\frac{1}{p(x)} $$
-          <p class="gloss"><b>In words:</b> the information in an event is “minus the log of how likely it
-          was.” Because probabilities are between 0 and 1, their log is negative, so the minus sign makes
-          <b>I(x)</b> positive. A sure thing (<b>p</b> = 1) gives $-\log 1 = 0$ — no surprise. A one-in-a-million event gives a big positive number. And the two
-          equal forms show the same idea two ways: <em>surprise is the log of “one over the probability,”</em>
-          i.e. the log of how many equally-likely possibilities you just ruled out.</p>
+          <p class="gloss"><b>In words:</b> the information in an event is “minus the log of how likely
+          it was.” Probabilities are between 0 and 1, so their log is negative or zero, and the minus sign
+          makes $I(x)$ positive or zero. A sure thing ($p = 1$) gives $-\log 1 = 0$: no surprise. A
+          one-in-a-million event gives a large positive number. The second form reads the same idea
+          another way. An event with probability $1/8$ is as surprising as picking one box out of 8
+          equally likely boxes. Surprise is the log of that number of equally likely options.</p>
+
+<figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 480 255" role="img" aria-labelledby="fig-04-1-t">
+      <title id="fig-04-1-t">The curve minus log base 2 of p: very high near p equals 0, falling to 0 at p equals 1.</title>
+      <line class="ax" x1="50" y1="210" x2="460" y2="210"/>
+      <line class="ax" x1="50" y1="210" x2="50" y2="20"/>
+      <text x="50" y="226" class="sm" text-anchor="middle">0</text>
+      <text x="152.5" y="226" class="sm" text-anchor="middle">0.25</text>
+      <text x="255" y="226" class="sm" text-anchor="middle">0.5</text>
+      <text x="357.5" y="226" class="sm" text-anchor="middle">0.75</text>
+      <text x="460" y="226" class="sm" text-anchor="middle">1</text>
+      <text x="44" y="214" class="sm" text-anchor="end">0</text>
+      <line class="grid" x1="50" y1="210" x2="460" y2="210"/>
+      <text x="44" y="186.9" class="sm" text-anchor="end">1</text>
+      <line class="grid" x1="50" y1="182.9" x2="460" y2="182.9"/>
+      <text x="44" y="159.7" class="sm" text-anchor="end">2</text>
+      <line class="grid" x1="50" y1="155.7" x2="460" y2="155.7"/>
+      <text x="44" y="132.6" class="sm" text-anchor="end">3</text>
+      <line class="grid" x1="50" y1="128.6" x2="460" y2="128.6"/>
+      <text x="44" y="105.4" class="sm" text-anchor="end">4</text>
+      <line class="grid" x1="50" y1="101.4" x2="460" y2="101.4"/>
+      <text x="44" y="78.3" class="sm" text-anchor="end">5</text>
+      <line class="grid" x1="50" y1="74.3" x2="460" y2="74.3"/>
+      <text x="44" y="51.1" class="sm" text-anchor="end">6</text>
+      <line class="grid" x1="50" y1="47.1" x2="460" y2="47.1"/>
+      <text x="44" y="24" class="sm" text-anchor="end">7</text>
+      <line class="grid" x1="50" y1="20" x2="460" y2="20"/>
+      <path class="ln s-v" d="M53.3,20.9 L53.7,25.5 L54.1,29.7 L54.5,33.4 L54.9,36.8 L55.3,39.9 L55.7,42.8 L56.1,45.5 L56.6,48.1 L57,50.4 L57.4,52.7 L57.8,54.8 L58.2,56.8 L58.6,58.7 L59,60.5 L59.4,62.3 L59.8,63.9 L60.2,65.5 L60.7,67.1 L61.1,68.6 L61.5,70 L61.9,71.4 L62.3,72.7 L62.7,74 L63.1,75.2 L63.5,76.4 L63.9,77.6 L64.3,78.7 L64.8,79.8 L65.2,80.9 L65.6,81.9 L66,83 L66.4,84 L66.8,84.9 L67.2,85.9 L67.6,86.8 L68,87.7 L68.5,88.6 L68.9,89.4 L69.3,90.3 L69.7,91.1 L70.1,91.9 L70.5,92.7 L70.9,93.5 L71.3,94.2 L71.7,95 L72.1,95.7 L72.5,96.4 L73,97.1 L73.4,97.8 L73.8,98.5 L74.2,99.2 L74.6,99.8 L75,100.5 L75.4,101.1 L75.8,101.7 L76.2,102.4 L76.7,103 L77.1,103.6 L77.5,104.2 L77.9,104.7 L78.3,105.3 L78.7,105.9 L79.1,106.4 L79.5,107 L79.9,107.5 L80.3,108 L80.8,108.6 L81.2,109.1 L81.6,109.6 L82,110.1 L82.4,110.6 L82.8,111.1 L83.2,111.6 L83.6,112.1 L84,112.5 L84.4,113 L84.8,113.5 L85.3,113.9 L85.7,114.4 L86.1,114.8 L86.5,115.3 L86.9,115.7 L87.3,116.1 L87.7,116.6 L88.1,117 L88.5,117.4 L89,117.8 L89.4,118.2 L89.8,118.6 L90.2,119 L90.6,119.4 L91,119.8 L91.4,120.2 L91.8,120.6 L92.2,121 L92.6,121.4 L93,121.7 L93.5,122.1 L93.9,122.5 L94.3,122.8 L94.7,123.2 L95.1,123.6 L95.5,123.9 L95.9,124.3 L96.3,124.6 L96.7,125 L97.2,125.3 L97.6,125.6 L98,126 L98.4,126.3 L98.8,126.6 L99.2,127 L99.6,127.3 L100,127.6 L100.4,127.9 L100.8,128.3 L101.2,128.6 L101.7,128.9 L102.1,129.2 L102.5,129.5 L102.9,129.8 L103.3,130.1 L103.7,130.4 L104.1,130.7 L104.5,131 L104.9,131.3 L105.3,131.6 L105.8,131.9 L106.2,132.2 L106.6,132.4 L107,132.7 L107.4,133 L107.8,133.3 L108.2,133.6 L108.6,133.8 L109,134.1 L109.4,134.4 L109.9,134.7 L110.3,134.9 L110.7,135.2 L111.1,135.4 L111.5,135.7 L111.9,136 L112.3,136.2 L112.7,136.5 L113.1,136.7 L113.5,137 L114,137.2 L114.4,137.5 L114.8,137.7 L115.2,138 L115.6,138.2 L116,138.5 L116.4,138.7 L116.8,139 L117.2,139.2 L117.7,139.4 L118.1,139.7 L118.5,139.9 L118.9,140.1 L119.3,140.4 L119.7,140.6 L120.1,140.8 L120.5,141.1 L120.9,141.3 L121.3,141.5 L121.8,141.7 L122.2,142 L122.6,142.2 L123,142.4 L123.4,142.6 L123.8,142.9 L124.2,143.1 L124.6,143.3 L125,143.5 L125.4,143.7 L125.8,143.9 L126.3,144.1 L126.7,144.3 L127.1,144.6 L127.5,144.8 L127.9,145 L128.3,145.2 L128.7,145.4 L129.1,145.6 L129.5,145.8 L129.9,146 L130.4,146.2 L130.8,146.4 L131.2,146.6 L131.6,146.8 L132,147 L132.4,147.2 L132.8,147.4 L133.2,147.6 L133.6,147.8 L134.1,147.9 L134.5,148.1 L134.9,148.3 L135.3,148.5 L135.7,148.7 L136.1,148.9 L136.5,149.1 L136.9,149.3 L137.3,149.4 L137.7,149.6 L138.2,149.8 L138.6,150 L139,150.2 L139.4,150.4 L139.8,150.5 L140.2,150.7 L140.6,150.9 L141,151.1 L141.4,151.2 L141.8,151.4 L142.2,151.6 L142.7,151.8 L143.1,151.9 L143.5,152.1 L143.9,152.3 L144.3,152.4 L144.7,152.6 L145.1,152.8 L145.5,153 L145.9,153.1 L146.3,153.3 L146.8,153.5 L147.2,153.6 L147.6,153.8 L148,154 L148.4,154.1 L148.8,154.3 L149.2,154.4 L149.6,154.6 L150,154.8 L150.4,154.9 L150.9,155.1 L151.3,155.2 L151.7,155.4 L152.1,155.6 L152.5,155.7 L152.9,155.9 L153.3,156 L153.7,156.2 L154.1,156.3 L154.6,156.5 L155,156.6 L155.4,156.8 L155.8,156.9 L156.2,157.1 L156.6,157.3 L157,157.4 L157.4,157.6 L157.8,157.7 L158.2,157.8 L158.7,158 L159.1,158.1 L159.5,158.3 L159.9,158.4 L160.3,158.6 L160.7,158.7 L161.1,158.9 L161.5,159 L161.9,159.2 L162.3,159.3 L162.8,159.4 L163.2,159.6 L163.6,159.7 L164,159.9 L164.4,160 L164.8,160.2 L165.2,160.3 L165.6,160.4 L166,160.6 L166.4,160.7 L166.8,160.8 L167.3,161 L167.7,161.1 L168.1,161.3 L168.5,161.4 L168.9,161.5 L169.3,161.7 L169.7,161.8 L170.1,161.9 L170.5,162.1 L170.9,162.2 L171.4,162.3 L171.8,162.5 L172.2,162.6 L172.6,162.7 L173,162.9 L173.4,163 L173.8,163.1 L174.2,163.2 L174.6,163.4 L175.1,163.5 L175.5,163.6 L175.9,163.8 L176.3,163.9 L176.7,164 L177.1,164.1 L177.5,164.3 L177.9,164.4 L178.3,164.5 L178.7,164.6 L179.2,164.8 L179.6,164.9 L180,165 L180.4,165.1 L180.8,165.3 L181.2,165.4 L181.6,165.5 L182,165.6 L182.4,165.7 L182.8,165.9 L183.2,166 L183.7,166.1 L184.1,166.2 L184.5,166.3 L184.9,166.5 L185.3,166.6 L185.7,166.7 L186.1,166.8 L186.5,166.9 L186.9,167.1 L187.3,167.2 L187.8,167.3 L188.2,167.4 L188.6,167.5 L189,167.6 L189.4,167.8 L189.8,167.9 L190.2,168 L190.6,168.1 L191,168.2 L191.4,168.3 L191.9,168.4 L192.3,168.6 L192.7,168.7 L193.1,168.8 L193.5,168.9 L193.9,169 L194.3,169.1 L194.7,169.2 L195.1,169.3 L195.5,169.4 L196,169.6 L196.4,169.7 L196.8,169.8 L197.2,169.9 L197.6,170 L198,170.1 L198.4,170.2 L198.8,170.3 L199.2,170.4 L199.7,170.5 L200.1,170.6 L200.5,170.7 L200.9,170.9 L201.3,171 L201.7,171.1 L202.1,171.2 L202.5,171.3 L202.9,171.4 L203.3,171.5 L203.8,171.6 L204.2,171.7 L204.6,171.8 L205,171.9 L205.4,172 L205.8,172.1 L206.2,172.2 L206.6,172.3 L207,172.4 L207.4,172.5 L207.8,172.6 L208.3,172.7 L208.7,172.8 L209.1,172.9 L209.5,173 L209.9,173.1 L210.3,173.2 L210.7,173.3 L211.1,173.4 L211.5,173.5 L212,173.6 L212.4,173.7 L212.8,173.8 L213.2,173.9 L213.6,174 L214,174.1 L214.4,174.2 L214.8,174.3 L215.2,174.4 L215.6,174.5 L216.1,174.6 L216.5,174.7 L216.9,174.8 L217.3,174.9 L217.7,175 L218.1,175.1 L218.5,175.2 L218.9,175.3 L219.3,175.4 L219.7,175.5 L220.2,175.6 L220.6,175.7 L221,175.7 L221.4,175.8 L221.8,175.9 L222.2,176 L222.6,176.1 L223,176.2 L223.4,176.3 L223.8,176.4 L224.2,176.5 L224.7,176.6 L225.1,176.7 L225.5,176.8 L225.9,176.9 L226.3,177 L226.7,177 L227.1,177.1 L227.5,177.2 L227.9,177.3 L228.3,177.4 L228.8,177.5 L229.2,177.6 L229.6,177.7 L230,177.8 L230.4,177.9 L230.8,177.9 L231.2,178 L231.6,178.1 L232,178.2 L232.4,178.3 L232.9,178.4 L233.3,178.5 L233.7,178.6 L234.1,178.6 L234.5,178.7 L234.9,178.8 L235.3,178.9 L235.7,179 L236.1,179.1 L236.6,179.2 L237,179.3 L237.4,179.3 L237.8,179.4 L238.2,179.5 L238.6,179.6 L239,179.7 L239.4,179.8 L239.8,179.8 L240.2,179.9 L240.7,180 L241.1,180.1 L241.5,180.2 L241.9,180.3 L242.3,180.4 L242.7,180.4 L243.1,180.5 L243.5,180.6 L243.9,180.7 L244.3,180.8 L244.8,180.8 L245.2,180.9 L245.6,181 L246,181.1 L246.4,181.2 L246.8,181.3 L247.2,181.3 L247.6,181.4 L248,181.5 L248.4,181.6 L248.8,181.7 L249.3,181.7 L249.7,181.8 L250.1,181.9 L250.5,182 L250.9,182.1 L251.3,182.1 L251.7,182.2 L252.1,182.3 L252.5,182.4 L252.9,182.5 L253.4,182.5 L253.8,182.6 L254.2,182.7 L254.6,182.8 L255,182.9 L255.4,182.9 L255.8,183 L256.2,183.1 L256.6,183.2 L257.1,183.2 L257.5,183.3 L257.9,183.4 L258.3,183.5 L258.7,183.6 L259.1,183.6 L259.5,183.7 L259.9,183.8 L260.3,183.9 L260.7,183.9 L261.1,184 L261.6,184.1 L262,184.2 L262.4,184.2 L262.8,184.3 L263.2,184.4 L263.6,184.5 L264,184.5 L264.4,184.6 L264.8,184.7 L265.2,184.8 L265.7,184.8 L266.1,184.9 L266.5,185 L266.9,185.1 L267.3,185.1 L267.7,185.2 L268.1,185.3 L268.5,185.4 L268.9,185.4 L269.4,185.5 L269.8,185.6 L270.2,185.7 L270.6,185.7 L271,185.8 L271.4,185.9 L271.8,185.9 L272.2,186 L272.6,186.1 L273,186.2 L273.5,186.2 L273.9,186.3 L274.3,186.4 L274.7,186.4 L275.1,186.5 L275.5,186.6 L275.9,186.7 L276.3,186.7 L276.7,186.8 L277.1,186.9 L277.6,186.9 L278,187 L278.4,187.1 L278.8,187.2 L279.2,187.2 L279.6,187.3 L280,187.4 L280.4,187.4 L280.8,187.5 L281.2,187.6 L281.6,187.6 L282.1,187.7 L282.5,187.8 L282.9,187.9 L283.3,187.9 L283.7,188 L284.1,188.1 L284.5,188.1 L284.9,188.2 L285.3,188.3 L285.8,188.3 L286.2,188.4 L286.6,188.5 L287,188.5 L287.4,188.6 L287.8,188.7 L288.2,188.7 L288.6,188.8 L289,188.9 L289.4,188.9 L289.9,189 L290.3,189.1 L290.7,189.1 L291.1,189.2 L291.5,189.3 L291.9,189.3 L292.3,189.4 L292.7,189.5 L293.1,189.5 L293.5,189.6 L293.9,189.7 L294.4,189.7 L294.8,189.8 L295.2,189.9 L295.6,189.9 L296,190 L296.4,190.1 L296.8,190.1 L297.2,190.2 L297.6,190.3 L298,190.3 L298.5,190.4 L298.9,190.5 L299.3,190.5 L299.7,190.6 L300.1,190.6 L300.5,190.7 L300.9,190.8 L301.3,190.8 L301.7,190.9 L302.1,191 L302.6,191 L303,191.1 L303.4,191.2 L303.8,191.2 L304.2,191.3 L304.6,191.3 L305,191.4 L305.4,191.5 L305.8,191.5 L306.2,191.6 L306.7,191.7 L307.1,191.7 L307.5,191.8 L307.9,191.8 L308.3,191.9 L308.7,192 L309.1,192 L309.5,192.1 L309.9,192.2 L310.4,192.2 L310.8,192.3 L311.2,192.3 L311.6,192.4 L312,192.5 L312.4,192.5 L312.8,192.6 L313.2,192.6 L313.6,192.7 L314,192.8 L314.4,192.8 L314.9,192.9 L315.3,192.9 L315.7,193 L316.1,193.1 L316.5,193.1 L316.9,193.2 L317.3,193.3 L317.7,193.3 L318.1,193.4 L318.6,193.4 L319,193.5 L319.4,193.6 L319.8,193.6 L320.2,193.7 L320.6,193.7 L321,193.8 L321.4,193.8 L321.8,193.9 L322.2,194 L322.7,194 L323.1,194.1 L323.5,194.1 L323.9,194.2 L324.3,194.3 L324.7,194.3 L325.1,194.4 L325.5,194.4 L325.9,194.5 L326.3,194.6 L326.8,194.6 L327.2,194.7 L327.6,194.7 L328,194.8 L328.4,194.8 L328.8,194.9 L329.2,195 L329.6,195 L330,195.1 L330.4,195.1 L330.9,195.2 L331.3,195.2 L331.7,195.3 L332.1,195.4 L332.5,195.4 L332.9,195.5 L333.3,195.5 L333.7,195.6 L334.1,195.6 L334.5,195.7 L334.9,195.8 L335.4,195.8 L335.8,195.9 L336.2,195.9 L336.6,196 L337,196 L337.4,196.1 L337.8,196.1 L338.2,196.2 L338.6,196.3 L339.1,196.3 L339.5,196.4 L339.9,196.4 L340.3,196.5 L340.7,196.5 L341.1,196.6 L341.5,196.6 L341.9,196.7 L342.3,196.8 L342.7,196.8 L343.1,196.9 L343.6,196.9 L344,197 L344.4,197 L344.8,197.1 L345.2,197.1 L345.6,197.2 L346,197.2 L346.4,197.3 L346.8,197.4 L347.2,197.4 L347.7,197.5 L348.1,197.5 L348.5,197.6 L348.9,197.6 L349.3,197.7 L349.7,197.7 L350.1,197.8 L350.5,197.8 L350.9,197.9 L351.4,197.9 L351.8,198 L352.2,198 L352.6,198.1 L353,198.2 L353.4,198.2 L353.8,198.3 L354.2,198.3 L354.6,198.4 L355,198.4 L355.4,198.5 L355.9,198.5 L356.3,198.6 L356.7,198.6 L357.1,198.7 L357.5,198.7 L357.9,198.8 L358.3,198.8 L358.7,198.9 L359.1,198.9 L359.6,199 L360,199 L360.4,199.1 L360.8,199.2 L361.2,199.2 L361.6,199.3 L362,199.3 L362.4,199.4 L362.8,199.4 L363.2,199.5 L363.6,199.5 L364.1,199.6 L364.5,199.6 L364.9,199.7 L365.3,199.7 L365.7,199.8 L366.1,199.8 L366.5,199.9 L366.9,199.9 L367.3,200 L367.8,200 L368.2,200.1 L368.6,200.1 L369,200.2 L369.4,200.2 L369.8,200.3 L370.2,200.3 L370.6,200.4 L371,200.4 L371.4,200.5 L371.9,200.5 L372.3,200.6 L372.7,200.6 L373.1,200.7 L373.5,200.7 L373.9,200.8 L374.3,200.8 L374.7,200.9 L375.1,200.9 L375.5,201 L375.9,201 L376.4,201.1 L376.8,201.1 L377.2,201.2 L377.6,201.2 L378,201.3 L378.4,201.3 L378.8,201.4 L379.2,201.4 L379.6,201.5 L380.1,201.5 L380.5,201.6 L380.9,201.6 L381.3,201.7 L381.7,201.7 L382.1,201.7 L382.5,201.8 L382.9,201.8 L383.3,201.9 L383.7,201.9 L384.1,202 L384.6,202 L385,202.1 L385.4,202.1 L385.8,202.2 L386.2,202.2 L386.6,202.3 L387,202.3 L387.4,202.4 L387.8,202.4 L388.2,202.5 L388.7,202.5 L389.1,202.6 L389.5,202.6 L389.9,202.7 L390.3,202.7 L390.7,202.8 L391.1,202.8 L391.5,202.8 L391.9,202.9 L392.3,202.9 L392.8,203 L393.2,203 L393.6,203.1 L394,203.1 L394.4,203.2 L394.8,203.2 L395.2,203.3 L395.6,203.3 L396,203.4 L396.4,203.4 L396.9,203.5 L397.3,203.5 L397.7,203.5 L398.1,203.6 L398.5,203.6 L398.9,203.7 L399.3,203.7 L399.7,203.8 L400.1,203.8 L400.6,203.9 L401,203.9 L401.4,204 L401.8,204 L402.2,204 L402.6,204.1 L403,204.1 L403.4,204.2 L403.8,204.2 L404.2,204.3 L404.6,204.3 L405.1,204.4 L405.5,204.4 L405.9,204.5 L406.3,204.5 L406.7,204.5 L407.1,204.6 L407.5,204.6 L407.9,204.7 L408.3,204.7 L408.8,204.8 L409.2,204.8 L409.6,204.9 L410,204.9 L410.4,204.9 L410.8,205 L411.2,205 L411.6,205.1 L412,205.1 L412.4,205.2 L412.9,205.2 L413.3,205.3 L413.7,205.3 L414.1,205.3 L414.5,205.4 L414.9,205.4 L415.3,205.5 L415.7,205.5 L416.1,205.6 L416.5,205.6 L416.9,205.7 L417.4,205.7 L417.8,205.7 L418.2,205.8 L418.6,205.8 L419,205.9 L419.4,205.9 L419.8,206 L420.2,206 L420.6,206 L421.1,206.1 L421.5,206.1 L421.9,206.2 L422.3,206.2 L422.7,206.3 L423.1,206.3 L423.5,206.3 L423.9,206.4 L424.3,206.4 L424.7,206.5 L425.2,206.5 L425.6,206.6 L426,206.6 L426.4,206.6 L426.8,206.7 L427.2,206.7 L427.6,206.8 L428,206.8 L428.4,206.9 L428.8,206.9 L429.2,206.9 L429.7,207 L430.1,207 L430.5,207.1 L430.9,207.1 L431.3,207.2 L431.7,207.2 L432.1,207.2 L432.5,207.3 L432.9,207.3 L433.4,207.4 L433.8,207.4 L434.2,207.5 L434.6,207.5 L435,207.5 L435.4,207.6 L435.8,207.6 L436.2,207.7 L436.6,207.7 L437,207.7 L437.4,207.8 L437.9,207.8 L438.3,207.9 L438.7,207.9 L439.1,208 L439.5,208 L439.9,208 L440.3,208.1 L440.7,208.1 L441.1,208.2 L441.6,208.2 L442,208.2 L442.4,208.3 L442.8,208.3 L443.2,208.4 L443.6,208.4 L444,208.4 L444.4,208.5 L444.8,208.5 L445.2,208.6 L445.6,208.6 L446.1,208.6 L446.5,208.7 L446.9,208.7 L447.3,208.8 L447.7,208.8 L448.1,208.8 L448.5,208.9 L448.9,208.9 L449.3,209 L449.8,209 L450.2,209 L450.6,209.1 L451,209.1 L451.4,209.2 L451.8,209.2 L452.2,209.2 L452.6,209.3 L453,209.3 L453.4,209.4 L453.9,209.4 L454.3,209.4 L454.7,209.5 L455.1,209.5 L455.5,209.6 L455.9,209.6 L456.3,209.6 L456.7,209.7 L457.1,209.7 L457.5,209.8 L457.9,209.8 L458.4,209.8 L458.8,209.9 L459.2,209.9 L459.6,210 L460,210"/>
+      <circle class="f-a" cx="101.2" cy="128.6" r="5"/>
+      <text x="111.2" y="116.6" class="ta lg">p = 1/8: 3 bits</text>
+      <circle class="f-a" cx="255" cy="182.9" r="5"/>
+      <text x="263" y="170.9" class="ta lg">p = 1/2: 1 bit</text>
+      <circle class="f-a" cx="419" cy="205.9" r="5"/>
+      <text x="419" y="193.9" class="ta lg" text-anchor="middle">p = 0.9: 0.15 bits</text>
+      <text x="255" y="246" class="sm" text-anchor="middle">probability p of the event</text>
+      <text x="58" y="28" class="sm">surprise −log₂ p (bits)</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 4.1</b> Surprise $-\log_2 p$ in bits. A sure event ($p=1$) carries 0 bits. Surprise grows without limit as $p$ goes to 0.</figcaption>
+          </figure>
 
           <div class="callout definition">
             <div class="callout__label">Definition</div>
             <p>The <dfn>information content</dfn> (also called <dfn>surprise</dfn> or <dfn>surprisal</dfn>)
-            of an outcome $x$ is $I(x) = -\log p(x)$. When the log is base 2 the unit is <strong>bits</strong>; when it is the
-            natural log (base $e$) the unit is <strong>nats</strong>.
-            One bit is the surprise of a single fair coin flip.</p>
+            of an outcome $x$ is $I(x) = -\log p(x)$. When the log has base 2, the unit is
+            <strong>bits</strong>. When it is the natural log $\ln$ (base $e$), the unit is
+            <strong>nats</strong>. One bit is the surprise of one fair coin flip.</p>
           </div>
 
-          <p>Why is one fair coin flip worth exactly one bit? Plug in $p=\tfrac12$ with base-2 log: $-\log_2 \tfrac12 = \log_2 2 = 1$. One yes/no answer, one bit. Eight independent coin flips carry
-          $8 \times 1 = 8$ bits — which is why a byte (8 bits) can
-          name exactly $2^8 = 256$ equally likely things.</p>
+          <p>Why is one fair coin flip worth one bit? Put in $p=\tfrac12$ with a base-2 log:
+          $-\log_2 \tfrac12 = \log_2 2 = 1$. One yes/no answer, one bit. Eight independent coin flips carry
+          $8 \times 1 = 8$ bits. That is why a byte (8 bits) can name $2^8 = 256$ equally likely
+          things.</p>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
           <p class="codecap">surprise in bits and nats</p>
           <pre><code class="language-python">import torch
 
 # a rare event vs a common one
-p_rare   = torch.tensor(1/1000)   # one-in-a-thousand
+p_rare   = torch.tensor(1/1000)   # one in a thousand
 p_common = torch.tensor(0.9)      # happens most of the time
 
 # base-2 log -> answer in BITS
-print(-torch.log2(p_rare))    # tensor(9.9658)  ~10 bits of surprise
-print(-torch.log2(p_common))  # tensor(0.1520)  barely a fifth of a bit
+print(-torch.log2(p_rare))    # tensor(9.9658)  about 10 bits of surprise
+print(-torch.log2(p_common))  # tensor(0.1520)  about a seventh of a bit
 
-# natural log -> answer in NATS (what PyTorch losses use internally)
+# natural log -> answer in NATS (what PyTorch losses use)
 print(-torch.log(p_rare))     # tensor(6.9078)  same event, different unit</code></pre>
+          <p class="gloss"><b>In words:</b> the rare event carries about 66 times more surprise than the
+          common one. The two units differ by a constant factor: $9.9658 / 6.9078 \approx 1.44$. We
+          explain that factor in Section 2.</p>
 
           <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">A weather app says tomorrow's rain has probability <code>1/8</code>. In bits, how surprised should you be if it rains — and why does that number feel like “how many yes/no questions”?</span>
+                <span class="check__q">A weather app gives rain tomorrow a probability of $1/8$. How many bits of surprise is rain? And how many bits is “rain on both of the next two days,” if the days are independent?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p><code>-log₂(1/8) = log₂(8) = 3</code> bits. The reason 3 feels like three yes/no
-                questions: with equally-likely options, each yes/no question cuts the possibilities in half.
-                One-in-eight is the same as “which of 8 boxes?”, and you can pin down one of 8 boxes with
-                exactly 3 halvings (8 → 4 → 2 → 1). Surprise in bits <em>is</em> the number of ideal yes/no
-                questions the event's outcome answers.</p>
+                <p>$-\log_2(1/8) = \log_2 8 = 3$ bits. One option in 8 is like “which of 8 boxes?”, and 3
+                yes/no questions find one of 8 boxes (8 → 4 → 2 → 1). Two independent rainy days have
+                probability $1/8 \times 1/8 = 1/64$, and $\log_2 64 = 6$ bits. That is $3 + 3$: the
+                surprises add, as rule 3 demands.</p>
               </div>
             </details>
           </div>
@@ -165,54 +210,55 @@ print(-torch.log(p_rare))     # tensor(6.9078)  same event, different unit</code
 
           <p class="beat beat--intuition">Intuition first</p>
           <p>Surprise is defined for a <em>single</em> outcome. But usually we care about a whole
-          <strong>distribution</strong> — a source that keeps producing outcomes, like a coin you keep
-          flipping or a language that keeps emitting words. <strong>Entropy</strong> is the answer to:
-          <em>“on average, how surprised will I be per outcome from this source?”</em> It is the mean
-          surprise, weighted by how often each outcome actually happens.</p>
+          <strong>distribution</strong>. Think of a source that keeps producing outcomes, like a coin you
+          keep flipping or a language that keeps producing words. <strong>Entropy</strong> answers the question
+          <em>“on average, how surprised will I be by each outcome from this source?”</em> It is the mean
+          surprise, weighted by how often each outcome happens.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>Think of the game <strong>20 Questions</strong>. Entropy is the average number of yes/no
-            questions you need to guess the answer. If I'm thinking of a fair coin's result, one question
-            settles it — entropy 1. If I'm thinking of one of 1,024 equally likely names, you need about
-            10 questions — entropy 10. A predictable source (I <em>always</em> pick “heads”) needs zero
-            questions; you already know. <strong>Entropy is uncertainty measured in questions.</strong></p>
+            <p>Think of the game <strong>20 Questions</strong>. Entropy is the smallest average number of
+            yes/no questions you need to guess the answer, if you choose your questions well. For a fair
+            coin, one question settles it: entropy 1. For one of 1,024 equally likely names, you need 10
+            questions: entropy 10. For a source that <em>always</em> says “heads,” you need no questions,
+            because you already know: entropy 0. <strong>Entropy is uncertainty measured in
+            questions.</strong></p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>To average the surprise, we weight each outcome's surprise $-\log p(x)$ by its own probability $p(x)$ and add them
-          all up. That weighted average is written with the expectation symbol
-          $\mathbb{E}$ (“expected value” = long-run average):</p>
+          <p>To average the surprise, we weight each outcome's surprise $-\log p(x)$ by its probability
+          $p(x)$ and add them all. That weighted average is written with the expectation symbol
+          $\mathbb{E}$ from <a href="03-probability.html">Section 3</a>:</p>
           $$ H(p) \;=\; \mathbb{E}_{x\sim p}\big[-\log p(x)\big] \;=\; -\sum_{x} p(x)\,\log p(x) $$
-          <p class="gloss"><b>In words:</b> go through every possible outcome <b>x</b>; take its surprise
-          $-\log p(x)$; multiply by how often it happens,
-          <b>p(x)</b>; sum over all outcomes. Common outcomes are surprising rarely but counted often; rare
-          outcomes are very surprising but counted seldom. Entropy balances the two into one number:
-          <em>the surprise you should expect per draw.</em></p>
+          <p class="gloss"><b>In words:</b> go through every possible outcome $x$. Take its surprise
+          $-\log p(x)$, multiply by how often it happens, $p(x)$, and add over all outcomes. Common
+          outcomes are not very surprising, but they happen often. Rare outcomes are very surprising, but
+          they happen seldom. Entropy combines the two into one number: <em>the surprise you should
+          expect per draw.</em></p>
 
-          <p>Let's actually compute it for a coin that lands heads with probability $p$ (and tails with $1-p$). There are only two
-          outcomes, so the sum has two terms:</p>
+          <p>Let's compute it for a coin that lands heads with probability $p$ and tails with $1-p$.
+          There are only two outcomes, so the sum has two terms:</p>
           $$ H(p) \;=\; -\,p\log_2 p \;-\; (1-p)\log_2(1-p) $$
-          <p>Now read off the extremes, which is where the meaning lives:</p>
+          <p>Now look at some values of $p$:</p>
           <div class="scroll-x">
           <table>
             <thead><tr><th>Coin</th><th>$p$ (heads)</th><th>Entropy $H$ (bits)</th><th>What it means</th></tr></thead>
             <tbody>
-              <tr><td>Two-headed (rigged)</td><td>1</td><td>0</td><td>No uncertainty — you always know the result.</td></tr>
+              <tr><td>Two-headed (rigged)</td><td>1</td><td>0</td><td>No uncertainty: you always know the result.</td></tr>
               <tr><td>Heavily biased</td><td>0.1</td><td>0.47</td><td>Usually tails; little uncertainty.</td></tr>
-              <tr><td>Fair</td><td>0.5</td><td>1</td><td>Maximum uncertainty — a full bit per flip.</td></tr>
-              <tr><td>Two-tailed (rigged)</td><td>0</td><td>0</td><td>No uncertainty again — always tails.</td></tr>
+              <tr><td>Fair</td><td>0.5</td><td>1</td><td>Maximum uncertainty: a full bit per flip.</td></tr>
+              <tr><td>Two-tailed (rigged)</td><td>0</td><td>0</td><td>No uncertainty again: always tails.</td></tr>
             </tbody>
           </table>
           </div>
-          <p>Notice the shape: entropy is <strong>zero at both ends</strong> (a rigged coin holds no
-          surprise) and <strong>largest exactly in the middle</strong>, at $p=0.5$. Uncertainty peaks when the outcomes are equally likely and you have the least idea
-          what's coming.</p>
+          <p>(For $p = 0$ or $p = 1$, one term is $0 \log 0$. We define it as 0, because $p \log p$ goes to
+          0 as $p$ goes to 0.) Notice the shape. Entropy is <strong>zero at both ends</strong>: a rigged
+          coin holds no surprise. It is <strong>largest in the middle</strong>, at $p=0.5$. Uncertainty is
+          highest when the outcomes are equally likely, so you have the least idea what comes next.</p>
 
-          <p>We can <em>show</em> that the peak sits at $p=0.5$
-          rather than just eyeball the table. Using the natural log for the calculus and differentiating
-          $H(p) = -p\ln p - (1-p)\ln(1-p)$ with respect to
-          $p$:</p>
+          <p>We can <em>prove</em> that the peak is at $p=0.5$, instead of reading it from the table. Use
+          the natural log for the calculus, and differentiate $H(p) = -p\ln p - (1-p)\ln(1-p)$ with
+          respect to $p$:</p>
           $$
           \begin{aligned}
           \frac{dH}{dp}
@@ -221,49 +267,89 @@ print(-torch.log(p_rare))     # tensor(6.9078)  same event, different unit</code
             &= \ln\frac{1-p}{p}.
           \end{aligned}
           $$
-          <p class="gloss"><b>In words:</b> the slope of the entropy curve is the log of “tails-odds over
-          heads-odds.” Set the slope to 0 to find the top of the hill: $\ln\frac{1-p}{p}=0$ means $\frac{1-p}{p}=1$, i.e.
-          $1-p=p$, i.e. $p=0.5$.
-          The single flat point of the curve is dead centre — proving the fair coin is the most uncertain
-          coin there is.</p>
+          <p class="gloss"><b>In words:</b> the slope of the entropy curve is the log of “tails
+          probability over heads probability.” For $p &lt; 0.5$ the fraction is above 1, so its log is
+          positive: the curve rises. For $p &gt; 0.5$ the fraction is below 1, so the log is negative: the
+          curve falls. The slope is zero only where $\frac{1-p}{p}=1$, that is, at $p=0.5$. A curve that
+          rises and then falls has its top at the flat point. So the fair coin is the most uncertain
+          coin.</p>
+
+<figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 480 255" role="img" aria-labelledby="fig-04-2-t">
+      <title id="fig-04-2-t">The binary entropy curve: zero at p equals 0 and 1, rising to one bit at p equals 0.5.</title>
+      <line class="ax" x1="50" y1="210" x2="460" y2="210"/>
+      <line class="ax" x1="50" y1="210" x2="50" y2="30"/>
+      <text x="50" y="226" class="sm" text-anchor="middle">0</text>
+      <text x="152.5" y="226" class="sm" text-anchor="middle">0.25</text>
+      <text x="255" y="226" class="sm" text-anchor="middle">0.5</text>
+      <text x="357.5" y="226" class="sm" text-anchor="middle">0.75</text>
+      <text x="460" y="226" class="sm" text-anchor="middle">1</text>
+      <text x="44" y="214" class="sm" text-anchor="end">0</text>
+      <line class="grid" x1="50" y1="210" x2="460" y2="210"/>
+      <text x="44" y="132.2" class="sm" text-anchor="end">0.5</text>
+      <line class="grid" x1="50" y1="128.2" x2="460" y2="128.2"/>
+      <text x="44" y="50.4" class="sm" text-anchor="end">1</text>
+      <line class="grid" x1="50" y1="46.4" x2="460" y2="46.4"/>
+      <path class="ln s-v" d="M50,210 L51,205.9 L52,202.6 L53.1,199.6 L54.1,196.8 L55.1,194.1 L56.1,191.6 L57.2,189.2 L58.2,186.9 L59.2,184.6 L60.2,182.4 L61.3,180.3 L62.3,178.2 L63.3,176.2 L64.3,174.2 L65.4,172.2 L66.4,170.4 L67.4,168.5 L68.5,166.7 L69.5,164.9 L70.5,163.1 L71.5,161.4 L72.5,159.7 L73.6,158.1 L74.6,156.4 L75.6,154.8 L76.7,153.2 L77.7,151.7 L78.7,150.1 L79.7,148.6 L80.8,147.1 L81.8,145.6 L82.8,144.2 L83.8,142.8 L84.8,141.3 L85.9,140 L86.9,138.6 L87.9,137.2 L89,135.9 L90,134.6 L91,133.3 L92,132 L93,130.7 L94.1,129.4 L95.1,128.2 L96.1,127 L97.2,125.8 L98.2,124.6 L99.2,123.4 L100.2,122.2 L101.2,121.1 L102.3,119.9 L103.3,118.8 L104.3,117.7 L105.3,116.6 L106.4,115.5 L107.4,114.4 L108.4,113.3 L109.4,112.3 L110.5,111.2 L111.5,110.2 L112.5,109.2 L113.5,108.2 L114.6,107.2 L115.6,106.2 L116.6,105.2 L117.7,104.3 L118.7,103.3 L119.7,102.4 L120.7,101.4 L121.8,100.5 L122.8,99.6 L123.8,98.7 L124.8,97.8 L125.8,96.9 L126.9,96.1 L127.9,95.2 L128.9,94.4 L129.9,93.5 L131,92.7 L132,91.9 L133,91.1 L134.1,90.2 L135.1,89.5 L136.1,88.7 L137.1,87.9 L138.2,87.1 L139.2,86.4 L140.2,85.6 L141.2,84.9 L142.2,84.1 L143.3,83.4 L144.3,82.7 L145.3,82 L146.3,81.3 L147.4,80.6 L148.4,79.9 L149.4,79.2 L150.4,78.6 L151.5,77.9 L152.5,77.2 L153.5,76.6 L154.6,76 L155.6,75.3 L156.6,74.7 L157.6,74.1 L158.7,73.5 L159.7,72.9 L160.7,72.3 L161.7,71.7 L162.8,71.1 L163.8,70.6 L164.8,70 L165.8,69.5 L166.8,68.9 L167.9,68.4 L168.9,67.8 L169.9,67.3 L170.9,66.8 L172,66.3 L173,65.8 L174,65.3 L175.1,64.8 L176.1,64.3 L177.1,63.8 L178.1,63.4 L179.2,62.9 L180.2,62.5 L181.2,62 L182.2,61.6 L183.2,61.1 L184.3,60.7 L185.3,60.3 L186.3,59.9 L187.3,59.5 L188.4,59.1 L189.4,58.7 L190.4,58.3 L191.4,57.9 L192.5,57.5 L193.5,57.2 L194.5,56.8 L195.5,56.4 L196.6,56.1 L197.6,55.7 L198.6,55.4 L199.7,55.1 L200.7,54.8 L201.7,54.4 L202.7,54.1 L203.8,53.8 L204.8,53.5 L205.8,53.2 L206.8,52.9 L207.8,52.7 L208.9,52.4 L209.9,52.1 L210.9,51.9 L212,51.6 L213,51.4 L214,51.1 L215,50.9 L216.1,50.7 L217.1,50.4 L218.1,50.2 L219.1,50 L220.2,49.8 L221.2,49.6 L222.2,49.4 L223.2,49.2 L224.2,49 L225.3,48.9 L226.3,48.7 L227.3,48.5 L228.3,48.4 L229.4,48.2 L230.4,48.1 L231.4,47.9 L232.4,47.8 L233.5,47.7 L234.5,47.5 L235.5,47.4 L236.6,47.3 L237.6,47.2 L238.6,47.1 L239.6,47 L240.7,46.9 L241.7,46.9 L242.7,46.8 L243.7,46.7 L244.8,46.7 L245.8,46.6 L246.8,46.6 L247.8,46.5 L248.8,46.5 L249.9,46.4 L250.9,46.4 L251.9,46.4 L252.9,46.4 L254,46.4 L255,46.4 L256,46.4 L257.1,46.4 L258.1,46.4 L259.1,46.4 L260.1,46.4 L261.1,46.5 L262.2,46.5 L263.2,46.6 L264.2,46.6 L265.2,46.7 L266.3,46.7 L267.3,46.8 L268.3,46.9 L269.4,46.9 L270.4,47 L271.4,47.1 L272.4,47.2 L273.5,47.3 L274.5,47.4 L275.5,47.5 L276.5,47.7 L277.6,47.8 L278.6,47.9 L279.6,48.1 L280.6,48.2 L281.6,48.4 L282.7,48.5 L283.7,48.7 L284.7,48.9 L285.8,49 L286.8,49.2 L287.8,49.4 L288.8,49.6 L289.9,49.8 L290.9,50 L291.9,50.2 L292.9,50.4 L293.9,50.7 L295,50.9 L296,51.1 L297,51.4 L298,51.6 L299.1,51.9 L300.1,52.1 L301.1,52.4 L302.1,52.7 L303.2,52.9 L304.2,53.2 L305.2,53.5 L306.2,53.8 L307.3,54.1 L308.3,54.4 L309.3,54.8 L310.4,55.1 L311.4,55.4 L312.4,55.7 L313.4,56.1 L314.4,56.4 L315.5,56.8 L316.5,57.2 L317.5,57.5 L318.6,57.9 L319.6,58.3 L320.6,58.7 L321.6,59.1 L322.7,59.5 L323.7,59.9 L324.7,60.3 L325.7,60.7 L326.8,61.1 L327.8,61.6 L328.8,62 L329.8,62.5 L330.9,62.9 L331.9,63.4 L332.9,63.8 L333.9,64.3 L334.9,64.8 L336,65.3 L337,65.8 L338,66.3 L339.1,66.8 L340.1,67.3 L341.1,67.8 L342.1,68.4 L343.1,68.9 L344.2,69.5 L345.2,70 L346.2,70.6 L347.2,71.1 L348.3,71.7 L349.3,72.3 L350.3,72.9 L351.4,73.5 L352.4,74.1 L353.4,74.7 L354.4,75.3 L355.4,76 L356.5,76.6 L357.5,77.2 L358.5,77.9 L359.6,78.6 L360.6,79.2 L361.6,79.9 L362.6,80.6 L363.6,81.3 L364.7,82 L365.7,82.7 L366.7,83.4 L367.8,84.1 L368.8,84.9 L369.8,85.6 L370.8,86.4 L371.9,87.1 L372.9,87.9 L373.9,88.7 L374.9,89.5 L375.9,90.2 L377,91.1 L378,91.9 L379,92.7 L380.1,93.5 L381.1,94.4 L382.1,95.2 L383.1,96.1 L384.1,96.9 L385.2,97.8 L386.2,98.7 L387.2,99.6 L388.2,100.5 L389.3,101.4 L390.3,102.4 L391.3,103.3 L392.3,104.3 L393.4,105.2 L394.4,106.2 L395.4,107.2 L396.4,108.2 L397.5,109.2 L398.5,110.2 L399.5,111.2 L400.6,112.3 L401.6,113.3 L402.6,114.4 L403.6,115.5 L404.6,116.6 L405.7,117.7 L406.7,118.8 L407.7,119.9 L408.8,121.1 L409.8,122.2 L410.8,123.4 L411.8,124.6 L412.9,125.8 L413.9,127 L414.9,128.2 L415.9,129.4 L416.9,130.7 L418,132 L419,133.3 L420,134.6 L421.1,135.9 L422.1,137.2 L423.1,138.6 L424.1,140 L425.2,141.3 L426.2,142.8 L427.2,144.2 L428.2,145.6 L429.2,147.1 L430.3,148.6 L431.3,150.1 L432.3,151.7 L433.4,153.2 L434.4,154.8 L435.4,156.4 L436.4,158.1 L437.4,159.7 L438.5,161.4 L439.5,163.1 L440.5,164.9 L441.6,166.7 L442.6,168.5 L443.6,170.4 L444.6,172.2 L445.6,174.2 L446.7,176.2 L447.7,178.2 L448.7,180.3 L449.8,182.4 L450.8,184.6 L451.8,186.9 L452.8,189.2 L453.9,191.6 L454.9,194.1 L455.9,196.8 L456.9,199.6 L457.9,202.6 L459,205.9 L460,210"/>
+      <circle class="f-a" cx="255" cy="46.4" r="5"/>
+      <text x="255" y="36.4" class="ta lg b" text-anchor="middle">maximum: 1 bit at p = 0.5</text>
+      <line class="ln thin s-g" x1="95.1" y1="121.3" x2="168.9" y2="62.4"/>
+      <text x="173" y="120" class="tg lg" text-anchor="start">slope &gt; 0: rising</text>
+      <line class="ln thin s-g" x1="341.1" y1="62.4" x2="414.9" y2="121.3"/>
+      <text x="337" y="160.9" class="tg lg" text-anchor="end">slope &lt; 0: falling</text>
+      <text x="255" y="246" class="sm" text-anchor="middle">p (probability of heads)</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 4.2</b> Entropy of a coin, $H(p)$ in bits. The slope is positive left of $p=0.5$ and negative right of it, so the one flat point is the top of the hill.</figcaption>
+          </figure>
 
           <div class="callout definition">
             <div class="callout__label">Definition</div>
             <p><dfn>Bits vs nats.</dfn> Entropy is the same quantity whichever log you use; only the unit
-            changes. Base-2 log gives <strong>bits</strong> (natural for “yes/no questions” and file sizes);
-            natural log gives <strong>nats</strong>. They differ only by a constant factor
-            ($1\text{ nat} \approx 1.44\text{ bits}$). Machine
-            learning code uses nats, because the natural log is the one calculus likes.</p>
+            changes. Base-2 log gives <strong>bits</strong> (natural for yes/no questions and file sizes).
+            The natural log gives <strong>nats</strong>. Since $\log_2 x = \ln x / \ln 2$, a value in nats
+            becomes bits when you divide by $\ln 2 \approx 0.693$. So $1\text{ nat} = 1/\ln 2 \approx
+            1.44\text{ bits}$. Machine learning code uses nats, because derivatives of $\ln$ are
+            simplest.</p>
           </div>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
-          <p class="codecap">entropy of a coin across all biases</p>
-          <pre><code class="language-python">import torch
+          <p class="codecap">entropy of a coin for several biases</p>
+          <pre><code class="language-python">import math
+import torch
 
 def coin_entropy_bits(p):
-    # clamp keeps log(0) from blowing up; 0*log0 is defined as 0
-    p = torch.clamp(p, 1e-9, 1 - 1e-9)
-    return -(p * torch.log2(p) + (1 - p) * torch.log2(1 - p))
+    # entr(t) = -t * ln(t), with entr(0) = 0 built in; divide by ln 2 for bits
+    return (torch.special.entr(p) + torch.special.entr(1 - p)) / math.log(2)
 
 for p in [0.0, 0.1, 0.5, 0.9, 1.0]:
     print(f"p={p:.1f}  H={coin_entropy_bits(torch.tensor(p)):.3f} bits")
-# p=0.0  H=0.000   p=0.1  H=0.469   p=0.5  H=1.000
-# p=0.9  H=0.469   p=1.0  H=0.000    -> peak in the middle</code></pre>
+# p=0.0  H=0.000 bits
+# p=0.1  H=0.469 bits
+# p=0.5  H=1.000 bits
+# p=0.9  H=0.469 bits
+# p=1.0  H=0.000 bits    -> peak in the middle</code></pre>
+          <p class="gloss"><b>In words:</b> <code>torch.special.entr</code> computes $-t\ln t$ and returns
+          0 at $t = 0$, which follows our convention. A naive version,
+          <code>-(p * torch.log(p))</code>, gives <code>nan</code> at $p = 0$, because
+          $0 \times (-\infty)$ is undefined in floating point.</p>
 
           <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">A fair six-sided die has entropy <code>log₂(6) ≈ 2.585</code> bits. Why is that <em>more</em> than the fair coin's 1 bit, and what would drop the die's entropy below that?</span>
+                <span class="check__q">A fair six-sided die has entropy $\log_2 6 \approx 2.585$ bits. Can a yes/no strategy find the face with 2.585 questions on average? What would make the die's entropy lower?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>The die has six equally likely outcomes instead of two, so you need more yes/no questions
-                to pin one down — about 2.585 on average — hence higher entropy. Entropy is maximised when
-                all outcomes are equally likely: for <code>k</code> equal options it is exactly
-                <code>log₂(k)</code>. To <em>lower</em> the die's entropy you'd make it unfair — say it lands
-                on 6 half the time — because now you can guess “6?” first and often be right, so fewer
-                questions are needed on average. Predictability always lowers entropy.</p>
+                <p>Not quite. The best strategy splits the six faces into groups of 3 and 3, then 1 and 2.
+                Two faces need 2 questions and four faces need 3, so the average is
+                $(2+2+3+3+3+3)/6 = 8/3 \approx 2.67$. Entropy is a lower limit on the average; a
+                question-by-question strategy reaches it exactly only when the probabilities are powers of
+                $\tfrac12$. For $k$ equally likely options the entropy is $\log_2 k$, the largest possible.
+                To <em>lower</em> it, make the die unfair, for example a 6 half the time. Then “is it a 6?”
+                is often the only question you need. Predictability always lowers entropy.</p>
               </div>
             </details>
           </div>
@@ -272,45 +358,41 @@ for p in [0.0, 0.1, 0.5, 0.9, 1.0]:
           <h2><span class="h-num">3</span>Cross-entropy: surprise under the wrong beliefs</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>Entropy assumed you <em>knew</em> the true probabilities $p$. But a model doesn't know them — it only has a <em>guess</em>, a predicted distribution we'll
-          call $q$. <strong>Cross-entropy</strong> asks the honest
-          question: <em>if the world really runs on $p$, but I plan
-          for it as if it runs on $q$, how surprised will I be on
-          average?</em> It is your average surprise when your beliefs are $q$ but reality is $p$.</p>
+          <p>Entropy assumed that you <em>know</em> the true probabilities $p$. A model does not know
+          them. It only has a <em>guess</em>, a predicted distribution we call $q$.
+          <strong>Cross-entropy</strong> asks: <em>if the world follows $p$, but I plan for it as if it
+          follows $q$, how surprised will I be on average?</em> It is your average surprise when your
+          beliefs are $q$ but reality is $p$.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>You travel to a country and pack the <em>wrong</em> phrasebook — it's for a neighbouring
-            language. You can still get by: many phrases overlap, so you're understood often enough. But
-            every mismatch costs you extra effort — repeating yourself, pointing, guessing. The <em>true</em>
-            language is $p$; your phrasebook is
-            $q$. Cross-entropy is the total effort you spend
-            speaking reality through the wrong book. Pack a better-matched book (a better
-            $q$) and the daily effort drops.</p>
+            <p>Think of a code like Morse code, built for English. Common English letters, like E and T, get
+            short signals; rare ones, like Q and Z, get long signals. In the ideal code, a letter with
+            frequency $q$ gets a signal about $-\log_2 q$ bits long. Now use this English code to send
+            <em>Polish</em> text. The letters arrive at Polish frequencies $p$, but each one costs the
+            length the English code gave it, $-\log_2 q$. Your average signal length is the
+            cross-entropy. Polish uses Z often, and each Z costs a long English signal, so the average
+            grows.</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>The recipe is the same as entropy — average the surprise, weighted by how often each outcome
-          happens — with <strong>one change</strong>. The outcomes still happen with the true frequency
-          $p(x)$ (reality decides how often things occur). But the
-          surprise you actually <em>feel</em> is computed from your belief
-          $q(x)$, because that's the probability you assigned. So we
-          weight by $p$ but take the log of
-          $q$:</p>
+          <p>The formula is the same as for entropy (average the surprise, weighted by how often each
+          outcome happens) with <strong>one change</strong>. The outcomes still happen at the true rate
+          $p(x)$, because reality decides how often things occur. But the surprise you <em>feel</em> comes
+          from your belief $q(x)$, because that is the probability you gave. So we weight by $p$ but take
+          the log of $q$:</p>
           $$ H(p, q) \;=\; \mathbb{E}_{x\sim p}\big[-\log q(x)\big] \;=\; -\sum_{x} p(x)\,\log q(x) $$
-          <p class="gloss"><b>In words:</b> outcomes arrive at their real rate <b>p(x)</b>, but each one
-          startles you by $-\log q(x)$ — the surprise <em>your</em>
-          model assigned it. If your guess <b>q</b> matched reality <b>p</b> perfectly, this would collapse
-          back into ordinary entropy $H(p)$. Any mismatch makes it
-          bigger. Cross-entropy is never smaller than entropy — a fact we prove in the next section.</p>
+          <p class="gloss"><b>In words:</b> outcomes arrive at their real rate $p(x)$, but each one
+          surprises you by $-\log q(x)$, the surprise <em>your</em> model gave it. If your guess $q$
+          matched reality $p$ perfectly, this would be the ordinary entropy $H(p)$. Any mismatch makes it
+          larger. Cross-entropy is never smaller than entropy; we prove this in the next section.</p>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> Read the two arguments carefully</div>
-            <p>The order matters: $H(p,q)$ weights by the
-            <strong>first</strong> argument $p$ (what's true) and
-            takes the log of the <strong>second</strong> argument $q$
-            (what you believe). Swap them and you get a different number. Keep saying it to yourself:
-            <em>“weighted by truth, surprised by belief.”</em></p>
+            <p>The order matters. $H(p,q)$ weights by the <strong>first</strong> argument $p$ (what is
+            true). It takes the log of the <strong>second</strong> argument $q$ (what you believe). Swap
+            them and you get a different number. A short way to remember it: <em>“weighted by truth,
+            surprised by belief.”</em></p>
           </div>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
@@ -325,24 +407,25 @@ q_bad = torch.tensor([0.1, 0.2, 0.7])   # confidently wrong
 def cross_entropy(p, q):
     return -(p * torch.log(q)).sum()    # nats
 
-print(cross_entropy(p, p))      # tensor(0.8018)  = H(p), the floor
-print(cross_entropy(p, q_ok))   # tensor(0.8286)  a little above the floor
+print(cross_entropy(p, p))      # tensor(0.8018)  = H(p), the lowest possible
+print(cross_entropy(p, q_ok))   # tensor(0.8286)  a little above it
 print(cross_entropy(p, q_bad))  # tensor(1.9694)  far above -> bad model</code></pre>
+          <p class="gloss"><b>In words:</b> the function multiplies each true probability by the log of
+          the guessed one and adds the results. The better the guess, the closer the result is to
+          $H(p)$.</p>
 
           <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">In the code above, <code>cross_entropy(p, p)</code> gave the <em>smallest</em> value of the three. Why can no guess <code>q</code> ever beat using the true <code>p</code> itself?</span>
+                <span class="check__q">In <code>q_bad</code>, the model gives the first class only 0.1, though it really happens 70% of the time. Which single term of the sum contributes most to the cross-entropy? Estimate it.</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>Because the least-surprising code for a source is the one built from its <em>true</em>
-                probabilities — that's what entropy <code>H(p)</code> is, the theoretical minimum average
-                surprise. Any other belief <code>q</code> assigns at least one outcome a probability that's
-                too low, and you pay for that with extra surprise when it happens. So
-                <code>H(p, q) ≥ H(p)</code> always, with equality only when <code>q = p</code>. The exact
-                proof of this inequality is the whole point of the next section.</p>
+                <p>The first term: $-0.7 \ln 0.1 = 0.7 \times 2.303 \approx 1.61$ nats. The other two terms
+                add only $-0.2\ln 0.2 - 0.1\ln 0.7 \approx 0.32 + 0.04 = 0.36$. Total: about 1.97, as the
+                code prints. Most of the cost comes from a common outcome that the model thought was rare.
+                Cross-entropy punishes that kind of mistake most.</p>
               </div>
             </details>
           </div>
@@ -351,25 +434,25 @@ print(cross_entropy(p, q_bad))  # tensor(1.9694)  far above -> bad model</code><
           <h2><span class="h-num">4</span>KL divergence: the extra cost of being wrong</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>Cross-entropy $H(p,q)$ is your total surprise with a
-          wrong belief. Entropy $H(p)$ is the unavoidable surprise
-          even with a perfect belief. The <em>difference</em> is the part you could have avoided — the pure
-          <strong>waste</strong> caused by believing $q$ instead of
-          $p$. That waste is the <strong>Kullback–Leibler
-          divergence</strong>, written $D_{\mathrm{KL}}(p\Vert q)$.</p>
+          <p>Cross-entropy $H(p,q)$ is your total surprise with a wrong belief. Entropy $H(p)$ is the
+          surprise you cannot avoid, even with a perfect belief. The <em>difference</em> is the part you
+          could have avoided: the <strong>waste</strong> caused by believing $q$ instead of $p$. That
+          waste is the <strong>Kullback–Leibler divergence</strong>, written
+          $D_{\mathrm{KL}}(p\Vert q)$.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>Back to the phrasebook. Cross-entropy is the <em>total</em> effort you spend communicating.
-            Entropy is the effort a fluent local <em>still</em> spends — language is never effortless, some
-            work is irreducible. KL divergence is the <strong>extra</strong> effort you burn purely because
-            your phrasebook is wrong: the repeats, the pointing, the confused looks. Get the right book and
-            KL drops to zero; you're down to the irreducible effort and not a jot more.</p>
+            <p>Back to the English code used for Polish. A code built for Polish would send Polish text
+            with an average length of $H(p)$. That is the shortest possible. The English code needs
+            $H(p,q)$. The KL divergence is the <strong>extra</strong> length per letter that you pay only
+            because the code was built for the wrong language. The asymmetry is also clear here. Sending
+            Polish with an English code wastes a different amount than sending English with a Polish
+            code.</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>By definition it is the gap between cross-entropy and entropy. Subtract, and the two sums
-          combine termwise into a single clean sum:</p>
+          <p>By definition, it is the gap between cross-entropy and entropy. Subtract, and the two sums
+          combine term by term into one sum:</p>
           $$
           \begin{aligned}
           D_{\mathrm{KL}}(p\Vert q)
@@ -379,61 +462,115 @@ print(cross_entropy(p, q_bad))  # tensor(1.9694)  far above -> bad model</code><
             &= \sum_x p(x)\,\log\frac{p(x)}{q(x)}.
           \end{aligned}
           $$
-          <p class="gloss"><b>In words:</b> for each outcome, look at the ratio of what's true to what you
-          believed, $p(x)/q(x)$; take its log; weight by how often
-          the outcome happens, <b>p(x)</b>; sum up. Where your belief matched reality the ratio is 1 and its
-          log is 0 — no penalty. Wherever you were wrong the ratio strays from 1 and adds a positive cost.</p>
+          <p class="gloss"><b>In words:</b> for each outcome, look at the ratio of what is true to what
+          you believed, $p(x)/q(x)$. Take its log, weight it by how often the outcome happens, $p(x)$, and
+          add. Where your belief matched reality, the ratio is 1 and its log is 0: no penalty.</p>
+
+<figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 500 190" role="img" aria-labelledby="fig-04-3-t">
+      <title id="fig-04-3-t">A bar of total length 0.986 nats split into entropy 0.802 and KL divergence 0.184.</title>
+      <rect class="f-vs" x="40.0" y="60" width="336.8" height="46"/>
+      <rect class="f-rs" x="376.8" y="60" width="77.2" height="46"/>
+      <line class="ln thin s-r" x1="376.8" y1="60" x2="376.8" y2="106"/>
+      <text x="208.4" y="88" class="lg b" text-anchor="middle">H(p) = 0.802</text>
+      <text x="415.4" y="88" class="tr lg b" text-anchor="middle">KL</text>
+      <text x="454" y="50" class="b" text-anchor="end">H(p, q) = 0.986</text>
+      <text x="415.4" y="126" class="tr" text-anchor="middle">0.184</text>
+      <line class="ax" x1="40" y1="140" x2="460" y2="140"/>
+      <line class="ax" x1="40" y1="140" x2="40" y2="145"/>
+      <text x="40" y="160" class="sm" text-anchor="middle">0.0</text>
+      <line class="ax" x1="124" y1="140" x2="124" y2="145"/>
+      <text x="124" y="160" class="sm" text-anchor="middle">0.2</text>
+      <line class="ax" x1="208" y1="140" x2="208" y2="145"/>
+      <text x="208" y="160" class="sm" text-anchor="middle">0.4</text>
+      <line class="ax" x1="292" y1="140" x2="292" y2="145"/>
+      <text x="292" y="160" class="sm" text-anchor="middle">0.6</text>
+      <line class="ax" x1="376" y1="140" x2="376" y2="145"/>
+      <text x="376" y="160" class="sm" text-anchor="middle">0.8</text>
+      <line class="ax" x1="460" y1="140" x2="460" y2="145"/>
+      <text x="460" y="160" class="sm" text-anchor="middle">1.0</text>
+      <text x="250" y="180" class="sm" text-anchor="middle">nats</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 4.3</b> Cross-entropy splits into two parts. The entropy $H(p)$ is the part no model can remove. The KL divergence is the extra cost of believing $q$. Numbers from the code below, with $p=[0.7,0.2,0.1]$ and $q=[0.4,0.4,0.2]$.</figcaption>
+          </figure>
 
           <h3>Why KL divergence is never negative (Gibbs' inequality)</h3>
-          <p>We keep claiming “cross-entropy ≥ entropy” and “the extra cost is never negative.” Let's
-          actually prove it, because the whole story hangs on it. The claim is
-          $D_{\mathrm{KL}}(p\Vert q)\ge 0$, known as
-          <strong>Gibbs' inequality</strong>. The clean proof uses one fact about the logarithm and one
-          fact about averages.</p>
-          <p>The fact about the logarithm: $\log$ is a
-          <dfn>concave</dfn> function — it bulges upward, so any straight chord between two points on the
-          curve lies <em>below</em> the curve. A concrete consequence we'll use is the simple bound
-          $\log t \le t - 1$ for all $t\gt 0$ (the line $t-1$ is the tangent to
-          $\log$ at $t=1$,
-          and a concave curve never rises above its tangent). Now watch:</p>
+          <p>We keep saying “cross-entropy ≥ entropy” and “the extra cost is never negative.” Let's prove
+          it, because the whole story depends on it. The claim is $D_{\mathrm{KL}}(p\Vert q)\ge 0$, known
+          as <strong>Gibbs' inequality</strong>. We work in nats, with the natural log $\ln$. (In bits,
+          every log is divided by the positive constant $\ln 2$, which does not change the sign.)</p>
+          <p>We need one fact about $\ln$: $\ln t \le t - 1$ for all $t\gt 0$. The line $t-1$ is the
+          tangent to $\ln t$ at $t=1$. The curve $\ln t$ is <dfn>concave</dfn> (it bends downward), so it
+          never rises above its tangent line. This fact is true only for the natural log. For example,
+          $\log_2 1.5 \approx 0.585$ is larger than $1.5 - 1 = 0.5$.</p>
+
+<figure class="fig">
+            <div class="fig__frame">
+              <svg viewBox="0 0 480 250" role="img" aria-labelledby="fig-04-4-t">
+      <title id="fig-04-4-t">The curve ln t lies below the straight line t minus 1 and touches it only at t equals 1; log base 2 of t rises above the line between 1 and 2.</title>
+      <line class="ax" x1="50" y1="130" x2="460" y2="130"/>
+      <line class="ax" x1="50" y1="230" x2="50" y2="20"/>
+      <text x="178.1" y="146" class="sm" text-anchor="middle">1</text>
+      <text x="306.2" y="146" class="sm" text-anchor="middle">2</text>
+      <text x="434.4" y="146" class="sm" text-anchor="middle">3</text>
+      <text x="44" y="234" class="sm" text-anchor="end">−2</text>
+      <line class="grid" x1="50" y1="230" x2="460" y2="230"/>
+      <text x="44" y="184" class="sm" text-anchor="end">−1</text>
+      <line class="grid" x1="50" y1="180" x2="460" y2="180"/>
+      <text x="44" y="84" class="sm" text-anchor="end">1</text>
+      <line class="grid" x1="50" y1="80" x2="460" y2="80"/>
+      <text x="44" y="34" class="sm" text-anchor="end">2</text>
+      <line class="grid" x1="50" y1="30" x2="460" y2="30"/>
+      <path class="ln thin dash s-f" d="M83.3,227.2 L84.6,224.4 L85.9,221.8 L87.2,219.3 L88.4,216.8 L89.7,214.5 L91,212.2 L92.3,210 L93.6,207.8 L94.8,205.7 L96.1,203.7 L97.4,201.7 L98.7,199.8 L100,197.9 L101.2,196.1 L102.5,194.3 L103.8,192.6 L105.1,190.9 L106.4,189.2 L107.7,187.6 L108.9,186 L110.2,184.5 L111.5,182.9 L112.8,181.5 L114.1,180 L115.3,178.6 L116.6,177.2 L117.9,175.8 L119.2,174.4 L120.5,173.1 L121.8,171.8 L123,170.5 L124.3,169.3 L125.6,168.1 L126.9,166.8 L128.2,165.7 L129.4,164.5 L130.7,163.3 L132,162.2 L133.3,161.1 L134.6,160 L135.8,158.9 L137.1,157.8 L138.4,156.8 L139.7,155.7 L141,154.7 L142.2,153.7 L143.5,152.7 L144.8,151.7 L146.1,150.8 L147.4,149.8 L148.7,148.9 L149.9,147.9 L151.2,147 L152.5,146.1 L153.8,145.2 L155.1,144.3 L156.3,143.4 L157.6,142.6 L158.9,141.7 L160.2,140.9 L161.5,140 L162.8,139.2 L164,138.4 L165.3,137.6 L166.6,136.8 L167.9,136 L169.2,135.2 L170.4,134.5 L171.7,133.7 L173,132.9 L174.3,132.2 L175.6,131.5 L176.8,130.7 L178.1,130 L179.4,129.3 L180.7,128.6 L182,127.9 L183.2,127.2 L184.5,126.5 L185.8,125.8 L187.1,125.1 L188.4,124.4 L189.7,123.8 L190.9,123.1 L192.2,122.5 L193.5,121.8 L194.8,121.2 L196.1,120.5 L197.3,119.9 L198.6,119.3 L199.9,118.7 L201.2,118.1 L202.5,117.5 L203.7,116.8 L205,116.2 L206.3,115.7 L207.6,115.1 L208.9,114.5 L210.2,113.9 L211.4,113.3 L212.7,112.8 L214,112.2 L215.3,111.6 L216.6,111.1 L217.8,110.5 L219.1,110 L220.4,109.4 L221.7,108.9 L223,108.4 L224.2,107.8 L225.5,107.3 L226.8,106.8 L228.1,106.2 L229.4,105.7 L230.7,105.2 L231.9,104.7 L233.2,104.2 L234.5,103.7 L235.8,103.2 L237.1,102.7 L238.3,102.2 L239.6,101.7 L240.9,101.2 L242.2,100.8 L243.5,100.3 L244.8,99.8 L246,99.3 L247.3,98.9 L248.6,98.4 L249.9,97.9 L251.2,97.5 L252.4,97 L253.7,96.5 L255,96.1 L256.3,95.6 L257.6,95.2 L258.8,94.8 L260.1,94.3 L261.4,93.9 L262.7,93.4 L264,93 L265.2,92.6 L266.5,92.1 L267.8,91.7 L269.1,91.3 L270.4,90.9 L271.7,90.5 L272.9,90 L274.2,89.6 L275.5,89.2 L276.8,88.8 L278.1,88.4 L279.3,88 L280.6,87.6 L281.9,87.2 L283.2,86.8 L284.5,86.4 L285.8,86 L287,85.6 L288.3,85.2 L289.6,84.8 L290.9,84.5 L292.2,84.1 L293.4,83.7 L294.7,83.3 L296,82.9 L297.3,82.6 L298.6,82.2 L299.8,81.8 L301.1,81.5 L302.4,81.1 L303.7,80.7 L305,80.4 L306.2,80 L307.5,79.6 L308.8,79.3 L310.1,78.9 L311.4,78.6 L312.7,78.2 L313.9,77.9 L315.2,77.5 L316.5,77.2 L317.8,76.8 L319.1,76.5 L320.3,76.1 L321.6,75.8 L322.9,75.5 L324.2,75.1 L325.5,74.8 L326.8,74.4 L328,74.1 L329.3,73.8 L330.6,73.5 L331.9,73.1 L333.2,72.8 L334.4,72.5 L335.7,72.1 L337,71.8 L338.3,71.5 L339.6,71.2 L340.8,70.9 L342.1,70.5 L343.4,70.2 L344.7,69.9 L346,69.6 L347.2,69.3 L348.5,69 L349.8,68.7 L351.1,68.4 L352.4,68.1 L353.7,67.8 L354.9,67.5 L356.2,67.1 L357.5,66.8 L358.8,66.5 L360.1,66.2 L361.3,66 L362.6,65.7 L363.9,65.4 L365.2,65.1 L366.5,64.8 L367.7,64.5 L369,64.2 L370.3,63.9 L371.6,63.6 L372.9,63.3 L374.2,63 L375.4,62.8 L376.7,62.5 L378,62.2 L379.3,61.9 L380.6,61.6 L381.8,61.4 L383.1,61.1 L384.4,60.8 L385.7,60.5 L387,60.2 L388.2,60 L389.5,59.7 L390.8,59.4 L392.1,59.2 L393.4,58.9 L394.7,58.6 L395.9,58.4 L397.2,58.1 L398.5,57.8 L399.8,57.6 L401.1,57.3 L402.3,57 L403.6,56.8 L404.9,56.5 L406.2,56.2 L407.5,56 L408.7,55.7 L410,55.5 L411.3,55.2 L412.6,55 L413.9,54.7 L415.2,54.5 L416.4,54.2 L417.7,53.9 L419,53.7 L420.3,53.4 L421.6,53.2 L422.8,52.9 L424.1,52.7 L425.4,52.5 L426.7,52.2 L428,52 L429.2,51.7 L430.5,51.5 L431.8,51.2 L433.1,51 L434.4,50.8 L435.7,50.5 L436.9,50.3 L438.2,50 L439.5,49.8 L440.8,49.6 L442.1,49.3 L443.3,49.1 L444.6,48.9 L445.9,48.6 L447.2,48.4 L448.5,48.2 L449.8,47.9 L451,47.7 L452.3,47.5 L453.6,47.2 L454.9,47 L456.2,46.8 L457.4,46.5 L458.7,46.3 L460,46.1"/>
+      <path class="ln s-a" d="M50,180 L460,20"/>
+      <path class="ln s-v" d="M67.9,228.3 L69.2,224.9 L70.5,221.6 L71.8,218.6 L73.1,215.7 L74.3,213 L75.6,210.5 L76.9,208 L78.2,205.7 L79.5,203.5 L80.8,201.4 L82,199.3 L83.3,197.4 L84.6,195.5 L85.9,193.6 L87.2,191.9 L88.4,190.2 L89.7,188.6 L91,187 L92.3,185.4 L93.6,183.9 L94.8,182.5 L96.1,181.1 L97.4,179.7 L98.7,178.4 L100,177.1 L101.2,175.8 L102.5,174.6 L103.8,173.4 L105.1,172.2 L106.4,171 L107.7,169.9 L108.9,168.8 L110.2,167.8 L111.5,166.7 L112.8,165.7 L114.1,164.7 L115.3,163.7 L116.6,162.7 L117.9,161.7 L119.2,160.8 L120.5,159.9 L121.8,159 L123,158.1 L124.3,157.2 L125.6,156.4 L126.9,155.5 L128.2,154.7 L129.4,153.9 L130.7,153.1 L132,152.3 L133.3,151.5 L134.6,150.8 L135.8,150 L137.1,149.3 L138.4,148.6 L139.7,147.8 L141,147.1 L142.2,146.4 L143.5,145.7 L144.8,145.1 L146.1,144.4 L147.4,143.7 L148.7,143.1 L149.9,142.4 L151.2,141.8 L152.5,141.2 L153.8,140.5 L155.1,139.9 L156.3,139.3 L157.6,138.7 L158.9,138.1 L160.2,137.5 L161.5,137 L162.8,136.4 L164,135.8 L165.3,135.3 L166.6,134.7 L167.9,134.2 L169.2,133.6 L170.4,133.1 L171.7,132.6 L173,132 L174.3,131.5 L175.6,131 L176.8,130.5 L178.1,130 L179.4,129.5 L180.7,129 L182,128.5 L183.2,128 L184.5,127.6 L185.8,127.1 L187.1,126.6 L188.4,126.2 L189.7,125.7 L190.9,125.2 L192.2,124.8 L193.5,124.3 L194.8,123.9 L196.1,123.4 L197.3,123 L198.6,122.6 L199.9,122.1 L201.2,121.7 L202.5,121.3 L203.7,120.9 L205,120.5 L206.3,120.1 L207.6,119.6 L208.9,119.2 L210.2,118.8 L211.4,118.4 L212.7,118 L214,117.7 L215.3,117.3 L216.6,116.9 L217.8,116.5 L219.1,116.1 L220.4,115.7 L221.7,115.4 L223,115 L224.2,114.6 L225.5,114.3 L226.8,113.9 L228.1,113.5 L229.4,113.2 L230.7,112.8 L231.9,112.5 L233.2,112.1 L234.5,111.8 L235.8,111.4 L237.1,111.1 L238.3,110.7 L239.6,110.4 L240.9,110.1 L242.2,109.7 L243.5,109.4 L244.8,109.1 L246,108.7 L247.3,108.4 L248.6,108.1 L249.9,107.8 L251.2,107.4 L252.4,107.1 L253.7,106.8 L255,106.5 L256.3,106.2 L257.6,105.9 L258.8,105.6 L260.1,105.3 L261.4,105 L262.7,104.7 L264,104.4 L265.2,104.1 L266.5,103.8 L267.8,103.5 L269.1,103.2 L270.4,102.9 L271.7,102.6 L272.9,102.3 L274.2,102 L275.5,101.7 L276.8,101.5 L278.1,101.2 L279.3,100.9 L280.6,100.6 L281.9,100.3 L283.2,100.1 L284.5,99.8 L285.8,99.5 L287,99.2 L288.3,99 L289.6,98.7 L290.9,98.4 L292.2,98.2 L293.4,97.9 L294.7,97.6 L296,97.4 L297.3,97.1 L298.6,96.9 L299.8,96.6 L301.1,96.4 L302.4,96.1 L303.7,95.8 L305,95.6 L306.2,95.3 L307.5,95.1 L308.8,94.8 L310.1,94.6 L311.4,94.4 L312.7,94.1 L313.9,93.9 L315.2,93.6 L316.5,93.4 L317.8,93.1 L319.1,92.9 L320.3,92.7 L321.6,92.4 L322.9,92.2 L324.2,92 L325.5,91.7 L326.8,91.5 L328,91.3 L329.3,91 L330.6,90.8 L331.9,90.6 L333.2,90.4 L334.4,90.1 L335.7,89.9 L337,89.7 L338.3,89.5 L339.6,89.2 L340.8,89 L342.1,88.8 L343.4,88.6 L344.7,88.4 L346,88.1 L347.2,87.9 L348.5,87.7 L349.8,87.5 L351.1,87.3 L352.4,87.1 L353.7,86.9 L354.9,86.6 L356.2,86.4 L357.5,86.2 L358.8,86 L360.1,85.8 L361.3,85.6 L362.6,85.4 L363.9,85.2 L365.2,85 L366.5,84.8 L367.7,84.6 L369,84.4 L370.3,84.2 L371.6,84 L372.9,83.8 L374.2,83.6 L375.4,83.4 L376.7,83.2 L378,83 L379.3,82.8 L380.6,82.6 L381.8,82.4 L383.1,82.2 L384.4,82 L385.7,81.8 L387,81.7 L388.2,81.5 L389.5,81.3 L390.8,81.1 L392.1,80.9 L393.4,80.7 L394.7,80.5 L395.9,80.3 L397.2,80.2 L398.5,80 L399.8,79.8 L401.1,79.6 L402.3,79.4 L403.6,79.2 L404.9,79.1 L406.2,78.9 L407.5,78.7 L408.7,78.5 L410,78.3 L411.3,78.2 L412.6,78 L413.9,77.8 L415.2,77.6 L416.4,77.5 L417.7,77.3 L419,77.1 L420.3,76.9 L421.6,76.8 L422.8,76.6 L424.1,76.4 L425.4,76.2 L426.7,76.1 L428,75.9 L429.2,75.7 L430.5,75.6 L431.8,75.4 L433.1,75.2 L434.4,75.1 L435.7,74.9 L436.9,74.7 L438.2,74.6 L439.5,74.4 L440.8,74.2 L442.1,74.1 L443.3,73.9 L444.6,73.8 L445.9,73.6 L447.2,73.4 L448.5,73.3 L449.8,73.1 L451,72.9 L452.3,72.8 L453.6,72.6 L454.9,72.5 L456.2,72.3 L457.4,72.2 L458.7,72 L460,71.8"/>
+      <circle class="f-i" cx="178.1" cy="130" r="4.5"/>
+      <text x="376.7" y="40.5" class="m ta" text-anchor="end">t − 1</text>
+      <text x="453.6" y="94.6" class="m tv" text-anchor="end">ln t</text>
+      <text x="344.7" y="57.9" class="sm" text-anchor="end">log₂ t</text>
+      <text x="186.1" y="152">touch at t = 1</text>
+              </svg>
+            </div>
+            <figcaption><b>Figure 4.4</b> The natural log $\ln t$ (violet) never rises above its tangent line $t-1$ (amber); they touch only at $t=1$. The dashed curve $\log_2 t$ does go above the line between 1 and 2, so the bound needs the natural log.</figcaption>
+          </figure>
+
+          <p>Now apply the fact to each term:</p>
           $$
           \begin{aligned}
           -D_{\mathrm{KL}}(p\Vert q)
-            &= \sum_x p(x)\,\log\frac{q(x)}{p(x)}
+            &= \sum_x p(x)\,\ln\frac{q(x)}{p(x)}
               &&\text{(flip the ratio; the minus sign flips the log)}\\[4pt]
             &\le \sum_x p(x)\left(\frac{q(x)}{p(x)} - 1\right)
-              &&\text{(apply } \log t \le t-1 \text{ with } t=\tfrac{q(x)}{p(x)})\\[4pt]
+              &&\text{(use } \ln t \le t-1 \text{ with } t=\tfrac{q(x)}{p(x)})\\[4pt]
             &= \sum_x \big(q(x) - p(x)\big) \\[4pt]
             &= \sum_x q(x) - \sum_x p(x) \;=\; 1 - 1 \;=\; 0.
           \end{aligned}
           $$
-          <p class="gloss"><b>In words:</b> we showed $-D_{\mathrm{KL}} \le 0$, which is the same as $D_{\mathrm{KL}} \ge 0$.
-          The last line used the only thing we know for sure about probability distributions: they each sum
-          to 1. So the extra cost of a wrong belief is <em>always</em> zero or positive — never a bonus.
-          And equality ($D_{\mathrm{KL}}=0$) holds only when the bound
-          $\log t = t-1$ is tight for every term, which happens only at
-          $t=1$, i.e. only when $q(x)=p(x)$ everywhere. Belief matches reality exactly, or you pay.</p>
+          <p class="gloss"><b>In words:</b> we showed $-D_{\mathrm{KL}} \le 0$, which is the same as
+          $D_{\mathrm{KL}} \ge 0$. The last line uses the one thing we know for sure about probability
+          distributions: each one adds up to 1. (The sums run over outcomes with $p(x) &gt; 0$. Skipping the
+          others can only make $\sum q$ smaller than 1, so the result still holds.) So the extra cost of a wrong
+          belief is <em>always</em> zero or positive, never a bonus. Equality ($D_{\mathrm{KL}}=0$) needs
+          $\ln t = t-1$ in every term. That happens only at $t=1$, so only when $q(x)=p(x)$ everywhere.</p>
 
           <div class="callout keyidea">
-            <div class="callout__label"><span class="ic">◆</span> This is the pillar</div>
-            <p>Gibbs' inequality is <em>why</em> minimising cross-entropy is a sensible goal.
-            Since $H(p,q) = H(p) + D_{\mathrm{KL}}(p\Vert q)$ and
-            $H(p)$ is a fixed constant the model cannot change,
-            pushing cross-entropy down is <strong>exactly</strong> pushing
-            $D_{\mathrm{KL}}$ down — dragging your predicted
-            distribution $q$ toward the truth
-            $p$. The lowest it can go is zero, reached only when
-            $q=p$.</p>
+            <div class="callout__label"><span class="ic">◆</span> Why this matters for training</div>
+            <p>Gibbs' inequality is <em>why</em> minimizing cross-entropy is a sensible goal. We have
+            $H(p,q) = H(p) + D_{\mathrm{KL}}(p\Vert q)$, and $H(p)$ is a constant that the model cannot
+            change. So pushing cross-entropy down is the same as pushing $D_{\mathrm{KL}}$ down. That moves
+            your predicted distribution $q$ toward the truth $p$. The lowest value is zero, reached only
+            when $q=p$.</p>
           </div>
 
           <div class="callout pitfall">
             <div class="callout__label"><span class="ic">▲</span> Watch out: KL is not a distance</div>
-            <p>KL divergence is <strong>asymmetric</strong>: in general
-            $D_{\mathrm{KL}}(p\Vert q) \ne D_{\mathrm{KL}}(q\Vert p)$.
-            The cost of using the wrong phrasebook depends on which language is actually being spoken. So
-            never call KL a “distance” — a real distance is symmetric, and this is not. It's a directed
-            measure of “extra surprise if the truth is $p$ and you
-            planned for $q$.”</p>
+            <p>KL divergence is <strong>asymmetric</strong>: in general,
+            $D_{\mathrm{KL}}(p\Vert q) \ne D_{\mathrm{KL}}(q\Vert p)$. The cost of using the wrong code
+            depends on which language is really being sent. So do not call KL a “distance.” A true distance
+            is symmetric, and KL is not. It measures “extra surprise if the truth is $p$ and you planned for
+            $q$.”</p>
           </div>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
@@ -453,53 +590,51 @@ kl_qp = H(q, p) - H(q)                  # the reversed question
 print(kl_pq)   # tensor(0.1838)
 print(kl_qp)   # tensor(0.1920)  -> different number: KL is asymmetric
 print(kl_pq >= 0, kl_qp >= 0)  # tensor(True) tensor(True) -> Gibbs holds</code></pre>
+          <p class="gloss"><b>In words:</b> the code computes KL as “cross-entropy minus entropy,” in
+          both directions. Here $H(p) = 0.8018$ and $H(p,q) = 0.9856$, the numbers in Figure 4.3.</p>
 
           <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">If a model's predicted distribution <code>q</code> exactly equals the truth <code>p</code>, what are the values of <code>H(p,q)</code>, <code>D_KL(p‖q)</code>, and the training loss — and can the loss ever reach zero for a genuinely uncertain source?</span>
+                <span class="check__q">A model's prediction $q$ equals the truth $p$. What are $D_{\mathrm{KL}}(p\Vert q)$ and $H(p,q)$? Can the cross-entropy loss ever reach zero when the source is truly uncertain?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>When <code>q = p</code>: <code>D_KL(p‖q) = 0</code> (no wasted effort), so
-                <code>H(p,q) = H(p) + 0 = H(p)</code> — cross-entropy bottoms out at the source's own
-                entropy. The <em>loss</em> here is the cross-entropy, so its floor is <code>H(p)</code>, not
-                zero. For a genuinely uncertain source (<code>H(p) &gt; 0</code>) the loss can never hit zero
-                no matter how perfect the model — some surprise is irreducible. It reaches zero only when the
-                truth itself is certain (one-hot), which is exactly the classification case we turn to now.</p>
+                <p>When $q = p$: $D_{\mathrm{KL}} = 0$ (no waste), so $H(p,q) = H(p) + 0 = H(p)$. The
+                cross-entropy can go no lower than the source's own entropy. So its lowest value is
+                $H(p)$, not zero. For a truly uncertain source ($H(p) &gt; 0$), the loss never reaches zero,
+                however good the model is. Some surprise cannot be removed. The loss can reach zero only
+                when the truth itself is certain (one-hot). That is the classification case we turn to
+                now.</p>
               </div>
             </details>
           </div>
 
           <!-- ===================== THE PUNCHLINE ===================== -->
-          <h2><span class="h-num">5</span>The punchline: why cross-entropy is THE classification loss</h2>
+          <h2><span class="h-num">5</span>Why cross-entropy is the classification loss</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>Everything above was general. Now specialise it to <strong>classification</strong> — the task
-          of putting an input into one of several categories (is this image a cat, a dog, or a bird?). Here
-          the truth is not fuzzy: each training example belongs to <em>exactly one</em> class. That single
-          fact collapses cross-entropy into something startlingly simple, and reveals that “minimise
-          cross-entropy” and “make the correct answer as likely as possible” are <em>the very same
-          instruction.</em></p>
+          <p>Everything above was general. Now apply it to <strong>classification</strong>: putting an
+          input into one of several categories (is this image a cat, a dog, or a bird?). Here the truth is
+          not uncertain: each training example belongs to <em>exactly one</em> class. This one fact makes
+          cross-entropy very simple. It shows that “minimize cross-entropy” and “make the correct answer as
+          likely as possible” are <em>the same instruction.</em></p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
-            <p>Imagine grading a multiple-choice test where only one answer is correct. You don't care how
-            confident the student was about the wrong options — you only care <em>how much probability they
-            put on the right one.</em> Full marks for “100% sure, and correct.” Harsh penalty for “only 5%
-            on the correct answer.” Cross-entropy is exactly this grader: it ignores the wrong boxes and
-            scores you purely on the confidence you placed on the true one.</p>
+            <p>Imagine a multiple-choice test where students must give a probability for each answer, and
+            only one answer is correct. The grader looks only at <em>the probability the student put on the
+            right answer</em>. “100% sure, and correct” costs nothing. “5% on the correct answer” costs a
+            lot. “0% on the correct answer” costs without limit: the penalty $-\log q$ has no upper bound.
+            Cross-entropy grades this way.</p>
           </div>
 
-          <p class="beat beat--math">Now the math — the collapse</p>
-          <p>In classification the true distribution $p$ for a single
-          example is <strong>one-hot</strong>: it puts probability 1 on the correct class
-          $c$ and 0 on every other class. That is,
-          $p(c)=1$ and $p(x)=0$
-          for $x\ne c$. (“One-hot” = a vector that is all zeros except
-          a single 1 marking the right answer.) Substitute that into the cross-entropy sum and watch every
-          term but one vanish:</p>
+          <p class="beat beat--math">Now the math</p>
+          <p>In classification, the true distribution $p$ for one example is <strong>one-hot</strong>. It
+          puts probability 1 on the correct class $c$ and 0 on every other class: $p(c)=1$, and $p(x)=0$
+          for $x\ne c$. (“One-hot” means a vector of zeros with a single 1 that marks the right answer.)
+          Put that into the cross-entropy sum, and every term but one disappears:</p>
           $$
           \begin{aligned}
           H(p, q)
@@ -509,53 +644,56 @@ print(kl_pq >= 0, kl_qp >= 0)  # tensor(True) tensor(True) -> Gibbs holds</code>
             &= -\log q(c).
           \end{aligned}
           $$
-          <p class="gloss"><b>In words:</b> because the truth is 1 for the correct class and 0 everywhere
-          else, every wrong-class term is multiplied by 0 and disappears. What survives is a single term:
-          <em>minus the log of the probability your model assigned to the correct class.</em> That's it. The
-          whole cross-entropy of a labelled example is just $-\log q(\text{correct class})$ — the surprise of the right answer under your model.</p>
+          <p class="gloss"><b>In words:</b> the truth is 1 for the correct class and 0 everywhere else. So
+          every wrong-class term is multiplied by 0 and disappears. One term remains: <em>minus the log
+          of the probability your model gave the correct class.</em> The whole cross-entropy of a labeled
+          example is $-\log q(\text{correct class})$: the surprise of the right answer under your
+          model.</p>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> Cross-entropy = negative log-likelihood</div>
-            <p>$-\log q(c)$ is precisely the
-            <strong>negative log-likelihood</strong> of the correct label. The <em>likelihood</em> is how
-            probable the model thinks the true answer is; the loss is minus its log. So minimising
-            cross-entropy is <strong>maximising the likelihood</strong> of the correct answers — the very
-            principle of <strong>Maximum Likelihood Estimation</strong> we met in
-            <a href="03-probability.html">Section 3</a>. Two ideas that looked unrelated — “shortest code”
-            from information theory and “most probable model” from statistics — turn out to be the same loss.</p>
+            <p>$-\log q(c)$ is the <strong>negative log-likelihood</strong> of the correct label. The
+            <em>likelihood</em> is how probable the model thinks the true answer is, and the loss is minus
+            its log. So minimizing cross-entropy is <strong>maximizing the likelihood</strong> of the
+            correct answers. That is the principle of <strong>maximum likelihood estimation</strong> from
+            <a href="03-probability.html">Section 3</a>. Two ideas that looked unrelated, “shortest code”
+            from information theory and “most probable model” from statistics, lead to the same loss.</p>
           </div>
 
-          <p>Over a whole dataset of $N$ independent examples, the
-          likelihoods multiply, so the log-likelihoods add, and the training loss is the <em>average</em>
-          negative log-likelihood — one cross-entropy term per example:</p>
+          <p>Take a dataset of $N$ independent examples. Their likelihoods multiply, so their
+          log-likelihoods add. The training loss is the <em>average</em> negative log-likelihood, one
+          cross-entropy term per example:</p>
           $$ L \;=\; \frac{1}{N}\sum_{i=1}^{N} -\log q_i(c_i) $$
-          <p class="gloss"><b>In words:</b> for each training example $i$ take the model's probability on that example's true class $c_i$, take its negative log (the surprise), and average over all
-          <b>N</b> examples. Drive this down and you are, example by example, making the model less surprised
-          by the right answers.</p>
+          <p class="gloss"><b>In words:</b> for each training example $i$, take the model's probability on
+          that example's true class $c_i$. Take its negative log (the surprise), and average over all $N$
+          examples. When you lower this number, the model becomes less surprised by the right answers,
+          example by example.</p>
 
           <h3>Where do the probabilities $q$ come from? The softmax</h3>
-          <p>A neural network's last layer doesn't output probabilities — it outputs a vector of raw,
-          unbounded real numbers called <strong>logits</strong> (one score per class; they can be negative,
-          huge, anything). To turn logits $z_1,\dots,z_K$ into a
-          valid probability distribution $q$, we pass them through the
-          <strong>softmax</strong> function — exponentiate each score (making it positive) and divide by the
-          total (making the whole set sum to 1):</p>
+          <p>A neural network's last layer does not output probabilities. It outputs a vector of raw real
+          numbers called <strong>logits</strong>: one score per class, which can be negative, large,
+          anything. To turn logits $z_1,\dots,z_K$ (for $K$ classes) into a valid probability distribution
+          $q$, we use the <strong>softmax</strong> function. It exponentiates each score (making it
+          positive) and divides by the total (making the set add up to 1):</p>
           $$ q_k \;=\; \operatorname{softmax}(z)_k \;=\; \frac{e^{z_k}}{\sum_{j=1}^{K} e^{z_j}} $$
-          <p class="gloss"><b>In words:</b> $e^{z_k}$ makes every
-          score positive and blows up the gaps so the largest logit dominates; dividing by the sum
-          normalises them into probabilities that add to 1. The class with the biggest logit gets the
-          biggest probability. Softmax is the bridge from “raw network scores” to “a distribution
-          $q$ you can feed to cross-entropy.”</p>
+          <p class="gloss"><b>In words:</b> $e^{z_k}$ makes every score positive and makes the gaps
+          larger, so the largest logit dominates. Dividing by the sum turns the scores into probabilities
+          that add up to 1. The class with the largest logit gets the largest probability. Softmax
+          connects the raw network scores to a distribution $q$ that cross-entropy can use.</p>
+
+          <p>Put softmax into the loss, and the log cancels the exponential:</p>
+          $$ -\log q_c \;=\; -z_c + \log \sum_{j=1}^{K} e^{z_j} $$
+          <p class="gloss"><b>In words:</b> the loss needs only the logits, never the probabilities
+          themselves. The second term can be computed safely even for very large logits, by subtracting
+          the largest $z_j$ before exponentiating. This is why PyTorch computes the two steps together.</p>
 
           <div class="callout keyidea">
-            <div class="callout__label"><span class="ic">◆</span> Softmax + cross-entropy: the standard pairing</div>
-            <p>Feed the network's logits through softmax to get $q$,
-            then score $q$ with cross-entropy
-            $-\log q(c)$. This softmax-then-cross-entropy pair is
-            the default output of virtually every classifier. It's so common — and so much more numerically
-            stable when fused — that PyTorch bundles both into a single function,
-            <code>nn.CrossEntropyLoss</code>, which takes the <em>raw logits</em> directly. You almost never
-            apply softmax by hand before the loss; the loss does it for you, safely.</p>
+            <div class="callout__label"><span class="ic">◆</span> Softmax + cross-entropy: the standard pair</div>
+            <p>Feed the network's logits through softmax to get $q$, then score $q$ with cross-entropy
+            $-\log q(c)$. This pair is the standard output of classifiers. PyTorch combines both steps in
+            one function, <code>nn.CrossEntropyLoss</code> (or <code>F.cross_entropy</code>), which takes
+            the <em>raw logits</em> directly. You almost never apply softmax yourself before the loss; the
+            loss does it for you, safely.</p>
           </div>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
@@ -566,42 +704,42 @@ import torch.nn.functional as F
 # a batch of 2 examples, 3 classes; these are raw LOGITS from a network
 logits = torch.tensor([[2.0, 0.5, -1.0],    # example 0
                        [0.1, 0.2,  3.0]])   # example 1
-targets = torch.tensor([0, 2])              # true classes: 0 and 2 (one-hot, given as index)
+targets = torch.tensor([0, 2])              # true classes 0 and 2 (given as indices, not one-hot)
 
-# --- the manual way: softmax -> pick correct class -> -log -> average ---
+# --- by hand: softmax -> pick correct class -> -log -> average ---
 q = F.softmax(logits, dim=1)                # logits -> probabilities per row
-p_correct = q[range(2), targets]            # q assigned to each true class
+p_correct = q[range(2), targets]            # q given to each true class
 manual = (-torch.log(p_correct)).mean()     # mean negative log-likelihood
 print(manual)                               # tensor(0.1755)
 
-# --- the idiomatic way: one fused, numerically-stable call on RAW logits ---
-builtin = F.cross_entropy(logits, targets)  # softmax + NLL, fused
+# --- the usual way: one combined, numerically stable call on RAW logits ---
+builtin = F.cross_entropy(logits, targets)  # softmax + negative log-likelihood
 print(builtin)                              # tensor(0.1755)  -> identical</code></pre>
+          <p class="gloss"><b>In words:</b> the first half follows our derivation step by step. The second
+          half gets the same number from one call. In real code, use the second.</p>
 
           <div class="callout pitfall">
-            <div class="callout__label"><span class="ic">▲</span> The classic double-softmax bug</div>
-            <p><code>nn.CrossEntropyLoss</code> / <code>F.cross_entropy</code> apply softmax
-            <em>internally</em>. If you also call <code>softmax</code> on your model's output first, you
-            softmax twice — squashing the logits toward uniform, so the model trains slowly and badly. Rule:
-            feed <strong>raw logits</strong> to the loss, never pre-softmaxed probabilities.</p>
+            <div class="callout__label"><span class="ic">▲</span> Watch out: the double-softmax bug</div>
+            <p><code>nn.CrossEntropyLoss</code> and <code>F.cross_entropy</code> apply softmax
+            <em>internally</em>. If you also call <code>softmax</code> on the model's output first, you apply
+            softmax twice. That squashes the probabilities toward uniform, so the model trains slowly and
+            badly. Rule: give the loss <strong>raw logits</strong>, never probabilities.</p>
           </div>
 
           <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
-                <span class="check__q">Your classifier puts probability <code>0.9</code> on the correct class for one image and <code>0.1</code> on the correct class for another. Which image contributes more to the loss, by how much (in nats), and what does that say about how cross-entropy treats confident mistakes?</span>
+                <span class="check__q">Your classifier puts probability $0.9$ on the correct class for one image and $0.1$ for another. Predict which image adds more to the loss, and by how much (in nats). What happens as the second probability goes toward 0?</span>
                 <span class="check__reveal">Reveal</span>
               </summary>
               <div class="check__answer">
-                <p>Loss per example is <code>-log(q_correct)</code>. For the first:
-                <code>-log(0.9) ≈ 0.105</code> nats. For the second: <code>-log(0.1) ≈ 2.303</code> nats.
-                The second image contributes about <code>2.303 / 0.105 ≈ 22×</code> more loss. Because
-                <code>-log</code> shoots toward infinity as the correct-class probability approaches 0,
-                cross-entropy <strong>punishes confident wrongness savagely</strong>: putting almost no
-                probability on the true answer is enormously costly, which is exactly what pushes the model
-                to stop being confidently wrong. This same loss, applied to “predict the next word,” is what
-                trains language models — see <a href="19-language-modeling.html">Section 19</a>.</p>
+                <p>The loss per example is $-\ln q_{\text{correct}}$. First image: $-\ln 0.9 \approx 0.105$
+                nats. Second image: $-\ln 0.1 \approx 2.303$ nats, about 22 times more. As the probability
+                on the correct class goes toward 0, $-\ln q$ grows without limit. So cross-entropy punishes
+                confident mistakes very strongly, and this pushes the model to stop being confidently
+                wrong. The same loss, applied to “predict the next word,” trains language models; see
+                <a href="19-language-modeling.html">Section 19</a>.</p>
               </div>
             </details>
           </div>
@@ -610,16 +748,16 @@ print(builtin)                              # tensor(0.1755)  -> identical</code
 
           <h2><span class="h-num">6</span>What to carry forward</h2>
           <ul>
-            <li><strong>Information / surprise</strong> is $-\log p(x)$: rare events carry more, and the log makes independent surprises add up.</li>
-            <li><strong>Entropy</strong> $H(p) = -\sum p\log p$ is your average surprise — uncertainty in “yes/no questions,” maximal when outcomes are equally likely.</li>
-            <li><strong>Cross-entropy</strong> $H(p,q) = -\sum p\log q$ is your average surprise when reality is $p$ but you believed $q$: weighted by truth, surprised by belief.</li>
-            <li><strong>KL divergence</strong> $D_{\mathrm{KL}}(p\Vert q) = H(p,q) - H(p) \ge 0$ is the pure extra cost of a wrong belief (Gibbs' inequality, proved via $\log t \le t-1$) — and it is asymmetric, so not a distance.</li>
-            <li><strong>The punchline:</strong> for one-hot labels cross-entropy collapses to $-\log q(\text{correct class})$ = negative log-likelihood, so minimising it <em>is</em> maximum likelihood (<a href="03-probability.html">Section 3</a>). Softmax turns logits into $q$; cross-entropy reappears in its binary form in <a href="06-logistic-regression.html">Section 6</a>, and the full softmax + cross-entropy pair in <a href="11-mlp-numpy.html">Section 11</a> and <a href="19-language-modeling.html">Section 19</a>.</li>
+            <li><strong>Information (surprise)</strong> is $-\log p(x)$. Rare events carry more, and the log makes surprises from independent events add up.</li>
+            <li><strong>Entropy</strong> $H(p) = -\sum p\log p$ is your average surprise. It is the lower limit on the average number of yes/no questions, and it is largest when outcomes are equally likely.</li>
+            <li><strong>Cross-entropy</strong> $H(p,q) = -\sum p\log q$ is your average surprise when reality is $p$ but you believe $q$: weighted by truth, surprised by belief.</li>
+            <li><strong>KL divergence</strong> $D_{\mathrm{KL}}(p\Vert q) = H(p,q) - H(p) \ge 0$ is the extra cost of a wrong belief (Gibbs' inequality, proved with $\ln t \le t-1$). It is asymmetric, so it is not a distance.</li>
+            <li><strong>The main result:</strong> for one-hot labels, cross-entropy becomes $-\log q(\text{correct class})$, the negative log-likelihood. So minimizing it <em>is</em> maximum likelihood (<a href="03-probability.html">Section 3</a>). Softmax turns logits into $q$. Cross-entropy returns in binary form in <a href="06-logistic-regression.html">Section 6</a>, and as the softmax + cross-entropy pair in <a href="11-mlp-numpy.html">Section 11</a> and <a href="19-language-modeling.html">Section 19</a>.</li>
           </ul>
-          <p>You now hold the loss function that trains nearly every classifier ever built — and you
-          <em>derived</em> it, from “why is snow in the desert surprising?” all the way to
-          <code>F.cross_entropy</code>. Next we build our first full model — linear regression — and put
-          the gradient from Section 2 to work reducing a real loss, end to end.</p>
+          <p>You now have the loss function that trains most classifiers. And you <em>derived</em> it, from
+          “why is snow in the desert surprising?” all the way to <code>F.cross_entropy</code>. Next we build
+          our first full model, linear regression, and use the gradient from Section 2 to lower a real loss
+          from start to finish.</p>
 
           <div class="complete-bar" data-complete>
             <span class="complete-bar__text">Finished this section? Mark it done to fill your progress bar.</span>
