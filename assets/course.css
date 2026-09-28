@@ -917,7 +917,15 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
   .check > summary { cursor: auto; }
   .check .check__answer { display: none; }
   .print-answers { display: block; break-before: page; }
+  .print-answers__q { font-weight: 600; margin: 1.1rem 0 .3rem; }
   .print-answers .check__answer { display: block; border: 0; padding: 0; margin: 0 0 1rem; }
   .print-answers .check__answer::before { content: none; }
   a { color: inherit; }
 }
+
+/* ============================================================
+   19. GLOSSARY (notation page)
+   ============================================================ */
+.glossary { max-width: var(--measure); margin: 1.2rem 0; }
+.glossary dt { font-family: var(--ui); font-weight: 650; font-size: .95rem; color: var(--ink); margin-top: 1rem; }
+.glossary dd { margin: .2rem 0 0; color: var(--ink-soft); }

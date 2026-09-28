@@ -149,6 +149,12 @@ function buildSidebar(currentSlug) {
       </a>`;
     }
   }
+  const ref = currentSlug === "notation" ? ` aria-current="page"` : "";
+  html += `<div class="nav__part"><div class="nav__part-label">Reference</div></div>
+    <a class="nav__link" href="${relRoot()}notation.html"${ref}>
+      <span class="nav__num">≡</span>
+      <span class="nav__title">Notation &amp; Glossary</span>
+    </a>`;
   nav.innerHTML = html;
 }
 
@@ -382,7 +388,7 @@ function buildPrintAnswers() {
     const a = d.querySelector(".check__answer");
     const tag = d.querySelector(".check__tag");
     if (tag) tag.textContent = "Check yourself " + (i + 1);
-    html += `<h3>${i + 1}. ${q ? q.innerHTML : ""}</h3>` +
+    html += `<p class="print-answers__q"><b>${i + 1}.</b> ${q ? q.innerHTML : ""}</p>` +
             `<div class="check__answer">${a ? a.innerHTML : ""}</div>`;
   });
   sec.innerHTML = html;
