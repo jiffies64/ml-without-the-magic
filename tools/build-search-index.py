@@ -29,12 +29,14 @@ for f in sorted(glob.glob(os.path.join(ROOT, "sections", "*.html"))):
         keywords = [strip_tags(k) for k in re.findall(r'<li>(.*?)</li>', m.group(1), re.S) if strip_tags(k)]
     # headings (h2 + h3) inside .prose; drop leading section number like runtime
     headings = []
-    for hm in re.finditer(r'<h[23][^>]*>(.*?)</h[23]>', s, re.S):
-        text = strip_tags(hm.group(1))
+    for hm in re.finditer(r'<h[23]([^>]*)>(.*?)</h[23]>', s, re.S):
+        text = strip_tags(hm.group(2))
         text = re.sub(r'^\s*\d+\s*', '', text).strip()
         if not text:
             continue
-        headings.append({"t": text, "id": slugify(text)})
+        # a hand-written id wins, like at runtime (assignHeadingIds skips headings that have one)
+        idm = re.search(r'\bid="([^"]+)"', hm.group(1))
+        headings.append({"t": text, "id": idm.group(1) if idm else slugify(text)})
     entries.append({"slug": slug, "num": num, "title": title,
                     "keywords": keywords, "headings": headings})
 
