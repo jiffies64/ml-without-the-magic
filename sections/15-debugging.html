@@ -41,7 +41,15 @@
           <p class="lesson-standfirst">Almost every training bug announces itself the same handful of ways — learn to recognize them and a broken run stops being a mystery and becomes a five-minute fix.</p>
           <div class="lesson-meta">
             <span><b>22 min</b> read</span>
-            <span><b>You'll learn:</b> shape discipline · gradient checking · overfit-a-single-batch · logging &amp; checkpointing</span>
+          </div>
+          <div class="objectives">
+            <div class="objectives__label">You'll learn</div>
+            <ul>
+              <li>shape discipline</li>
+              <li>gradient checking</li>
+              <li>overfit-a-single-batch</li>
+              <li>logging &amp; checkpointing</li>
+            </ul>
           </div>
         </header>
 
@@ -103,7 +111,7 @@ out = layer2(h)                # crashes</code></pre>
             runs. Five seconds of printing beats twenty minutes of guessing.</p>
           </div>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -174,7 +182,7 @@ for i in range(len(w)):
 print(analytic)   # tensor([2., 4., 6.])
 print(numeric)    # tensor([2.0000, 4.0000, 6.0000])  -- matches, within ~eps^2</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -238,7 +246,7 @@ for step in range(300):
 # healthy run: loss falls toward ~0 well before step 300
 # broken run: loss plateaus at a stubbornly high value -- go find the bug</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -342,7 +350,7 @@ model.eval()                  # dropout off; batchnorm uses running stats
 with torch.no_grad():         # also skip building the graph -- we won't call backward()
     preds = model(x_val)</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>

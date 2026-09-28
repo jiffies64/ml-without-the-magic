@@ -44,16 +44,18 @@
             <h2 class="hero__title">Watch the <em>loss</em> go down.</h2>
             <p class="hero__sub">
               Start with what a vector is. End by coding a Mixture-of-Experts transformer
-              from a research paper. Every idea arrives three ways: a plain-English picture,
-              the math derived line by line, then the smallest PyTorch that does the same thing.
+              from a research paper. Every idea arrives in four steps: a plain-English picture,
+              the math derived line by line, the smallest PyTorch that does the same thing, and a question to check
+              that it stuck.
             </p>
             <div class="hero__cta">
-              <a class="btn btn--primary" href="sections/01-linear-algebra.html">Start Part 1 →</a>
+              <a class="btn btn--primary" data-resume href="sections/01-linear-algebra.html" hidden>Continue →</a>
+              <a class="btn btn--primary" data-start href="sections/01-linear-algebra.html">Start Part 1 →</a>
               <a class="btn btn--ghost" href="#syllabus">Browse the full syllabus</a>
               <span class="hero__note">No prerequisites beyond high-school algebra.</span>
             </div>
           </div>
-          <figure class="hero__plot" aria-hidden="true">
+          <figure class="hero__plot">
             <svg viewBox="0 0 420 260" width="100%" role="img" aria-label="A training loss curve descending over epochs">
               <!-- grid -->
               <g stroke="var(--hairline)" stroke-width="1">
@@ -80,16 +82,16 @@
               <text x="350" y="228" fill="var(--ink-faint)" font-size="11" font-family="Inter, sans-serif">epoch N</text>
               <text x="8" y="120" fill="var(--ink-faint)" font-size="11" font-family="Inter, sans-serif" transform="rotate(-90 12,120)">loss</text>
             </svg>
-            <figcaption>Training loss (line) with validation checkpoints (dots) — the picture every section is quietly working toward.</figcaption>
+            <figcaption>Training loss (line) with validation checkpoints (dots). Every section works toward this picture.</figcaption>
           </figure>
         </section>
 
         <!-- Course promise -->
         <section style="max-width:44rem;">
           <p class="lead">Most ML material picks a lane: all math and no code, or all code and no
-          understanding. This course refuses to. You will never read <em>“it can be shown that.”</em>
-          We show it — then translate every equation into one plain sentence, and give every idea a
-          real-life parallel so it actually sticks.</p>
+          understanding. This course does both. You will never read <em>“it can be shown that.”</em>
+          We show each step. Then we translate every equation into one plain sentence, and we give
+          every idea a picture from everyday life, so that it stays with you.</p>
         </section>
 
         <!-- Parts grid (built by JS) -->
@@ -116,7 +118,7 @@
           <div class="part-block__head">
             <span class="part-block__num">${part.n}</span>
             <h3 class="part-block__title">${part.title}</h3>
-            ${part.deep ? '<span class="part-block__deep">Goes deepest</span>' : ''}
+            
           </div>
           <div class="card-list">`;
         for (const s of part.sections) {
@@ -125,6 +127,7 @@
             <div class="card__title">${s.title}</div>
             <div class="card__meta">
               <span>${s.min} min</span>
+              ${s.key ? '<span class="card__key">Key lesson</span>' : ''}
               <span class="done" data-card-done style="display:none">✓ done</span>
             </div>
           </a>`;

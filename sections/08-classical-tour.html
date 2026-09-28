@@ -41,7 +41,15 @@
           <p class="lesson-standfirst">Before neural networks, machine learning already worked — meet the four ideas that still quietly win on everyday tabular data.</p>
           <div class="lesson-meta">
             <span><b>16 min</b> read</span>
-            <span><b>You'll learn:</b> k-nearest neighbors · decision trees · ensembles · SVM intuition</span>
+          </div>
+          <div class="objectives">
+            <div class="objectives__label">You'll learn</div>
+            <ul>
+              <li>k-nearest neighbors</li>
+              <li>decision trees</li>
+              <li>ensembles</li>
+              <li>SVM intuition</li>
+            </ul>
           </div>
         </header>
 
@@ -89,7 +97,7 @@ model = KNeighborsClassifier(n_neighbors=5)
 model.fit(X_train, y_train)          # "fit" just stores the data -- no real learning happens
 pred = model.predict(X_new)          # for each new point: find its 5 closest neighbors, vote</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -134,7 +142,7 @@ pred = model.predict(X_new)          # for each new point: find its 5 closest ne
 model = DecisionTreeClassifier(max_depth=4)   # cap the depth so it can't ask endless questions
 model.fit(X_train, y_train)</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -179,7 +187,7 @@ forest.fit(X_train, y_train)
 boosted = GradientBoostingClassifier(n_estimators=200)  # boosting: each tree fixes the last one's errors
 boosted.fit(X_train, y_train)</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -230,7 +238,7 @@ boosted.fit(X_train, y_train)</code></pre>
 model = SVC(kernel="rbf")     # "rbf" kernel = the lift-into-higher-dimensions trick
 model.fit(X_train, y_train)</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>

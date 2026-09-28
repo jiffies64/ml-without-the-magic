@@ -41,7 +41,15 @@
           <p class="lesson-standfirst">Everything you hand-derived in Section 10 — the graph, the chain rule, the backward pass — is about to be built and run for you automatically. You'll re-derive a small graph by hand, then watch autograd reproduce your gradients to the decimal.</p>
           <div class="lesson-meta">
             <span><b>26 min</b> read</span>
-            <span><b>You'll learn:</b> tensors · broadcasting · autograd · the computation graph</span>
+          </div>
+          <div class="objectives">
+            <div class="objectives__label">You'll learn</div>
+            <ul>
+              <li>tensors</li>
+              <li>broadcasting</li>
+              <li>autograd</li>
+              <li>the computation graph</li>
+            </ul>
           </div>
         </header>
 
@@ -99,7 +107,7 @@ cube   = torch.zeros(2, 3, 4)                   # rank 3, shape (2, 3, 4)
 print(vector.shape, vector.dtype, vector.device)
 # torch.Size([3]) torch.float32 cpu</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -161,7 +169,7 @@ print(sales * tax_rate)   # shape (4, 3): the rate applied to every row, no loop
             <code>.shape</code>s and check which dimension refuses to line up.</p>
           </div>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -172,7 +180,7 @@ print(sales * tax_rate)   # shape (4, 3): the rate applied to every row, no loop
                 <p>Yes. Comparing from the right: 10 vs 10 match, and the leftover dimension on
                 <code>x</code> (64) simply stays. The result has shape <code>(64, 10)</code> — the same
                 bias vector added to every one of the 64 rows. This is exactly how a linear layer's bias
-                term <span style="white-space:nowrap">$\mathbf{Wx}+\mathbf{b}$</span> gets applied to a
+                term $\mathbf{Wx}+\mathbf{b}$ gets applied to a
                 whole batch at once.</p>
               </div>
             </details>
@@ -261,7 +269,7 @@ print(a.grad, b.grad, c.grad, f.grad)
           approximate technique, it is the literal chain-rule walk from Section 10, executed by a
           machine that never drops a term.</p>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -347,7 +355,7 @@ y = x ** 2
 y.backward()
 print(x.grad)      # tensor(4.)  correct, now that we cleared it first</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>

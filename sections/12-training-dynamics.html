@@ -41,7 +41,15 @@
           <p class="lesson-standfirst">The same network can fail or fly depending on how you start it and how you step — here's the why behind the knobs.</p>
           <div class="lesson-meta">
             <span><b>32 min</b> read</span>
-            <span><b>You'll learn:</b> weight initialization (Xavier/He) · learning rates · SGD, momentum, Adam · LR schedules</span>
+          </div>
+          <div class="objectives">
+            <div class="objectives__label">You'll learn</div>
+            <ul>
+              <li>weight initialization (Xavier/He)</li>
+              <li>learning rates</li>
+              <li>SGD, momentum, Adam</li>
+              <li>LR schedules</li>
+            </ul>
           </div>
         </header>
 
@@ -86,9 +94,9 @@
 
           <p class="beat beat--math">Now the math</p>
           <p>The tempting "safe" choice is to set every weight to zero. Let's prove why it destroys the
-          network. Take one layer with two identical-looking neurons. Each neuron <span style="white-space:nowrap">$j$</span>
-          computes a weighted sum of the same inputs <span style="white-space:nowrap">$\mathbf{x}$</span>,
-          then passes it through an activation function <span style="white-space:nowrap">$\phi$</span> (a
+          network. Take one layer with two identical-looking neurons. Each neuron $j$
+          computes a weighted sum of the same inputs $\mathbf{x}$,
+          then passes it through an activation function $\phi$ (a
           simple nonlinear squashing function like ReLU or sigmoid):</p>
           $$ a_j = \phi\!\left(\sum_i w_{ji}\, x_i + b_j\right) $$
           <p class="gloss"><b>In words:</b> neuron <b>j</b>'s output is: multiply each input <b>xᵢ</b> by
@@ -96,13 +104,13 @@
           from input <b>i</b> into neuron <b>j</b>.</p>
 
           <p>Now set every weight and bias to the same value — say zero. Then for <em>every</em> neuron
-          <span style="white-space:nowrap">$j$</span> in the layer, the sum inside is the same number, so
+          $j$ in the layer, the sum inside is the same number, so
           every neuron produces the <em>same output</em>:</p>
           $$ w_{ji} = 0 \;\;\Rightarrow\;\; a_1 = a_2 = \dots = a_n = \phi(0) $$
           <p>That is already bad, but the killer is what backprop does next. The gradient that flows back
-          into weight <span style="white-space:nowrap">$w_{ji}$</span> depends only on that neuron's input
-          <span style="white-space:nowrap">$x_i$</span> and the error signal arriving at neuron
-          <span style="white-space:nowrap">$j$</span>. Because all neurons in the layer are identical,
+          into weight $w_{ji}$ depends only on that neuron's input
+          $x_i$ and the error signal arriving at neuron
+          $j$. Because all neurons in the layer are identical,
           they all receive the <em>identical</em> error signal, so every weight in the layer gets the
           <em>identical</em> gradient:</p>
           $$ \frac{\partial L}{\partial w_{1i}} = \frac{\partial L}{\partial w_{2i}} = \dots = \frac{\partial L}{\partial w_{ni}} $$
@@ -158,11 +166,11 @@
           weight times input. <b>n_in</b> (called <em>fan-in</em>) is simply how many inputs feed this
           neuron.</p>
 
-          <p>We want the output <span style="white-space:nowrap">$z$</span> to have roughly the same
+          <p>We want the output $z$ to have roughly the same
           <em>spread</em> as the inputs, so the signal neither grows nor shrinks. "Spread" is measured by
           <strong>variance</strong> (a number saying how far values typically stray from their average).
           Assume the weights and inputs start centered at zero, are independent, and each input has variance
-          <span style="white-space:nowrap">$\mathrm{Var}(x)$</span>. The variance of a sum of independent
+          $\mathrm{Var}(x)$. The variance of a sum of independent
           zero-mean products adds up term by term:</p>
           $$ \mathrm{Var}(z) = \sum_{i=1}^{n_\text{in}} \mathrm{Var}(w_i\, x_i)
              = n_\text{in}\,\mathrm{Var}(w)\,\mathrm{Var}(x) $$
@@ -181,8 +189,8 @@
 
           <p><strong>Xavier / Glorot initialization</strong> refines this by noticing that signal flows
           <em>two</em> ways — forward (the activations) and backward (the gradients). The forward pass wants
-          <span style="white-space:nowrap">$\mathrm{Var}(w)=1/n_\text{in}$</span>; the backward pass wants
-          <span style="white-space:nowrap">$\mathrm{Var}(w)=1/n_\text{out}$</span>. Glorot's compromise
+          $\mathrm{Var}(w)=1/n_\text{in}$; the backward pass wants
+          $\mathrm{Var}(w)=1/n_\text{out}$. Glorot's compromise
           averages the two:</p>
           $$ \mathrm{Var}(w) = \frac{2}{n_\text{in} + n_\text{out}} $$
           <p class="gloss"><b>In words:</b> use the average of the fan-in and fan-out constraints. <b>n_out</b>
@@ -190,7 +198,7 @@
           symmetric around zero, like <b>tanh</b> and sigmoid.</p>
 
           <p><strong>He (Kaiming) initialization</strong> fixes Xavier for ReLU. ReLU
-          (<span style="white-space:nowrap">$\max(0,z)$</span> — it zeroes out every negative input) throws
+          ($\max(0,z)$ — it zeroes out every negative input) throws
           away half the signal on average, halving the variance at each layer. He compensates by doubling
           the scale:</p>
           $$ \mathrm{Var}(w) = \frac{2}{n_\text{in}} $$
@@ -235,7 +243,7 @@ print(layer.weight.var().item())   # ~0.0078
             initialization (or the learning rate, next) before anything else.</p>
           </div>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -260,7 +268,7 @@ print(layer.weight.var().item())   # ~0.0078
 
           <p class="beat beat--intuition">Intuition first</p>
           <p>Gradient descent moves each weight a little bit in the downhill direction that backprop found.
-          The <strong>learning rate</strong> (written <span style="white-space:nowrap">$\alpha$</span>, and
+          The <strong>learning rate</strong> (written $\alpha$, and
           sometimes called the <em>step size</em>) is the single number that says <em>how big</em> "a
           little bit" is. It is the most important hyperparameter you will tune, and it has a real
           sweet-spot: too big and the steps overshoot and the loss diverges; too small and training crawls,
@@ -277,14 +285,14 @@ print(layer.weight.var().item())   # ~0.0078
 
           <p class="beat beat--math">Now the math</p>
           <p>The update rule for one weight (or the whole parameter vector
-          <span style="white-space:nowrap">$\theta$</span>) is just:</p>
+          $\theta$) is just:</p>
           $$ \theta \leftarrow \theta - \alpha\, \nabla_\theta L $$
           <p class="gloss"><b>In words:</b> the arrow means "replace the left side with the right side."
           Take the current parameters <b>θ</b>, subtract the gradient <b>∇L</b> (the uphill direction)
           scaled by the learning rate <b>α</b>. Subtracting the uphill direction means stepping downhill.
           <b>α</b> controls the length of that step.</p>
 
-          <p>Why does too-large <span style="white-space:nowrap">$\alpha$</span> diverge? On a simple bowl-
+          <p>Why does too-large $\alpha$ diverge? On a simple bowl-
           shaped loss, if the step is larger than the curvature can absorb, each step lands on the opposite
           wall of the bowl <em>higher</em> than before. The loss then grows every step instead of shrinking
           — the tell-tale sign that your learning rate is too high.</p>
@@ -298,7 +306,7 @@ print(layer.weight.var().item())   # ~0.0078
             learning rate before fiddling with anything fancier.</p>
           </div>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -342,7 +350,7 @@ print(layer.weight.var().item())   # ~0.0078
 
           <p class="beat beat--math">Now the math</p>
           <p>SGD is the update from the last section, computed on a minibatch
-          <span style="white-space:nowrap">$\mathcal{B}$</span> instead of the whole set:</p>
+          $\mathcal{B}$ instead of the whole set:</p>
           $$ \theta \leftarrow \theta - \alpha\, \nabla_\theta L_{\mathcal{B}}(\theta) $$
           <p class="gloss"><b>In words:</b> same downhill step as before, but the gradient <b>∇L_B</b> is
           measured on just the current minibatch <b>B</b> — a noisy but unbiased estimate of the true
@@ -370,7 +378,7 @@ print(layer.weight.var().item())   # ~0.0078
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>Momentum keeps a <strong>velocity</strong> vector <span style="white-space:nowrap">$v$</span>,
+          <p>Momentum keeps a <strong>velocity</strong> vector $v$,
           which is an <dfn>exponentially-decaying moving average (EMA)</dfn> of past gradients — a running
           average that weights recent gradients more and lets old ones fade:</p>
           $$ \begin{aligned}
@@ -386,7 +394,7 @@ print(layer.weight.var().item())   # ~0.0078
           <div class="callout definition">
             <div class="callout__label">Definition</div>
             <p>An <dfn>EMA</dfn> (exponentially-decaying moving average) blends a running value with each
-            new observation: <span style="white-space:nowrap">$v \leftarrow \beta v + (1-\beta)\,g$</span>.
+            new observation: $v \leftarrow \beta v + (1-\beta)\,g$.
             A high <b>β</b> (like 0.9) means a long memory (each value influences many future steps); a low
             <b>β</b> means a short memory. It shows up three times in this section — in momentum, and twice
             inside Adam.</p>
@@ -412,15 +420,15 @@ print(layer.weight.var().item())   # ~0.0078
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>Adam keeps <em>two</em> running averages of the gradient <span style="white-space:nowrap">$g = \nabla_\theta L$</span>.
-          Let <span style="white-space:nowrap">$t$</span> be the step count, starting at 1. First, the
-          <strong>first moment</strong> <span style="white-space:nowrap">$m$</span> — an EMA of the gradient
+          <p>Adam keeps <em>two</em> running averages of the gradient $g = \nabla_\theta L$.
+          Let $t$ be the step count, starting at 1. First, the
+          <strong>first moment</strong> $m$ — an EMA of the gradient
           itself, i.e. plain momentum, tracking <em>which way</em> to go:</p>
           $$ m \leftarrow \beta_1\, m + (1-\beta_1)\, g $$
           <p class="gloss"><b>In words:</b> blend the running direction <b>m</b> with the fresh gradient.
           <b>β₁</b> is usually 0.9. This is the "momentum" half — the smoothed direction.</p>
 
-          <p>Second, the <strong>second moment</strong> <span style="white-space:nowrap">$v$</span> — an EMA
+          <p>Second, the <strong>second moment</strong> $v$ — an EMA
           of the gradient <em>squared</em> (each component squared, elementwise), tracking <em>how big and
           bouncy</em> each parameter's gradient has been:</p>
           $$ v \leftarrow \beta_2\, v + (1-\beta_2)\, g^2 $$
@@ -429,8 +437,8 @@ print(layer.weight.var().item())   # ~0.0078
           been large and jumpy builds a large <b>v</b>; a parameter with small steady gradients has a small
           <b>v</b>. This is the per-parameter terrain sensor.</p>
 
-          <p>There's a cold-start problem. Both <span style="white-space:nowrap">$m$</span> and
-          <span style="white-space:nowrap">$v$</span> start at zero, so for the first several steps they're
+          <p>There's a cold-start problem. Both $m$ and
+          $v$ start at zero, so for the first several steps they're
           biased toward zero — too small — which would make the early steps wrong. The <strong>bias
           correction</strong> scales them back up to their true size:</p>
           $$ \hat{m} = \frac{m}{1 - \beta_1^{\,t}}, \qquad
@@ -440,8 +448,8 @@ print(layer.weight.var().item())   # ~0.0078
           grows, <b>βᵗ</b> shrinks toward 0, the divisor approaches 1, and the correction quietly switches
           off. It's a warm-up patch for the first dozen or so steps.</p>
 
-          <p>Finally the update — momentum direction <span style="white-space:nowrap">$\hat{m}$</span>,
-          divided by the per-parameter scale <span style="white-space:nowrap">$\sqrt{\hat{v}}$</span>:</p>
+          <p>Finally the update — momentum direction $\hat{m}$,
+          divided by the per-parameter scale $\sqrt{\hat{v}}$:</p>
           $$ \theta \leftarrow \theta - \alpha\,\frac{\hat{m}}{\sqrt{\hat{v}} + \epsilon} $$
           <p class="gloss"><b>In words:</b> step in the smoothed direction <b>m̂</b>, but divide each
           parameter's step by the square root of its own <b>v̂</b>. A weight with a big, bouncy gradient
@@ -491,7 +499,7 @@ opt.step()         # the optimizer applies its update rule</code></pre>
             model won't converge. Clear the gradients every single step.</p>
           </div>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -516,7 +524,7 @@ opt.step()         # the optimizer applies its update rule</code></pre>
           <p>Even the best fixed learning rate is a compromise. Early in training you want <em>big</em> steps
           to cover ground fast; late in training, near the bottom, you want <em>small</em> steps so you can
           settle precisely into the minimum instead of bouncing around it. A <strong>learning-rate
-          schedule</strong> changes <span style="white-space:nowrap">$\alpha$</span> as training goes on —
+          schedule</strong> changes $\alpha$ as training goes on —
           usually starting higher and shrinking it over time.</p>
 
           <div class="callout parallel">
@@ -529,7 +537,7 @@ opt.step()         # the optimizer applies its update rule</code></pre>
 
           <p class="beat beat--math">Now the math</p>
           <p>Three schedules you'll meet constantly. <strong>Step decay</strong> multiplies the learning rate
-          by a factor <span style="white-space:nowrap">$\gamma$</span> (gamma, e.g. 0.1) every fixed number
+          by a factor $\gamma$ (gamma, e.g. 0.1) every fixed number
           of epochs (an <em>epoch</em> = one full pass over the training data):</p>
           $$ \alpha_t = \alpha_0 \cdot \gamma^{\lfloor t / s \rfloor} $$
           <p class="gloss"><b>In words:</b> start at <b>α₀</b>; every <b>s</b> epochs, drop the rate by the
@@ -537,8 +545,8 @@ opt.step()         # the optimizer applies its update rule</code></pre>
           Simple staircase: flat, then a sudden cut, then flat again.</p>
 
           <p><strong>Cosine decay</strong> lowers the rate smoothly along the shape of a cosine curve, from
-          <span style="white-space:nowrap">$\alpha_0$</span> down to (near) zero over the total training
-          length <span style="white-space:nowrap">$T$</span>:</p>
+          $\alpha_0$ down to (near) zero over the total training
+          length $T$:</p>
           $$ \alpha_t = \tfrac{1}{2}\,\alpha_0\left(1 + \cos\!\frac{\pi t}{T}\right) $$
           <p class="gloss"><b>In words:</b> at the start (<b>t=0</b>) the cosine is 1, so <b>αₜ = α₀</b>; at
           the end (<b>t=T</b>) the cosine is −1, so <b>αₜ = 0</b>. In between it glides down a smooth
@@ -548,8 +556,8 @@ opt.step()         # the optimizer applies its update rule</code></pre>
           learning rate and <em>raise</em> it over the first few hundred or thousand steps before letting a
           decay schedule take over. Why? Early on, the weights are freshly random and the gradient estimates
           are wild; a big step right away can throw the model into a bad region it never recovers from.
-          Warmup lets the running averages (Adam's <span style="white-space:nowrap">$m$</span> and
-          <span style="white-space:nowrap">$v$</span>) stabilise before you trust them with full-size steps.</p>
+          Warmup lets the running averages (Adam's $m$ and
+          $v$) stabilise before you trust them with full-size steps.</p>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> Why transformers always warm up</div>
@@ -586,7 +594,7 @@ for epoch in range(100):
           per-step schedulers exist). The scheduler simply overwrites the <code>lr</code> that the optimizer
           reads on its next step.</p>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -597,7 +605,7 @@ for epoch in range(100):
                 <p>Add a <strong>decay schedule</strong> (step or cosine) so the learning rate shrinks later
                 in training. The late-stage jitter is the optimizer taking steps too large to settle into
                 the narrow minimum — it keeps overshooting by a little, like trying to park at full speed.
-                Lowering <span style="white-space:nowrap">$\alpha$</span> over time lets it inch into the
+                Lowering $\alpha$ over time lets it inch into the
                 bottom precisely. Cosine decay to near zero is the usual go-to, and it typically buys a
                 small but real bump in final accuracy for free.</p>
               </div>
@@ -611,15 +619,15 @@ for epoch in range(100):
             <li><strong>Never initialize weights to all zeros</strong> — identical neurons get identical
             gradients and stay clones forever (the symmetry problem). Use small random weights.</li>
             <li>Scale that randomness to <strong>preserve variance</strong> across layers:
-            <span style="white-space:nowrap">$\mathrm{Var}(w)\approx 1/n_\text{in}$</span>. Use
-            <strong>He</strong> (<span style="white-space:nowrap">$2/n_\text{in}$</span>) with ReLU,
-            <strong>Xavier</strong> (<span style="white-space:nowrap">$2/(n_\text{in}+n_\text{out})$</span>)
+            $\mathrm{Var}(w)\approx 1/n_\text{in}$. Use
+            <strong>He</strong> ($2/n_\text{in}$) with ReLU,
+            <strong>Xavier</strong> ($2/(n_\text{in}+n_\text{out})$)
             with tanh/sigmoid.</li>
             <li>The <strong>learning rate</strong> is your most important knob: too high diverges, too low
             crawls. Tune it first; a good default is <code>1e-3</code> for Adam.</li>
             <li><strong>Optimizers</strong> build up: SGD steps on a cheap noisy minibatch gradient;
             <strong>momentum</strong> adds an EMA of past gradients for direction and speed;
-            <strong>Adam</strong> adds a per-parameter step size (<span style="white-space:nowrap">$\sqrt{\hat v}$</span>)
+            <strong>Adam</strong> adds a per-parameter step size ($\sqrt{\hat v}$)
             plus bias correction.</li>
             <li><strong>Schedules</strong> shrink the learning rate over time — step or cosine decay to
             settle precisely, with <strong>warmup</strong> at the start for touchy models like transformers.</li>

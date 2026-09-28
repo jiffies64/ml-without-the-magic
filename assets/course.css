@@ -1,9 +1,8 @@
 /* ============================================================
-   Zero to Hero: Machine Learning — course stylesheet
+   Machine Learning Without the Magic: course stylesheet
    One coherent system. Tokens first, then layout, then parts.
+   Fonts are vendored in assets/vendor/fonts/ and linked in <head>.
    ============================================================ */
-
-/* ---- Fonts (Google Fonts CDN) are linked in <head> ---- */
 
 /* ============================================================
    1. TOKENS
@@ -22,18 +21,18 @@
   --violet:      #5B50E6;   /* the through-line */
   --violet-soft: #EEECFD;
   --violet-ink:  #3A31B0;
-  --amber:       #B96E00;   /* check-yourself prompts */
+  --amber:       #955800;   /* check-yourself prompts (5.1:1 on amber-soft) */
   --amber-soft:  #FBF1DF;
-  --green:       #217F55;   /* revealed answers / done */
+  --green:       #1D7049;   /* revealed answers / done */
   --green-soft:  #E4F3EC;
-  --rose:        #C43F5A;   /* warnings / failure modes */
+  --rose:        #B0304C;   /* warnings / failure modes */
   --rose-soft:   #FBEAED;
 
   /* code token colors (own theme, no hljs CSS file) */
   --code-bg:      #F7F6F3;
   --code-border:  #E7E5DF;
   --hl-base:      #2C2F36;
-  --hl-comment:   #8A8F79;
+  --hl-comment:   #676C58;   /* comments carry teaching: keep >= 4.5:1 */
   --hl-keyword:   #8E44AD;
   --hl-string:    #337A4E;
   --hl-number:    #B5651D;
@@ -48,11 +47,13 @@
   --mono:    "JetBrains Mono", ui-monospace, monospace;
 
   /* rhythm */
-  --measure: 44rem;          /* readable line length */
+  --measure: 39rem;          /* readable line length: ~70 characters */
   --sidebar: 19rem;
   --gutter: clamp(1.25rem, 4vw, 3.5rem);
   --radius: 10px;
   --radius-sm: 7px;
+
+  --grid-line: color-mix(in srgb, var(--hairline) 55%, transparent);
 
   color-scheme: light;
 }
@@ -80,13 +81,15 @@
   --code-bg:      #12141B;
   --code-border:  #23262F;
   --hl-base:      #D4D7E0;
-  --hl-comment:   #6E7385;
+  --hl-comment:   #8A8FA3;
   --hl-keyword:   #C792EA;
   --hl-string:    #9FD5A6;
   --hl-number:    #E0A66B;
   --hl-func:      #82AAFF;
   --hl-builtin:   #6FD0DA;
   --hl-attr:      #E5B567;
+
+  --grid-line: color-mix(in srgb, var(--hairline) 45%, transparent);
 
   color-scheme: dark;
 }
@@ -142,20 +145,12 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
   overflow-y: auto;
   overscroll-behavior: contain;
   background:
-    linear-gradient(var(--paper-sunken), var(--paper-sunken)),
-    repeating-linear-gradient(0deg, transparent, transparent 23px, var(--hairline) 23px, var(--hairline) 24px),
-    repeating-linear-gradient(90deg, transparent, transparent 23px, var(--hairline) 23px, var(--hairline) 24px);
-  background-blend-mode: normal, multiply, multiply;
+    repeating-linear-gradient(0deg, transparent 0 23px, var(--grid-line) 23px 24px),
+    repeating-linear-gradient(90deg, transparent 0 23px, var(--grid-line) 23px 24px),
+    var(--paper-sunken);
   border-right: 1px solid var(--hairline-strong);
   padding: 1.6rem 0 3rem;
   font-family: var(--ui);
-}
-[data-theme="dark"] .sidebar {
-  background:
-    linear-gradient(var(--paper-sunken), var(--paper-sunken)),
-    repeating-linear-gradient(0deg, transparent, transparent 23px, var(--hairline) 23px, var(--hairline) 24px),
-    repeating-linear-gradient(90deg, transparent, transparent 23px, var(--hairline) 23px, var(--hairline) 24px);
-  background-blend-mode: normal, screen, screen;
 }
 
 .brand {
@@ -424,7 +419,7 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 }
 .beat--intuition { color: var(--violet); }
 .beat--math     { color: var(--ink-soft); }
-.beat--code     { color: var(--builtin, var(--green)); color: var(--green); }
+.beat--code     { color: var(--green); }
 .beat--check    { color: var(--amber); }
 
 /* callout base */
@@ -700,9 +695,8 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
     width: min(84vw, 20rem); height: 100dvh;
     transform: translateX(-100%);
     transition: transform .28s cubic-bezier(.4,0,.2,1);
-    box-shadow: 0 0 60px rgba(0,0,0,.25);
   }
-  body.nav-open .sidebar { transform: translateX(0); }
+  body.nav-open .sidebar { transform: translateX(0); box-shadow: 0 0 60px rgba(0,0,0,.25); }
   .nav-scrim {
     position: fixed; inset: 0; z-index: 55;
     background: rgba(0,0,0,.4); opacity: 0; pointer-events: none;
@@ -788,6 +782,7 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 .card__title { font-family: var(--body); font-weight: 600; font-size: 1.08rem; line-height: 1.25; margin: .3rem 0 .4rem; }
 .card__meta { font-family: var(--ui); font-size: .74rem; color: var(--ink-faint); display: flex; gap: .8rem; }
 .card__meta .done { color: var(--green); }
+.card__key { color: var(--amber); font-weight: 600; }
 
 /* skip link */
 .skip {
@@ -796,3 +791,133 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
   font-family: var(--ui); font-size: .85rem;
 }
 .skip:focus { left: 0; }
+
+/* ============================================================
+   12. INLINE MATH, GLOSS MATH
+   ============================================================ */
+/* short inline formulas never break across lines; long ones belong in display math */
+.prose :not(.katex-display) > .katex { white-space: nowrap; }
+.gloss .katex { font-size: 1.02em; color: var(--ink); }
+.check-wrap { display: contents; }
+
+/* ============================================================
+   13. FIGURES (inline SVG that follows the theme)
+   ============================================================ */
+.prose figure.fig { max-width: var(--measure); margin: 2.2rem 0; }
+.fig__frame {
+  background: var(--paper-raised);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem .8rem;
+}
+.fig svg { display: block; width: 100%; height: auto; overflow: visible; }
+.prose figure.fig figcaption { text-align: left; }
+.fig figcaption b { color: var(--ink-soft); font-weight: 650; }
+/* shared SVG vocabulary: strokes, fills, text */
+.fig .ax   { stroke: var(--hairline-strong); stroke-width: 1.5; fill: none; }
+.fig .grid { stroke: var(--hairline); stroke-width: 1; fill: none; }
+.fig .ln   { fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.fig .thin { stroke-width: 1.5; }
+.fig .dash { stroke-dasharray: 5 4; }
+.fig .s-v { stroke: var(--violet); }  .fig .f-v  { fill: var(--violet); }  .fig .f-vs { fill: var(--violet-soft); }
+.fig .s-a { stroke: var(--amber); }   .fig .f-a  { fill: var(--amber); }   .fig .f-as { fill: var(--amber-soft); }
+.fig .s-g { stroke: var(--green); }   .fig .f-g  { fill: var(--green); }   .fig .f-gs { fill: var(--green-soft); }
+.fig .s-r { stroke: var(--rose); }    .fig .f-r  { fill: var(--rose); }    .fig .f-rs { fill: var(--rose-soft); }
+.fig .s-i { stroke: var(--ink-soft); } .fig .f-i { fill: var(--ink-soft); } .fig .f-p { fill: var(--paper-raised); }
+.fig .s-f { stroke: var(--ink-faint); } .fig .f-f { fill: var(--ink-faint); } .fig .f-k { fill: var(--paper-sunken); }
+.fig text { font-family: var(--ui); font-size: 12px; fill: var(--ink-soft); }
+.fig text.sm { font-size: 10.5px; fill: var(--ink-faint); }
+.fig text.lg { font-size: 14px; }
+.fig text.b  { font-weight: 650; fill: var(--ink); }
+.fig text.m  { font-family: var(--body); font-style: italic; font-size: 15px; fill: var(--ink); }
+.fig text.tv { fill: var(--violet); } .fig text.ta { fill: var(--amber); }
+.fig text.tg { fill: var(--green); }  .fig text.tr { fill: var(--rose); }
+
+/* ============================================================
+   14. LESSON HEAD: objectives + prerequisites
+   ============================================================ */
+.objectives {
+  margin-top: 1.3rem;
+  padding: .9rem 1.1rem;
+  border: 1px solid var(--hairline);
+  border-left: 3px solid var(--violet);
+  border-radius: var(--radius-sm);
+  background: var(--paper-raised);
+  font-family: var(--ui);
+  font-size: .88rem;
+  color: var(--ink-soft);
+}
+.objectives__label {
+  font-size: .7rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--violet); margin-bottom: .4rem;
+}
+.objectives ul { margin: 0; padding-left: 1.1rem; }
+.objectives li { margin: .15rem 0; }
+.objectives li::marker { color: var(--violet); }
+.objectives__pre { margin: .6rem 0 0; font-size: .82rem; color: var(--ink-faint); }
+
+/* ============================================================
+   15. ON THIS PAGE (wide screens only)
+   ============================================================ */
+.toc { display: none; }
+@media (min-width: 1400px) {
+  .toc {
+    display: block;
+    position: fixed; top: 5.2rem; right: 1.6rem; width: 12.5rem;
+    max-height: calc(100vh - 7rem); overflow-y: auto;
+    font-family: var(--ui); font-size: .78rem; line-height: 1.35;
+  }
+  .toc__label {
+    font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--ink-faint); margin-bottom: .5rem;
+  }
+  .toc a {
+    display: block; padding: .28rem 0 .28rem .7rem;
+    border-left: 2px solid var(--hairline);
+    color: var(--ink-faint);
+  }
+  .toc a:hover { color: var(--ink); text-decoration: none; }
+  .toc a.is-active { color: var(--violet); border-left-color: var(--violet); }
+}
+
+/* ============================================================
+   16. CODE: copy button
+   ============================================================ */
+.prose pre { position: relative; }
+.copybtn {
+  position: absolute; top: .5rem; right: .5rem;
+  font-family: var(--ui); font-size: .7rem; font-weight: 600;
+  padding: .25rem .55rem; border-radius: 5px; cursor: pointer;
+  background: var(--paper-raised); color: var(--ink-faint);
+  border: 1px solid var(--code-border);
+  opacity: 0; transition: opacity .15s, color .15s;
+}
+.prose pre:hover .copybtn, .copybtn:focus-visible { opacity: 1; }
+.copybtn:hover { color: var(--violet); }
+@media (hover: none) { .copybtn { opacity: 1; } }
+
+/* ============================================================
+   17. HOME: continue button
+   ============================================================ */
+.btn--resume[hidden] { display: none; }
+
+/* ============================================================
+   18. PRINT
+   ============================================================ */
+.print-answers { display: none; }
+@media print {
+  @page { margin: 16mm 15mm 18mm; }
+  :root { --measure: 100%; }
+  body { font-size: 10.5pt; line-height: 1.55; background: #fff; }
+  .sidebar, .topbar, .nav-scrim, .skip, .pager, .complete-bar, .toc, .copybtn, .check__reveal { display: none !important; }
+  .layout { display: block; }
+  .reading { max-width: none; padding: 0; }
+  .prose pre, .callout, .check, figure, .eq, table, .katex-display { break-inside: avoid; }
+  .prose h2, .prose h3 { break-after: avoid; }
+  .check > summary { cursor: auto; }
+  .check .check__answer { display: none; }
+  .print-answers { display: block; break-before: page; }
+  .print-answers .check__answer { display: block; border: 0; padding: 0; margin: 0 0 1rem; }
+  .print-answers .check__answer::before { content: none; }
+  a { color: inherit; }
+}

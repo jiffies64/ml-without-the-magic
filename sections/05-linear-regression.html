@@ -41,7 +41,15 @@
           <p class="lesson-standfirst">Every model you will ever train is secretly just three ingredients — a hypothesis, a loss, and an optimizer — and linear regression is the cleanest place to watch all three get solved by hand.</p>
           <div class="lesson-meta">
             <span><b>30 min</b> read</span>
-            <span><b>You'll learn:</b> hypothesis classes · loss functions · optimization · linear regression (closed form &amp; gradient descent)</span>
+          </div>
+          <div class="objectives">
+            <div class="objectives__label">You'll learn</div>
+            <ul>
+              <li>hypothesis classes</li>
+              <li>loss functions</li>
+              <li>optimization</li>
+              <li>linear regression (closed form &amp; gradient descent)</li>
+            </ul>
           </div>
         </header>
 
@@ -107,7 +115,7 @@
             knows how to take the current guess and produce a slightly better one.</p>
           </div>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -165,7 +173,7 @@ x = torch.tensor([1800.0])     # house size, sqft
 y_hat = x * w + b
 print(y_hat)                   # tensor([226000.])</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -227,7 +235,7 @@ print(y_hat)                   # tensor([226000.])</code></pre>
             noise.</p>
           </div>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -318,7 +326,7 @@ y = np.array([150_000.0, 180_000.0, 240_000.0, 300_000.0])
 w, b = fit_normal_equation(X, y)
 print(w, b)   # array([176.6...]), 22...   -- exact best-fit line, in one call</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -409,7 +417,7 @@ for step in range(500):
 
 print(w.item(), b.item(), loss.item())</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>

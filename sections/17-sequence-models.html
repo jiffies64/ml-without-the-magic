@@ -41,7 +41,16 @@
           <p class="lesson-standfirst">A recurrent network reads one step at a time and carries a memory forward — and the very thing that makes that possible is also what makes it so hard to train over long stretches.</p>
           <div class="lesson-meta">
             <span><b>24 min</b> read</span>
-            <span><b>You'll learn:</b> RNNs &amp; hidden state · unrolling · vanishing/exploding gradients · LSTMs · why we moved on</span>
+          </div>
+          <div class="objectives">
+            <div class="objectives__label">You'll learn</div>
+            <ul>
+              <li>RNNs &amp; hidden state</li>
+              <li>unrolling</li>
+              <li>vanishing/exploding gradients</li>
+              <li>LSTMs</li>
+              <li>why we moved on</li>
+            </ul>
           </div>
         </header>
 
@@ -85,7 +94,7 @@
           hidden state <b>h_{t-1}</b>, and produces the new hidden state <b>h_t</b>:</p>
           $$ \mathbf{h}_t = \tanh\!\left( \mathbf{W} \mathbf{x}_t + \mathbf{U} \mathbf{h}_{t-1} + \mathbf{b} \right) $$
           <p class="gloss"><b>In words:</b> <b>W</b> is a matrix that transforms the current input
-          (exactly the <span style="white-space:nowrap">$\mathbf{Wx}$</span> from
+          (exactly the $\mathbf{Wx}$ from
           <a href="01-linear-algebra.html">Section 1</a>); <b>U</b> is a matrix that transforms the
           previous hidden state, folding in what's been remembered so far; <b>b</b> is a bias vector; and
           <b>tanh</b> squashes the result into a bounded range so the hidden state can't grow without
@@ -118,7 +127,7 @@ outputs, h_last = rnn(x, h0)
 print(outputs.shape)   # torch.Size([4, 10, 16]) -> hidden state at every one of the 10 steps
 print(h_last.shape)    # torch.Size([1, 4, 16])  -> just the final hidden state</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -181,7 +190,7 @@ print(h_last.shape)    # torch.Size([1, 4, 16])  -> just the final hidden state<
             information about that early subject has often faded to nearly nothing.</p>
           </div>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -233,7 +242,7 @@ print(h_last.shape)    # torch.Size([1, 4, 16])  -> just the final hidden state<
           and the algebra is more bookkeeping than new insight. The one thing worth carrying forward: the
           memory cell is updated additively (old memory times the forget gate, <em>plus</em> new
           information times the input gate), which is structurally similar to the
-          <span style="white-space:nowrap">$x + F(x)$</span> skip connection from
+          $x + F(x)$ skip connection from
           <a href="16-cnns.html">Section 16</a> — an additive path that lets gradients flow back through
           many steps without being forced through a repeated multiplication every time. This is what eases
           (though doesn't fully solve) the vanishing-gradient problem from the section above.</p>
@@ -252,7 +261,7 @@ outputs, (h_last, c_last) = lstm(x, (h0, c0))
 print(outputs.shape)  # torch.Size([4, 10, 16])
 print(c_last.shape)   # torch.Size([1, 4, 16])  -> the memory cell, separate from the hidden state</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -312,7 +321,7 @@ print(c_last.shape)   # torch.Size([1, 4, 16])  -> the memory cell, separate fro
 
           <h2><span class="h-num">5</span>What to carry forward</h2>
           <ul>
-            <li>An <strong>RNN</strong> reads a sequence step by step, keeping a <strong>hidden state</strong> that's updated by the same reused weights (<span style="white-space:nowrap">$\mathbf{h}_t = \tanh(\mathbf{W}\mathbf{x}_t + \mathbf{U}\mathbf{h}_{t-1} + \mathbf{b})$</span>) at every step.</li>
+            <li>An <strong>RNN</strong> reads a sequence step by step, keeping a <strong>hidden state</strong> that's updated by the same reused weights ($\mathbf{h}_t = \tanh(\mathbf{W}\mathbf{x}_t + \mathbf{U}\mathbf{h}_{t-1} + \mathbf{b})$) at every step.</li>
             <li><strong>Unrolling</strong> turns the recurrence into a deep chain of identical steps; training it is backpropagation through time.</li>
             <li>Because the same weight matrix is applied repeatedly, gradients over long sequences <strong>vanish or explode</strong> depending on that matrix's eigenvalues — the same phenomenon as Section 1's eigenvalues and Section 16's deep-network gradient problem.</li>
             <li><strong>LSTMs</strong> add gates and an additive memory cell to ease (not eliminate) that problem, at the cost of more parameters and computation per step.</li>

@@ -41,7 +41,16 @@
           <p class="lesson-standfirst">Models don't output answers, they output beliefs. Probability is the language we use to reason carefully about things we are not sure of — and, quietly, it's where every loss function is born.</p>
           <div class="lesson-meta">
             <span><b>30 min</b> read</span>
-            <span><b>You'll learn:</b> distributions · expectation · variance · Bayes' rule · maximum likelihood</span>
+          </div>
+          <div class="objectives">
+            <div class="objectives__label">You'll learn</div>
+            <ul>
+              <li>distributions</li>
+              <li>expectation</li>
+              <li>variance</li>
+              <li>Bayes' rule</li>
+              <li>maximum likelihood</li>
+            </ul>
           </div>
         </header>
 
@@ -68,7 +77,7 @@
           <p class="beat beat--intuition">Intuition first</p>
           <p>A <strong>random variable</strong> is just a number whose value is uncertain until you
           look — the outcome of some process you can't predict exactly. Roll a die and call the
-          result <span style="white-space:nowrap">$X$</span>: before the roll, <span style="white-space:nowrap">$X$</span> could be any of 1–6. A
+          result $X$: before the roll, $X$ could be any of 1–6. A
           <strong>distribution</strong> is the full accounting of that uncertainty: it tells you,
           for every possible value, how likely that value is. If a random variable is the question
           (“what will come up?”), the distribution is the complete answer key with the odds
@@ -86,7 +95,7 @@
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
             <p>A <strong>die roll</strong> versus <strong>tomorrow's temperature</strong>. The die is
-            discrete: six neat outcomes, each with a clean <span style="white-space:nowrap">$1/6$</span> chance, and it makes sense to
+            discrete: six neat outcomes, each with a clean $1/6$ chance, and it makes sense to
             ask “what's the probability of exactly a 4?” The temperature is continuous: it could be
             21.0°, 21.3°, 21.3007°… Asking “what's the chance it's <em>exactly</em> 21.30000…°?” is
             the wrong question — there are infinitely many values, so any single one has essentially
@@ -96,25 +105,25 @@
 
           <p class="beat beat--math">Now the math</p>
           <p>For a <strong>discrete</strong> variable we use a <dfn>probability mass function</dfn>,
-          written <span style="white-space:nowrap">$P(X = x)$</span> — the amount of probability sitting <em>on</em> each specific value.
+          written $P(X = x)$ — the amount of probability sitting <em>on</em> each specific value.
           Two honest rules hold: every mass is between 0 and 1, and all the masses add up to
           exactly 1 (something must happen).</p>
           $$ 0 \le P(X = x) \le 1, \qquad \sum_{x} P(X = x) = 1 $$
           <p class="gloss"><b>In words:</b> each outcome gets a share of belief between “impossible”
           (0) and “certain” (1), and the shares of all outcomes together make one whole. For a fair
-          die, <span style="white-space:nowrap">$P(X = x) = 1/6$</span> for each of the six faces, and <span style="white-space:nowrap">$6 \times \tfrac{1}{6} = 1$</span>. The
+          die, $P(X = x) = 1/6$ for each of the six faces, and $6 \times \tfrac{1}{6} = 1$. The
           function is called “mass” because you can picture a lump of probability weight parked on
           each value.</p>
 
           <p>For a <strong>continuous</strong> variable, single values have zero probability, so we
-          use a <dfn>probability density function</dfn> <span style="white-space:nowrap">$p(x)$</span> instead. Density is not
+          use a <dfn>probability density function</dfn> $p(x)$ instead. Density is not
           probability itself — it's probability <em>per unit of x</em>, like grams per centimetre.
           To get an actual probability you must sum the density over a range, which for a smooth
           curve means taking an <strong>integral</strong> (the area under the curve):</p>
           $$ P(a \le X \le b) = \int_{a}^{b} p(x)\,dx, \qquad \int_{-\infty}^{\infty} p(x)\,dx = 1 $$
-          <p class="gloss"><b>In words:</b> the chance that <span style="white-space:nowrap">$X$</span> falls between <b>a</b> and <b>b</b> is
-          the <em>area</em> under the density curve over that stretch. The <span style="white-space:nowrap">$\int$</span> sign is just a
-          continuous cousin of the <span style="white-space:nowrap">$\sum$</span> sign — “add up over a smooth range” instead of “add up
+          <p class="gloss"><b>In words:</b> the chance that $X$ falls between <b>a</b> and <b>b</b> is
+          the <em>area</em> under the density curve over that stretch. The $\int$ sign is just a
+          continuous cousin of the $\sum$ sign — “add up over a smooth range” instead of “add up
           over a list.” And the total area under the whole curve is 1, the continuous version of
           “the masses sum to 1.”</p>
 
@@ -140,7 +149,7 @@ die = torch.distributions.Categorical(probs=probs)
 samples = die.sample((10_000,))
 print((samples == 5).float().mean())   # ~0.50   (face index 5 == the '6')</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -164,7 +173,7 @@ print((samples == 5).float().mean())   # ~0.50   (face index 5 == the '6')</code
           <p class="beat beat--intuition">Intuition first</p>
           <p>Once you have a distribution, the first thing you want is a one-number summary: “on
           average, what value should I expect?” That's the <strong>expectation</strong> (also called
-          the <em>mean</em> or <em>expected value</em>), written <span style="white-space:nowrap">$\mathbb{E}[X]$</span>. It is the
+          the <em>mean</em> or <em>expected value</em>), written $\mathbb{E}[X]$. It is the
           long-run average you'd converge to if you repeated the random process forever. Crucially,
           it's a <em>weighted</em> average: outcomes that are more likely pull the average toward
           them harder.</p>
@@ -174,7 +183,7 @@ print((samples == 5).float().mean())   # ~0.50   (face index 5 == the '6')</code
             <p>A slot machine pays <em>0 dollars most spins, but 100 dollars one time in fifty</em>. What do you win
             <strong>per spin on average</strong>? Not 100 dollars (that's rare), not 0 dollars (you do sometimes
             win). It's each payout weighted by how often it happens:
-            <span style="white-space:nowrap">$\tfrac{49}{50}\times\$0 + \tfrac{1}{50}\times\$100 = \$2$</span> per spin.
+            $\tfrac{49}{50}\times\$0 + \tfrac{1}{50}\times\$100 = \$2$ per spin.
             That 2 dollars is the expectation. The casino sets the machine so your expected win is less than
             what you paid to play — the “house edge” is just an expectation calculation running in
             their favour, spin after spin.</p>
@@ -183,13 +192,13 @@ print((samples == 5).float().mean())   # ~0.50   (face index 5 == the '6')</code
           <p class="beat beat--math">Now the math</p>
           <p>For a discrete variable, expectation is the probability-weighted sum of the values:</p>
           $$ \mathbb{E}[X] = \sum_{x} x \, P(X = x) $$
-          <p class="gloss"><b>In words:</b> go through every possible value <span style="white-space:nowrap">$x$</span>, multiply it by how
+          <p class="gloss"><b>In words:</b> go through every possible value $x$, multiply it by how
           likely it is, and add all those products up. Likely values contribute more; rare ones
           barely nudge the total. The result is the balance point of the distribution — the spot
           where it would sit level on a seesaw.</p>
 
           <p>Let's derive one concretely. A <strong>fair die</strong>: values 1–6, each with
-          probability <span style="white-space:nowrap">$1/6$</span>.</p>
+          probability $1/6$.</p>
           $$
           \begin{aligned}
           \mathbb{E}[X] &= 1\cdot\tfrac{1}{6} + 2\cdot\tfrac{1}{6} + 3\cdot\tfrac{1}{6}
@@ -204,16 +213,16 @@ print((samples == 5).float().mean())   # ~0.50   (face index 5 == the '6')</code
 
           <p>The mean tells you <em>where</em> a distribution sits. The next question is <em>how
           spread out</em> it is — do outcomes cluster tightly around the mean, or scatter wildly?
-          That's the <strong>variance</strong>, written <span style="white-space:nowrap">$\mathrm{Var}[X]$</span>. We measure each
-          outcome's distance from the mean <span style="white-space:nowrap">$\mu = \mathbb{E}[X]$</span>, <em>square</em> it (so that
+          That's the <strong>variance</strong>, written $\mathrm{Var}[X]$. We measure each
+          outcome's distance from the mean $\mu = \mathbb{E}[X]$, <em>square</em> it (so that
           being too high and too low both count as spread, and never cancel out), and take the
           expected value of that:</p>
           $$ \mathrm{Var}[X] = \mathbb{E}\big[(X - \mu)^2\big] $$
           <p class="gloss"><b>In words:</b> variance is the average squared distance from the mean.
           Big variance means outcomes routinely land far from the average (a wild, unpredictable
           variable); small variance means they hug it (a steady, reliable one). We square the
-          distances so that a swing of <span style="white-space:nowrap">$+3$</span> and a swing of <span style="white-space:nowrap">$-3$</span> both count as spread rather than
-          erasing each other. The square root of variance, <span style="white-space:nowrap">$\sigma$</span>, is the
+          distances so that a swing of $+3$ and a swing of $-3$ both count as spread rather than
+          erasing each other. The square root of variance, $\sigma$, is the
           <dfn>standard deviation</dfn> — the same idea back in the original units.</p>
 
           <div class="callout parallel">
@@ -240,7 +249,7 @@ streaky  = torch.tensor([ 2., 40.,  5., 38., 15.])
 print(reliable.mean(), streaky.mean())   # both 20.0
 print(reliable.var(),  streaky.var())    # ~0.5   vs   ~326.5</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -268,26 +277,26 @@ print(reliable.var(),  streaky.var())    # ~0.5   vs   ~326.5</code></pre>
           <p class="beat beat--intuition">Intuition first</p>
           <p>The <strong>Bernoulli distribution</strong> is the simplest one there is: a single event
           with exactly two outcomes, 1 (“success”) or 0 (“failure”), governed by one number
-          <span style="white-space:nowrap">$p$</span> — the probability of the 1. A coin flip, a click-or-no-click, a
+          $p$ — the probability of the 1. A coin flip, a click-or-no-click, a
           spam-or-not-spam decision. Whenever a model answers a single yes/no question, a Bernoulli
           is hiding underneath.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
             <p>A single coin flip with a possibly-bent coin. If the coin comes up heads 70% of the
-            time, then <span style="white-space:nowrap">$p = 0.7$</span>: heads (1) has probability 0.7, tails (0) has probability
-            0.3. That one number <span style="white-space:nowrap">$p$</span> is the entire distribution — nothing else to know.</p>
+            time, then $p = 0.7$: heads (1) has probability 0.7, tails (0) has probability
+            0.3. That one number $p$ is the entire distribution — nothing else to know.</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
           <p>Its PMF can be written as a single tidy line that works for both outcomes:</p>
           $$ P(X = x) = p^{\,x}\,(1-p)^{\,1-x}, \qquad x \in \{0, 1\} $$
-          <p class="gloss"><b>In words:</b> plug in <span style="white-space:nowrap">$x = 1$</span> and the formula collapses to
-          <span style="white-space:nowrap">$p$</span> (the chance of a 1); plug in <span style="white-space:nowrap">$x = 0$</span> and it collapses to <span style="white-space:nowrap">$1 - p$</span> (the
+          <p class="gloss"><b>In words:</b> plug in $x = 1$ and the formula collapses to
+          $p$ (the chance of a 1); plug in $x = 0$ and it collapses to $1 - p$ (the
           chance of a 0). The exponents are a clever switch: whichever outcome you ask about, the
           other term's exponent becomes 0 and vanishes (anything to the power 0 is 1). Its mean is
-          <span style="white-space:nowrap">$\mathbb{E}[X] = p$</span> and its variance is <span style="white-space:nowrap">$p(1-p)$</span> — biggest at
-          <span style="white-space:nowrap">$p = 0.5$</span>, the most unpredictable coin.</p>
+          $\mathbb{E}[X] = p$ and its variance is $p(1-p)$ — biggest at
+          $p = 0.5$, the most unpredictable coin.</p>
 
           <h3>The Gaussian: the bell curve</h3>
 
@@ -307,15 +316,15 @@ print(reliable.var(),  streaky.var())    # ~0.5   vs   ~326.5</code></pre>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>The Gaussian PDF is controlled by just two numbers — its mean <span style="white-space:nowrap">$\mu$</span> and its
-          standard deviation <span style="white-space:nowrap">$\sigma$</span>:</p>
+          <p>The Gaussian PDF is controlled by just two numbers — its mean $\mu$ and its
+          standard deviation $\sigma$:</p>
           $$ p(x) = \frac{1}{\sigma\sqrt{2\pi}}\,\exp\!\left(-\frac{(x-\mu)^2}{2\sigma^2}\right) $$
-          <p class="gloss"><b>In words:</b> <span style="white-space:nowrap">$\mu$</span> (mu) is the <em>centre</em> — where the peak
-          sits, the typical value. <span style="white-space:nowrap">$\sigma$</span> (sigma) is the <em>width</em> — how fat the
+          <p class="gloss"><b>In words:</b> $\mu$ (mu) is the <em>centre</em> — where the peak
+          sits, the typical value. $\sigma$ (sigma) is the <em>width</em> — how fat the
           bell is, i.e. how much things spread around the centre. The heart of the formula is
-          <span style="white-space:nowrap">$-(x-\mu)^2$</span>: the further <span style="white-space:nowrap">$x$</span> is from the centre, the more negative that gets, and
-          <span style="white-space:nowrap">$\exp$</span> of a big negative number is tiny — so probability density falls off fast as you
-          move away from <span style="white-space:nowrap">$\mu$</span>. The <span style="white-space:nowrap">$\frac{1}{\sigma\sqrt{2\pi}}$</span> out front is just a scaling
+          $-(x-\mu)^2$: the further $x$ is from the centre, the more negative that gets, and
+          $\exp$ of a big negative number is tiny — so probability density falls off fast as you
+          move away from $\mu$. The $\frac{1}{\sigma\sqrt{2\pi}}$ out front is just a scaling
           factor that forces the total area to equal 1.</p>
 
           <div class="callout keyidea">
@@ -342,7 +351,7 @@ print(samples.mean(), samples.std())   # ~170.0, ~10.0  -> recovers mu, sigma
 within_1sigma = ((samples &gt; 160) &amp; (samples &lt; 180)).float().mean()
 print(within_1sigma)                   # ~0.68  the famous 68% rule</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -364,7 +373,7 @@ print(within_1sigma)                   # ~0.68  the famous 68% rule</code></pre>
           <h2><span class="h-num">4</span>Conditional probability & Bayes' rule</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p><strong>Conditional probability</strong>, written <span style="white-space:nowrap">$P(A \mid B)$</span> and read “the
+          <p><strong>Conditional probability</strong>, written $P(A \mid B)$ and read “the
           probability of A <em>given</em> B,” is how likely A is <em>once you already know B has
           happened</em>. New information shrinks the world of possibilities, and the odds shift
           accordingly. Learning that it's cloudy raises the chance of rain; the raw chance of rain
@@ -381,7 +390,7 @@ print(within_1sigma)                   # ~0.68  the famous 68% rule</code></pre>
 
           <p class="beat beat--math">Now the math</p>
           <p>Start from the <dfn>joint probability</dfn> — the chance that <em>both</em> A and B
-          happen, written <span style="white-space:nowrap">$P(A, B)$</span>. There are two equally valid ways to build that joint
+          happen, written $P(A, B)$. There are two equally valid ways to build that joint
           up out of a condition, depending on which event you condition on:</p>
           $$ P(A, B) = P(A \mid B)\,P(B) = P(B \mid A)\,P(A) $$
           <p class="gloss"><b>In words:</b> the chance of both A and B is the chance of B, times the
@@ -390,7 +399,7 @@ print(within_1sigma)                   # ~0.68  the famous 68% rule</code></pre>
           joint, so the two products are equal.</p>
 
           <p>Now set those two expressions for the same joint equal to each other and divide by
-          <span style="white-space:nowrap">$P(B)$</span>. That single step of algebra <em>is</em> <strong>Bayes' rule</strong>:</p>
+          $P(B)$. That single step of algebra <em>is</em> <strong>Bayes' rule</strong>:</p>
           $$
           \begin{aligned}
           P(A \mid B)\,P(B) &= P(B \mid A)\,P(A) \\[4pt]
@@ -404,10 +413,10 @@ print(within_1sigma)                   # ~0.68  the famous 68% rule</code></pre>
 
           <div class="callout definition">
             <div class="callout__label">The three words of Bayes</div>
-            <p>The <dfn>prior</dfn> <span style="white-space:nowrap">$P(A)$</span> is your belief in A <em>before</em> the evidence.
-            The <dfn>likelihood</dfn> <span style="white-space:nowrap">$P(B \mid A)$</span> is how well A explains the evidence B —
+            <p>The <dfn>prior</dfn> $P(A)$ is your belief in A <em>before</em> the evidence.
+            The <dfn>likelihood</dfn> $P(B \mid A)$ is how well A explains the evidence B —
             how probable the evidence would be if A were true. The <dfn>posterior</dfn>
-            <span style="white-space:nowrap">$P(A \mid B)$</span> is your updated belief in A <em>after</em> seeing the evidence. Bayes
+            $P(A \mid B)$ is your updated belief in A <em>after</em> seeing the evidence. Bayes
             is the machine that turns prior + likelihood into posterior.</p>
           </div>
 
@@ -426,9 +435,9 @@ print(within_1sigma)                   # ~0.68  the famous 68% rule</code></pre>
           you're <em>healthy</em> it wrongly comes back positive just 5% of the time (the false-positive
           rate). You test positive. What's the real chance you're sick?</p>
 
-          <p>Let <span style="white-space:nowrap">$D$</span> = “has disease,” <span style="white-space:nowrap">$+$</span> = “tests positive.” We want the posterior
-          <span style="white-space:nowrap">$P(D \mid +)$</span>. Bayes needs the total chance of a positive result,
-          <span style="white-space:nowrap">$P(+)$</span>, which is positives from sick people <em>plus</em> positives from healthy
+          <p>Let $D$ = “has disease,” $+$ = “tests positive.” We want the posterior
+          $P(D \mid +)$. Bayes needs the total chance of a positive result,
+          $P(+)$, which is positives from sick people <em>plus</em> positives from healthy
           people:</p>
           $$
           \begin{aligned}
@@ -443,7 +452,7 @@ print(within_1sigma)                   # ~0.68  the famous 68% rule</code></pre>
           $$
           <p class="gloss"><b>In words:</b> even after a positive result on a 99%-accurate test, your
           chance of actually being sick is only about <strong>2%</strong>. Why so low? Because the
-          disease is rare (the prior <span style="white-space:nowrap">$P(D) = 0.001$</span> is tiny). Out of a positive pile, the vast
+          disease is rare (the prior $P(D) = 0.001$ is tiny). Out of a positive pile, the vast
           majority come from the huge healthy population's 5% false-positive rate, which swamps the
           few true positives. This is the <strong>base-rate effect</strong>: ignore how rare
           something is to begin with, and you'll wildly overreact to evidence. Bayes forces you to
@@ -462,7 +471,7 @@ p_pos = p_pos_sick * p_disease + p_pos_well * (1 - p_disease)
 posterior = (p_pos_sick * p_disease) / p_pos
 print(posterior)     # tensor(0.0194)  -> ~2%, not 99%</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -503,29 +512,29 @@ print(posterior)     # tensor(0.0194)  -> ~2%, not 99%</code></pre>
 
           <p class="beat beat--math">Now the math</p>
           <p>Let's derive it fully for a coin. You flip a coin with unknown heads-probability
-          <span style="white-space:nowrap">$p$</span> and observe <span style="white-space:nowrap">$H$</span> heads out of <span style="white-space:nowrap">$N$</span> flips. Each flip is a Bernoulli, and
+          $p$ and observe $H$ heads out of $N$ flips. Each flip is a Bernoulli, and
           because the flips are independent, the probability of the whole sequence is the product of
           the individual probabilities. That product, viewed as a function of the unknown
-          <span style="white-space:nowrap">$p$</span>, is the <dfn>likelihood</dfn>:</p>
+          $p$, is the <dfn>likelihood</dfn>:</p>
           $$ L(p) = p^{\,H}\,(1-p)^{\,N-H} $$
-          <p class="gloss"><b>In words:</b> to get exactly this data you need <span style="white-space:nowrap">$H$</span> heads (each
-          contributing a factor of <span style="white-space:nowrap">$p$</span>) and <span style="white-space:nowrap">$N - H$</span> tails (each contributing
-          <span style="white-space:nowrap">$1 - p$</span>). Multiply them all together and you get the chance of the observed sequence
-          for a given <span style="white-space:nowrap">$p$</span>. We want the <span style="white-space:nowrap">$p$</span> that makes this as large as possible.</p>
+          <p class="gloss"><b>In words:</b> to get exactly this data you need $H$ heads (each
+          contributing a factor of $p$) and $N - H$ tails (each contributing
+          $1 - p$). Multiply them all together and you get the chance of the observed sequence
+          for a given $p$. We want the $p$ that makes this as large as possible.</p>
 
           <p>Multiplying many probabilities gives a tiny, awkward number, and products are painful to
           differentiate. So we take the <strong>logarithm</strong> first. Two reasons the log is a
-          free win: it turns products into sums (much easier calculus), and because <span style="white-space:nowrap">$\log$</span> is a
-          steadily increasing function, <em>the <span style="white-space:nowrap">$p$</span> that maximizes <span style="white-space:nowrap">$\log L$</span> is the exact
-          same <span style="white-space:nowrap">$p$</span> that maximizes <span style="white-space:nowrap">$L$</span></em> — we lose nothing by working with the log.</p>
+          free win: it turns products into sums (much easier calculus), and because $\log$ is a
+          steadily increasing function, <em>the $p$ that maximizes $\log L$ is the exact
+          same $p$ that maximizes $L$</em> — we lose nothing by working with the log.</p>
           $$ \ell(p) = \log L(p) = H \log p + (N - H)\log(1 - p) $$
-          <p class="gloss"><b>In words:</b> the <span style="white-space:nowrap">$\log$</span> pulled the exponents down into multipliers
-          and turned the product into a sum. This <span style="white-space:nowrap">$\ell(p)$</span> is the <dfn>log-likelihood</dfn>,
+          <p class="gloss"><b>In words:</b> the $\log$ pulled the exponents down into multipliers
+          and turned the product into a sum. This $\ell(p)$ is the <dfn>log-likelihood</dfn>,
           and it's what we'll actually maximize.</p>
 
           <p>To find the maximum, use calculus from <a href="02-calculus.html">Section&nbsp;2</a>:
-          take the derivative with respect to <span style="white-space:nowrap">$p$</span>, set it to zero (the slope is flat at a
-          peak), and solve. Recall <span style="white-space:nowrap">$\frac{d}{dp}\log p = \frac{1}{p}$</span>:</p>
+          take the derivative with respect to $p$, set it to zero (the slope is flat at a
+          peak), and solve. Recall $\frac{d}{dp}\log p = \frac{1}{p}$:</p>
           $$
           \begin{aligned}
           \frac{d\ell}{dp} &= \frac{H}{p} - \frac{N - H}{1 - p} = 0 \\[6pt]
@@ -536,9 +545,9 @@ print(posterior)     # tensor(0.0194)  -> ~2%, not 99%</code></pre>
           \hat{p} &= \frac{H}{N}
           \end{aligned}
           $$
-          <p class="gloss"><b>In words:</b> the best estimate is <span style="white-space:nowrap">$\hat{p} = H/N$</span> — the fraction of
+          <p class="gloss"><b>In words:</b> the best estimate is $\hat{p} = H/N$ — the fraction of
           flips that came up heads. Flip 100 times, see 70 heads, and MLE says the most likely coin
-          is one with <span style="white-space:nowrap">$p = 0.7$</span>. The little hat on <span style="white-space:nowrap">$\hat{p}$</span> marks it as an
+          is one with $p = 0.7$. The little hat on $\hat{p}$ marks it as an
           <em>estimate from data</em>, not the true hidden value. What feels like plain common sense —
           “just count the heads” — turns out to be exactly what the maximum-likelihood principle
           prescribes. That's reassuring: the fancy method agrees with your intuition on the easy case,
@@ -563,7 +572,7 @@ print(p)          # tensor(0.70...)  -> matches the closed-form p_hat = H/N = 0.
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> Where loss functions come from</div>
             <p>Notice what we maximized: a log-likelihood. Now flip the sign. Maximizing
-            <span style="white-space:nowrap">$\log L$</span> is the same as <em>minimizing</em> <span style="white-space:nowrap">$-\log L$</span>, and that quantity,
+            $\log L$ is the same as <em>minimizing</em> $-\log L$, and that quantity,
             <strong>negative log-likelihood</strong>, is precisely the loss function most classifiers
             are trained on — you'll meet it as <em>cross-entropy</em> in
             <a href="04-information-theory.html">Section&nbsp;4</a>. The Gaussian version, where you
@@ -574,7 +583,7 @@ print(p)          # tensor(0.70...)  -> matches the closed-form p_hat = H/N = 0.
             probable” is the same sentence as “find the parameters that minimize the loss.”</p>
           </div>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -601,18 +610,18 @@ print(p)          # tensor(0.70...)  -> matches the closed-form p_hat = H/N = 0.
             <li>A model outputs a <strong>distribution</strong> — belief spread over outcomes.
             Discrete ones use a <strong>PMF</strong> (mass on each value); continuous ones use a
             <strong>PDF</strong> (area under a curve gives probability).</li>
-            <li><strong>Expectation</strong> <span style="white-space:nowrap">$\mathbb{E}[X]$</span> is the probability-weighted average —
-            where the distribution balances. <strong>Variance</strong> <span style="white-space:nowrap">$\mathbb{E}[(X-\mu)^2]$</span> is
+            <li><strong>Expectation</strong> $\mathbb{E}[X]$ is the probability-weighted average —
+            where the distribution balances. <strong>Variance</strong> $\mathbb{E}[(X-\mu)^2]$ is
             its spread — reliable versus streaky.</li>
-            <li>The <strong>Bernoulli</strong> models one yes/no event via a single <span style="white-space:nowrap">$p$</span>; the
-            <strong>Gaussian</strong> is the bell curve set by mean <span style="white-space:nowrap">$\mu$</span> and spread
-            <span style="white-space:nowrap">$\sigma$</span>, and it appears everywhere because sums of many small random effects tend
+            <li>The <strong>Bernoulli</strong> models one yes/no event via a single $p$; the
+            <strong>Gaussian</strong> is the bell curve set by mean $\mu$ and spread
+            $\sigma$, and it appears everywhere because sums of many small random effects tend
             toward it.</li>
-            <li><strong>Bayes' rule</strong> <span style="white-space:nowrap">$P(A\mid B)=\frac{P(B\mid A)P(A)}{P(B)}$</span> updates a
+            <li><strong>Bayes' rule</strong> $P(A\mid B)=\frac{P(B\mid A)P(A)}{P(B)}$ updates a
             <em>prior</em> belief with <em>likelihood</em> into a <em>posterior</em>. Never ignore the
             base rate.</li>
             <li><strong>MLE</strong> picks the parameters that make the observed data most probable;
-            for a coin it gives the plain count <span style="white-space:nowrap">$\hat{p} = H/N$</span>. Minimizing negative
+            for a coin it gives the plain count $\hat{p} = H/N$. Minimizing negative
             log-likelihood <em>is</em> where loss functions come from.</li>
           </ul>
           <p>Next we turn probability into a way to <em>measure information and surprise</em> — which

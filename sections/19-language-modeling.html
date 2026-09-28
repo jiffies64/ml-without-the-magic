@@ -41,7 +41,15 @@
           <p class="lesson-standfirst">How a stack of transformer blocks becomes something that writes — end to end, from characters to sampled text.</p>
           <div class="lesson-meta">
             <span><b>32 min</b> read</span>
-            <span><b>You'll learn:</b> tokenization · embeddings · next-token prediction · the GPT-style decoder &amp; causal masking</span>
+          </div>
+          <div class="objectives">
+            <div class="objectives__label">You'll learn</div>
+            <ul>
+              <li>tokenization</li>
+              <li>embeddings</li>
+              <li>next-token prediction</li>
+              <li>the GPT-style decoder &amp; causal masking</li>
+            </ul>
           </div>
         </header>
 
@@ -81,7 +89,7 @@
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>Write the text as a sequence of tokens <span style="white-space:nowrap">$x_1, x_2, \dots, x_T$</span>.
+          <p>Write the text as a sequence of tokens $x_1, x_2, \dots, x_T$.
           The model estimates the probability of the whole sequence by multiplying together the
           probability of each token given everything before it:</p>
           $$ P(x_1, x_2, \dots, x_T) = \prod_{t=1}^{T} P(x_t \mid x_1, x_2, \dots, x_{t-1}) $$
@@ -89,7 +97,7 @@
           token, times the chance of the second <em>given</em> the first, times the chance of the third
           <em>given</em> the first two, and so on. The big <b>∏</b> (“product”) just means “multiply all
           these together.” The one factor we actually train the model to produce is
-          <span style="white-space:nowrap">$P(x_t \mid x_{\lt t})$</span> — the next token given the past.
+          $P(x_t \mid x_{\lt t})$ — the next token given the past.
           Get that factor right and the whole product takes care of itself.</p>
 
           <div class="callout definition">
@@ -100,7 +108,7 @@
             append it, predict the next.</p>
           </div>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -111,7 +119,7 @@
                 <p>Because language is about context. On its own, “bank” is a coin flip between a river
                 edge and a place for money. But after “I deposited the cheque at the”, “bank” becomes
                 overwhelmingly the money kind. Conditioning on the past
-                (<span style="white-space:nowrap">$x_1 \dots x_{t-1}$</span>) is what lets the model use
+                ($x_1 \dots x_{t-1}$) is what lets the model use
                 context to sharpen every prediction. Modelling each token in isolation would throw all
                 that context away and produce word salad.</p>
               </div>
@@ -214,7 +222,7 @@ def decode(ids): return "".join(itos[i] for i in ids)  # ids -> text
 print(encode("hello"))        # [3, 2, 4, 4, 5]
 print(decode([3, 2, 4, 4, 5]))  # 'hello'  -> round-trips exactly</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -252,11 +260,11 @@ print(decode([3, 2, 4, 4, 5]))  # 'hello'  -> round-trips exactly</code></pre>
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>The embedding table is a matrix <span style="white-space:nowrap">$\mathbf{E} \in \mathbb{R}^{V \times d}$</span>,
-          where <span style="white-space:nowrap">$V$</span> is the vocabulary size and
-          <span style="white-space:nowrap">$d$</span> is the <dfn>embedding dimension</dfn> (how many
-          numbers describe each token). To embed token id <span style="white-space:nowrap">$i$</span>,
-          you simply pick out row <span style="white-space:nowrap">$i$</span> of the table:</p>
+          <p>The embedding table is a matrix $\mathbf{E} \in \mathbb{R}^{V \times d}$,
+          where $V$ is the vocabulary size and
+          $d$ is the <dfn>embedding dimension</dfn> (how many
+          numbers describe each token). To embed token id $i$,
+          you simply pick out row $i$ of the table:</p>
           $$ \text{embed}(i) = \mathbf{E}[i, :] \in \mathbb{R}^{d} $$
           <p class="gloss"><b>In words:</b> “the embedding of token <b>i</b> is the <b>i</b>-th row of
           the table <b>E</b>.” No multiplication, just a row lookup. Those rows are ordinary parameters,
@@ -333,7 +341,7 @@ print(h.shape)                                # torch.Size([1, 5, 32])</code></p
           $$ L = -\frac{1}{T}\sum_{t=1}^{T} \log \hat{p}_{t,\, x_{t+1}} $$
           <p class="gloss"><b>In words:</b> for each position <b>t</b>, look up the probability the
           model gave to the token that actually came next
-          (<span style="white-space:nowrap">$x_{t+1}$</span>), take its <b>log</b>, flip the sign, and
+          ($x_{t+1}$), take its <b>log</b>, flip the sign, and
           average over all positions. If the model was confident and right, that probability is near 1,
           its log is near 0, and the loss is tiny. If it was confident and <em>wrong</em>, the
           probability is near 0, its log dives to −∞, and the loss is huge. Minimising this drives the
@@ -368,7 +376,7 @@ print(loss)     # a single scalar; ~log(8)=2.08 at random init, driven down by t
           (prediction, true-next-token) pairs and average their losses. The targets are just the inputs
           shifted left by one — position <b>t</b> is asked to predict what really sat at <b>t+1</b>.</p>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -401,7 +409,7 @@ print(loss)     # a single scalar; ~log(8)=2.08 at random init, driven down by t
             <div class="callout__label"><span class="ic">◆</span> The whole shape, top to bottom</div>
             <p>token ids → <strong>embeddings + positions</strong> → <strong>N transformer blocks</strong>
             (each = masked self-attention, then a feed-forward layer, with residual connections) →
-            <strong>final linear layer</strong> to size <span style="white-space:nowrap">$V$</span> →
+            <strong>final linear layer</strong> to size $V$ →
             <strong>logits</strong> → softmax → probabilities. Training minimises next-token
             cross-entropy over those probabilities; generation samples from them.</p>
           </div>
@@ -423,34 +431,34 @@ print(loss)     # a single scalar; ~log(8)=2.08 at random init, driven down by t
           <p class="beat beat--math">Deriving the causal mask</p>
           <p>Recall from <a href="18-transformers.html">Section 18</a> that self-attention first
           computes a grid of <dfn>attention scores</dfn> — a matrix
-          <span style="white-space:nowrap">$\mathbf{S} \in \mathbb{R}^{T \times T}$</span> where
-          <span style="white-space:nowrap">$S_{ij}$</span> says how much the token at position
-          <span style="white-space:nowrap">$i$</span> (the one asking) wants to attend to the token at
-          position <span style="white-space:nowrap">$j$</span> (the one being read):</p>
+          $\mathbf{S} \in \mathbb{R}^{T \times T}$ where
+          $S_{ij}$ says how much the token at position
+          $i$ (the one asking) wants to attend to the token at
+          position $j$ (the one being read):</p>
           $$ \mathbf{S} = \frac{\mathbf{Q}\mathbf{K}^{\top}}{\sqrt{d_k}} $$
           <p class="gloss"><b>In words:</b> <b>Q</b> holds each position's “query” (what am I looking
           for?) and <b>K</b> holds each position's “key” (what do I offer?). Their dot products fill the
-          grid <b>S</b>; the <span style="white-space:nowrap">$\sqrt{d_k}$</span> just keeps the numbers
+          grid <b>S</b>; the $\sqrt{d_k}$ just keeps the numbers
           from getting too large. Row <b>i</b> of <b>S</b> is position <b>i</b>'s wish-list over all
           positions <b>j</b>.</p>
 
-          <p>“Position <span style="white-space:nowrap">$i$</span> must not attend to future position
-          <span style="white-space:nowrap">$j \gt i$</span>” means: kill every entry where the column is
+          <p>“Position $i$ must not attend to future position
+          $j \gt i$” means: kill every entry where the column is
           to the right of the diagonal. Softmax is applied to each row to turn scores into weights, and
-          softmax sends <span style="white-space:nowrap">$-\infty$</span> to a weight of exactly
-          <strong>0</strong> (because <span style="white-space:nowrap">$e^{-\infty} = 0$</span>). So we
+          softmax sends $-\infty$ to a weight of exactly
+          <strong>0</strong> (because $e^{-\infty} = 0$). So we
           don't delete the future entries — we set their <em>scores</em> to
-          <span style="white-space:nowrap">$-\infty$</span> before the softmax:</p>
+          $-\infty$ before the softmax:</p>
           $$ S^{\text{masked}}_{ij} = \begin{cases} S_{ij} & j \le i \quad(\text{past or self}) \\[4pt] -\infty & j \gt i \quad(\text{future}) \end{cases} $$
           <p class="gloss"><b>In words:</b> keep a score if the column <b>j</b> is at or before the row
           <b>i</b> (a token may read itself and everything earlier); replace it with
-          <span style="white-space:nowrap">$-\infty$</span> if <b>j</b> is later. After softmax those
-          <span style="white-space:nowrap">$-\infty$</span> entries become zero weight, so no
+          $-\infty$ if <b>j</b> is later. After softmax those
+          $-\infty$ entries become zero weight, so no
           information flows backward in time.</p>
 
           <p>For a length-5 sequence the mask is this lower-triangular pattern — a
-          <span style="white-space:nowrap">$\checkmark$</span> means “allowed to attend”, a
-          <span style="white-space:nowrap">$-\infty$</span> means “blocked”:</p>
+          $\checkmark$ means “allowed to attend”, a
+          $-\infty$ means “blocked”:</p>
           $$ \begin{array}{c|ccccc} i \backslash j & 0 & 1 & 2 & 3 & 4 \\ \hline
              0 & \checkmark & -\infty & -\infty & -\infty & -\infty \\
              1 & \checkmark & \checkmark & -\infty & -\infty & -\infty \\
@@ -482,7 +490,7 @@ weights = torch.softmax(scores, dim=-1)          # each row sums to 1; future = 
 print(weights[0])   # tensor([1., 0., 0., 0., 0.]) -> token 0 attends only to itself</code></pre>
           <p class="gloss"><b>In words:</b> <code>torch.tril</code> keeps the lower triangle (past and
           self) and zeroes the upper triangle (future). <code>masked_fill</code> writes
-          <span style="white-space:nowrap">$-\infty$</span> everywhere the future lives, and softmax over
+          $-\infty$ everywhere the future lives, and softmax over
           the last dimension turns each row into weights that sum to 1 with the future entries at exactly
           0. Row 0 attends only to itself, which is precisely what the mask math promised.</p>
 
@@ -494,7 +502,7 @@ print(weights[0])   # tensor([1., 0., 0., 0., 0.]) -> token 0 attends only to it
             silently miscalibrated. Mask first, softmax second.</p>
           </div>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -532,20 +540,20 @@ print(weights[0])   # tensor([1., 0., 0., 0., 0.]) -> token 0 attends only to it
 
           <p class="beat beat--math">Greedy, sampling, and temperature</p>
           <p><strong>Greedy decoding</strong> always takes the highest-probability token
-          (<span style="white-space:nowrap">$\arg\max$</span>). It's deterministic and safe but tends to
+          ($\arg\max$). It's deterministic and safe but tends to
           loop and sound robotic. <strong>Sampling</strong> instead draws a token at random <em>in
           proportion to its probability</em> — likely tokens are picked often, rare ones occasionally —
           which gives variety and life. <strong>Temperature</strong>
-          (<span style="white-space:nowrap">$\tau$</span>) reshapes the distribution before we sample by
+          ($\tau$) reshapes the distribution before we sample by
           dividing the logits:</p>
           $$ \hat{p}_j = \text{softmax}\!\left(\frac{\mathbf{z}}{\tau}\right)_j = \frac{e^{z_j/\tau}}{\sum_{k} e^{z_k/\tau}} $$
           <p class="gloss"><b>In words:</b> divide every logit by <b>τ</b> before softmax.
-          When <span style="white-space:nowrap">$\tau \lt 1$</span> the gaps between scores grow, so the
+          When $\tau \lt 1$ the gaps between scores grow, so the
           top token dominates — the model is <em>more confident and greedier</em>. When
-          <span style="white-space:nowrap">$\tau \gt 1$</span> the gaps shrink, probabilities flatten
+          $\tau \gt 1$ the gaps shrink, probabilities flatten
           toward equal, and the model is <em>more random and adventurous</em>. As
-          <span style="white-space:nowrap">$\tau \to 0$</span> sampling collapses to pure greedy; at
-          <span style="white-space:nowrap">$\tau = 1$</span> you sample from the model's raw
+          $\tau \to 0$ sampling collapses to pure greedy; at
+          $\tau = 1$ you sample from the model's raw
           distribution.</p>
 
           <div class="callout definition">
@@ -586,7 +594,7 @@ def generate(model, idx, max_new_tokens, block_size, temperature=1.0):
             <code>logits[:, -1, :]</code>.</p>
           </div>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -598,8 +606,8 @@ def generate(model, idx, max_new_tokens, block_size, temperature=1.0):
                 open. After softmax, the single top token gets essentially all the probability mass, so
                 <code>multinomial</code> picks it almost every time. The output becomes effectively
                 deterministic and matches greedy decoding in practice — because
-                <span style="white-space:nowrap">$\tau \to 0$</span> <em>is</em> the limit that turns
-                sampling into <span style="white-space:nowrap">$\arg\max$</span>. Very low temperature is
+                $\tau \to 0$ <em>is</em> the limit that turns
+                sampling into $\arg\max$. Very low temperature is
                 a common way to get near-greedy, focused output while keeping the same sampling code.</p>
               </div>
             </details>
@@ -718,7 +726,7 @@ print(logits.shape)                                  # torch.Size([1, 5, 8])</co
             at every position — with <strong>teacher forcing</strong> feeding the true past.</li>
             <li>A <strong>GPT</strong> is a stack of transformer blocks plus a final linear layer to
             logits. The <strong>causal mask</strong> sets future scores to
-            <span style="white-space:nowrap">$-\infty$</span> so no position can cheat by reading ahead.</li>
+            $-\infty$ so no position can cheat by reading ahead.</li>
             <li><strong>Generation</strong> = logits → softmax → sample → append → repeat, with
             <strong>temperature</strong> dialing between greedy/confident and random/creative.</li>
           </ul>

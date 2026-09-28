@@ -1,64 +1,66 @@
 /* ============================================================
-   Zero to Hero: Machine Learning — course engine
+   Machine Learning Without the Magic: course engine
    Builds the sidebar from one manifest, handles theme,
-   in-memory progress, prev/next, math + code rendering,
-   and the collapsible "check yourself" blocks.
-   No framework. No localStorage (in-memory state only).
+   progress, prev/next, prerequisites, the "on this page"
+   outline, copy buttons, math + code rendering, and the
+   print-only answer list.
+   No framework. Progress and theme persist in localStorage
+   when it is available, and fall back to memory when not.
    ============================================================ */
 
 /* ---- The single source of truth: the whole curriculum ---- */
 const PARTS = [
   {
-    n: 1, title: "Math Foundations", deep: true,
+    n: 1, title: "Math Foundations",
     sections: [
       { n: 1,  slug: "01-linear-algebra",         title: "Linear Algebra for ML",              min: 28 },
-      { n: 2,  slug: "02-calculus",               title: "Calculus for ML",                    min: 32 },
-      { n: 3,  slug: "03-probability",            title: "Probability & Statistics",           min: 30 },
-      { n: 4,  slug: "04-information-theory",      title: "Information Theory",                 min: 26 },
+      { n: 2,  slug: "02-calculus",               title: "Calculus for ML",                    min: 32, pre: [1] },
+      { n: 3,  slug: "03-probability",            title: "Probability & Statistics",           min: 30, pre: [2] },
+      { n: 4,  slug: "04-information-theory",      title: "Information Theory",                 min: 26, pre: [3] },
     ],
   },
   {
     n: 2, title: "Classical ML",
     sections: [
-      { n: 5,  slug: "05-linear-regression",      title: "What Learning Means",                min: 30 },
-      { n: 6,  slug: "06-logistic-regression",    title: "Logistic Regression",                min: 24 },
-      { n: 7,  slug: "07-overfitting",            title: "Overfitting & Regularization",       min: 26 },
-      { n: 8,  slug: "08-classical-tour",         title: "A Tour of Classical Models",         min: 16 },
+      { n: 5,  slug: "05-linear-regression",      title: "What Learning Means",                min: 30, pre: [2, 3] },
+      { n: 6,  slug: "06-logistic-regression",    title: "Logistic Regression",                min: 24, pre: [4, 5] },
+      { n: 7,  slug: "07-overfitting",            title: "Overfitting & Regularization",       min: 26, pre: [5] },
+      { n: 8,  slug: "08-classical-tour",         title: "A Tour of Classical Models",         min: 16, pre: [7] },
     ],
   },
   {
-    n: 3, title: "Neural Nets from Scratch", deep: true,
+    n: 3, title: "Neural Nets from Scratch",
     sections: [
-      { n: 9,  slug: "09-neurons",                title: "Neurons, Layers, Activations",       min: 28 },
-      { n: 10, slug: "10-backprop",               title: "Backpropagation by Hand",            min: 34 },
-      { n: 11, slug: "11-mlp-numpy",              title: "Build an MLP in NumPy",              min: 30 },
-      { n: 12, slug: "12-training-dynamics",      title: "Training Dynamics & Optimizers",     min: 32 },
+      { n: 9,  slug: "09-neurons",                title: "Neurons, Layers, Activations",       min: 28, pre: [1, 6] },
+      { n: 10, slug: "10-backprop",               title: "Backpropagation by Hand",            min: 34, key: true, pre: [2, 9] },
+      { n: 11, slug: "11-mlp-numpy",              title: "Build an MLP in NumPy",              min: 30, pre: [10] },
+      { n: 12, slug: "12-training-dynamics",      title: "Training Dynamics & Optimizers",     min: 32, pre: [11] },
     ],
   },
   {
     n: 4, title: "PyTorch",
     sections: [
-      { n: 13, slug: "13-tensors-autograd",       title: "Tensors & Autograd",                 min: 26 },
-      { n: 14, slug: "14-nn-module",              title: "nn.Module & the Training Loop",      min: 26 },
-      { n: 15, slug: "15-debugging",              title: "Debugging & Good Habits",            min: 22 },
+      { n: 13, slug: "13-tensors-autograd",       title: "Tensors & Autograd",                 min: 26, pre: [10] },
+      { n: 14, slug: "14-nn-module",              title: "nn.Module & the Training Loop",      min: 26, pre: [13] },
+      { n: 15, slug: "15-debugging",              title: "Debugging & Good Habits",            min: 22, pre: [14] },
     ],
   },
   {
     n: 5, title: "Deep Learning Architectures",
     sections: [
-      { n: 16, slug: "16-cnns",                   title: "Convolutional Networks",             min: 30 },
-      { n: 17, slug: "17-sequence-models",        title: "Sequence Models: RNNs & LSTMs",      min: 24 },
-      { n: 18, slug: "18-transformers",           title: "Attention & Transformers",           min: 42, deep: true },
-      { n: 19, slug: "19-language-modeling",      title: "Language Modeling & GPT",            min: 32, deep: true },
-      { n: 20, slug: "20-training-at-scale",      title: "Training at Scale",                  min: 28 },
+      { n: 16, slug: "16-cnns",                   title: "Convolutional Networks",             min: 30, pre: [14] },
+      { n: 17, slug: "17-sequence-models",        title: "Sequence Models: RNNs & LSTMs",      min: 24, pre: [14] },
+      { n: 18, slug: "18-transformers",           title: "Attention & Transformers",           min: 42, key: true, pre: [14, 17] },
+      { n: 19, slug: "19-language-modeling",      title: "Language Modeling & GPT",            min: 32, pre: [18] },
+      { n: 20, slug: "20-training-at-scale",      title: "Training at Scale",                  min: 28, pre: [18] },
     ],
   },
   {
-    n: 6, title: "Capstone: Paper from Scratch", deep: true,
+    n: 6, title: "Capstone: Paper from Scratch",
     sections: [
-      { n: 21, slug: "21-reading-papers",         title: "Reading a Paper Like an Engineer",   min: 22 },
-      { n: 22, slug: "22-moe",                    title: "Mixture of Experts from Scratch",    min: 46 },
-      { n: 23, slug: "23-next-steps",             title: "Where to Go Next",                   min: 18 },
+      { n: 21, slug: "21-reading-papers",         title: "Reading a Paper Like an Engineer",   min: 22, pre: [18] },
+      { n: 22, slug: "22-moe",                    title: "Mixture of Experts from Scratch",    min: 46, key: true, pre: [19, 21] },
+      { n: 23, slug: "23-next-steps",             title: "Where to Go Next",                   min: 18, pre: [22] },
     ],
   },
 ];
@@ -305,6 +307,104 @@ function buildSearch() {
 }
 
 /* ============================================================
+   PREREQUISITES (lesson head)
+   ============================================================ */
+function buildPrereqs(slug) {
+  const box = document.querySelector(".objectives");
+  const s = FLAT.find(x => x.slug === slug);
+  if (!box || !s || !s.pre || !s.pre.length) return;
+  const links = s.pre.map(n => {
+    const p = FLAT.find(x => x.n === n);
+    return `<a href="${sectionHref(p.slug)}">Section ${p.n}: ${p.title}</a>`;
+  });
+  const el = document.createElement("p");
+  el.className = "objectives__pre";
+  el.innerHTML = "Before you start: " + links.join(" and ") + ".";
+  box.appendChild(el);
+}
+
+/* ============================================================
+   ON THIS PAGE (wide screens)
+   ============================================================ */
+function buildToc() {
+  const main = document.querySelector("main.reading");
+  const hs = [...document.querySelectorAll(".prose h2[id]")];
+  if (!main || hs.length < 3) return;
+  const nav = document.createElement("nav");
+  nav.className = "toc";
+  nav.setAttribute("aria-label", "On this page");
+  nav.innerHTML = '<div class="toc__label">On this page</div>' + hs.map(h =>
+    `<a href="#${h.id}">${h.textContent.replace(/^\s*\d+\s*/, "")}</a>`).join("");
+  main.appendChild(nav);
+  const links = [...nav.querySelectorAll("a")];
+  if (!("IntersectionObserver" in window)) return;
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      links.forEach(a => a.classList.toggle("is-active", a.getAttribute("href") === "#" + e.target.id));
+    }
+  }, { rootMargin: "0px 0px -70% 0px" });
+  hs.forEach(h => io.observe(h));
+}
+
+/* ============================================================
+   COPY BUTTONS on code blocks
+   ============================================================ */
+function addCopyButtons() {
+  document.querySelectorAll(".prose pre > code").forEach(code => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "copybtn";
+    btn.textContent = "Copy";
+    btn.setAttribute("aria-label", "Copy code");
+    btn.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(code.innerText); btn.textContent = "Copied"; }
+      catch (e) { btn.textContent = "Select + Ctrl-C"; }
+      setTimeout(() => { btn.textContent = "Copy"; }, 1500);
+    });
+    code.parentNode.appendChild(btn);
+  });
+}
+
+/* ============================================================
+   PRINT: collect the check-yourself answers at the end
+   so a reader on paper does not see an answer under its question
+   ============================================================ */
+function buildPrintAnswers() {
+  const checks = [...document.querySelectorAll(".prose details.check")];
+  const prose = document.querySelector(".prose");
+  if (!checks.length || !prose) return;
+  const sec = document.createElement("section");
+  sec.className = "print-answers";
+  let html = "<h2>Answers to “Check yourself”</h2>";
+  checks.forEach((d, i) => {
+    const q = d.querySelector(".check__q");
+    const a = d.querySelector(".check__answer");
+    const tag = d.querySelector(".check__tag");
+    if (tag) tag.textContent = "Check yourself " + (i + 1);
+    html += `<h3>${i + 1}. ${q ? q.innerHTML : ""}</h3>` +
+            `<div class="check__answer">${a ? a.innerHTML : ""}</div>`;
+  });
+  sec.innerHTML = html;
+  const bar = prose.querySelector("[data-complete]");
+  prose.insertBefore(sec, bar || null);
+}
+
+/* ============================================================
+   HOME: "continue where you left off"
+   ============================================================ */
+function initResume() {
+  const btn = document.querySelector("[data-resume]");
+  if (!btn || !done.size) return;
+  const next = FLAT.find(s => !done.has(s.slug));
+  if (!next) { btn.textContent = "You finished the course. Review Section 1 →"; btn.href = sectionHref(FLAT[0].slug); }
+  else { btn.textContent = `Continue: Section ${next.n}, ${next.title} →`; btn.href = sectionHref(next.slug); }
+  btn.hidden = false;
+  const start = document.querySelector("[data-start]");
+  if (start) start.classList.replace("btn--primary", "btn--ghost");
+}
+
+/* ============================================================
    BOOT
    ============================================================ */
 function boot() {
@@ -317,8 +417,13 @@ function boot() {
   initMobileNav();
   refreshProgress();
   assignHeadingIds();
+  buildPrereqs(slug);
+  buildToc();
+  initResume();
   highlightCode();
+  addCopyButtons();
   renderMath();
+  buildPrintAnswers();
 }
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", boot);

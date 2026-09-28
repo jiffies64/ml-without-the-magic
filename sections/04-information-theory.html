@@ -41,7 +41,16 @@
           <p class="lesson-standfirst">By the end of this page you will have <em>derived</em>, not been told, why cross-entropy is the loss function for classification. Every step is shown; nothing is asserted.</p>
           <div class="lesson-meta">
             <span><b>26 min</b> read</span>
-            <span><b>You'll learn:</b> information &amp; surprise · entropy · cross-entropy · KL divergence · why cross-entropy is THE classification loss</span>
+          </div>
+          <div class="objectives">
+            <div class="objectives__label">You'll learn</div>
+            <ul>
+              <li>information &amp; surprise</li>
+              <li>entropy</li>
+              <li>cross-entropy</li>
+              <li>KL divergence</li>
+              <li>why cross-entropy is THE classification loss</li>
+            </ul>
           </div>
         </header>
 
@@ -82,42 +91,42 @@
 
           <p class="beat beat--math">Now the math</p>
           <p>We want a number — call it <strong>information content</strong>, or <dfn>surprise</dfn> — that
-          takes the probability <span style="white-space:nowrap">$p(x)$</span> of an event <span style="white-space:nowrap">$x$</span> and grows as that probability shrinks. Let's not pull a formula out of a
+          takes the probability $p(x)$ of an event $x$ and grows as that probability shrinks. Let's not pull a formula out of a
           hat; let's demand the properties any honest measure of surprise <em>must</em> have, then see what
           function is forced on us.</p>
           <ol>
-            <li><strong>Certain events are boring.</strong> If <span style="white-space:nowrap">$p(x)=1$</span>, the surprise must be exactly 0. You learn nothing from what was guaranteed.</li>
-            <li><strong>Rarer means more surprising.</strong> As <span style="white-space:nowrap">$p(x)$</span> goes down, surprise must go up. The measure decreases with probability.</li>
+            <li><strong>Certain events are boring.</strong> If $p(x)=1$, the surprise must be exactly 0. You learn nothing from what was guaranteed.</li>
+            <li><strong>Rarer means more surprising.</strong> As $p(x)$ goes down, surprise must go up. The measure decreases with probability.</li>
             <li><strong>Independent surprises add up.</strong> If two unrelated things happen — a coin lands
             heads <em>and</em> a die rolls a six — the total surprise should be the surprise of the first
             <em>plus</em> the surprise of the second. (Two independent events. “Independent” means the
             outcome of one tells you nothing about the other.)</li>
           </ol>
           <p>That third rule is the strict one. For independent events, probabilities <em>multiply</em>:
-          <span style="white-space:nowrap">$p(\text{both}) = p(x)\,p(y)$</span>. But we want the surprises to
+          $p(\text{both}) = p(x)\,p(y)$. But we want the surprises to
           <em>add</em>. We need a function that turns multiplication on the inside into addition on the
           outside. There is exactly one family of functions that does that — the <strong>logarithm</strong>,
-          because <span style="white-space:nowrap">$\log(ab)=\log a+\log b$</span>. So the surprise must be a
+          because $\log(ab)=\log a+\log b$. So the surprise must be a
           log of the probability. To make it <em>decrease</em> as probability rises (rule 2) and be
           non-negative, we put a minus sign in front:</p>
           $$ I(x) \;=\; -\log p(x) \;=\; \log\frac{1}{p(x)} $$
           <p class="gloss"><b>In words:</b> the information in an event is “minus the log of how likely it
           was.” Because probabilities are between 0 and 1, their log is negative, so the minus sign makes
-          <b>I(x)</b> positive. A sure thing (<b>p</b> = 1) gives <span style="white-space:nowrap">$-\log 1 = 0$</span> — no surprise. A one-in-a-million event gives a big positive number. And the two
+          <b>I(x)</b> positive. A sure thing (<b>p</b> = 1) gives $-\log 1 = 0$ — no surprise. A one-in-a-million event gives a big positive number. And the two
           equal forms show the same idea two ways: <em>surprise is the log of “one over the probability,”</em>
           i.e. the log of how many equally-likely possibilities you just ruled out.</p>
 
           <div class="callout definition">
             <div class="callout__label">Definition</div>
             <p>The <dfn>information content</dfn> (also called <dfn>surprise</dfn> or <dfn>surprisal</dfn>)
-            of an outcome <span style="white-space:nowrap">$x$</span> is <span style="white-space:nowrap">$I(x) = -\log p(x)$</span>. When the log is base 2 the unit is <strong>bits</strong>; when it is the
-            natural log (base <span style="white-space:nowrap">$e$</span>) the unit is <strong>nats</strong>.
+            of an outcome $x$ is $I(x) = -\log p(x)$. When the log is base 2 the unit is <strong>bits</strong>; when it is the
+            natural log (base $e$) the unit is <strong>nats</strong>.
             One bit is the surprise of a single fair coin flip.</p>
           </div>
 
-          <p>Why is one fair coin flip worth exactly one bit? Plug in <span style="white-space:nowrap">$p=\tfrac12$</span> with base-2 log: <span style="white-space:nowrap">$-\log_2 \tfrac12 = \log_2 2 = 1$</span>. One yes/no answer, one bit. Eight independent coin flips carry
-          <span style="white-space:nowrap">$8 \times 1 = 8$</span> bits — which is why a byte (8 bits) can
-          name exactly <span style="white-space:nowrap">$2^8 = 256$</span> equally likely things.</p>
+          <p>Why is one fair coin flip worth exactly one bit? Plug in $p=\tfrac12$ with base-2 log: $-\log_2 \tfrac12 = \log_2 2 = 1$. One yes/no answer, one bit. Eight independent coin flips carry
+          $8 \times 1 = 8$ bits — which is why a byte (8 bits) can
+          name exactly $2^8 = 256$ equally likely things.</p>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
           <p class="codecap">surprise in bits and nats</p>
@@ -134,7 +143,7 @@ print(-torch.log2(p_common))  # tensor(0.1520)  barely a fifth of a bit
 # natural log -> answer in NATS (what PyTorch losses use internally)
 print(-torch.log(p_rare))     # tensor(6.9078)  same event, different unit</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -171,23 +180,23 @@ print(-torch.log(p_rare))     # tensor(6.9078)  same event, different unit</code
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>To average the surprise, we weight each outcome's surprise <span style="white-space:nowrap">$-\log p(x)$</span> by its own probability <span style="white-space:nowrap">$p(x)$</span> and add them
+          <p>To average the surprise, we weight each outcome's surprise $-\log p(x)$ by its own probability $p(x)$ and add them
           all up. That weighted average is written with the expectation symbol
-          <span style="white-space:nowrap">$\mathbb{E}$</span> (“expected value” = long-run average):</p>
+          $\mathbb{E}$ (“expected value” = long-run average):</p>
           $$ H(p) \;=\; \mathbb{E}_{x\sim p}\big[-\log p(x)\big] \;=\; -\sum_{x} p(x)\,\log p(x) $$
           <p class="gloss"><b>In words:</b> go through every possible outcome <b>x</b>; take its surprise
-          <span style="white-space:nowrap">$-\log p(x)$</span>; multiply by how often it happens,
+          $-\log p(x)$; multiply by how often it happens,
           <b>p(x)</b>; sum over all outcomes. Common outcomes are surprising rarely but counted often; rare
           outcomes are very surprising but counted seldom. Entropy balances the two into one number:
           <em>the surprise you should expect per draw.</em></p>
 
-          <p>Let's actually compute it for a coin that lands heads with probability <span style="white-space:nowrap">$p$</span> (and tails with <span style="white-space:nowrap">$1-p$</span>). There are only two
+          <p>Let's actually compute it for a coin that lands heads with probability $p$ (and tails with $1-p$). There are only two
           outcomes, so the sum has two terms:</p>
           $$ H(p) \;=\; -\,p\log_2 p \;-\; (1-p)\log_2(1-p) $$
           <p>Now read off the extremes, which is where the meaning lives:</p>
           <div class="scroll-x">
           <table>
-            <thead><tr><th>Coin</th><th><span style="white-space:nowrap">$p$</span> (heads)</th><th>Entropy <span style="white-space:nowrap">$H$</span> (bits)</th><th>What it means</th></tr></thead>
+            <thead><tr><th>Coin</th><th>$p$ (heads)</th><th>Entropy $H$ (bits)</th><th>What it means</th></tr></thead>
             <tbody>
               <tr><td>Two-headed (rigged)</td><td>1</td><td>0</td><td>No uncertainty — you always know the result.</td></tr>
               <tr><td>Heavily biased</td><td>0.1</td><td>0.47</td><td>Usually tails; little uncertainty.</td></tr>
@@ -197,13 +206,13 @@ print(-torch.log(p_rare))     # tensor(6.9078)  same event, different unit</code
           </table>
           </div>
           <p>Notice the shape: entropy is <strong>zero at both ends</strong> (a rigged coin holds no
-          surprise) and <strong>largest exactly in the middle</strong>, at <span style="white-space:nowrap">$p=0.5$</span>. Uncertainty peaks when the outcomes are equally likely and you have the least idea
+          surprise) and <strong>largest exactly in the middle</strong>, at $p=0.5$. Uncertainty peaks when the outcomes are equally likely and you have the least idea
           what's coming.</p>
 
-          <p>We can <em>show</em> that the peak sits at <span style="white-space:nowrap">$p=0.5$</span>
+          <p>We can <em>show</em> that the peak sits at $p=0.5$
           rather than just eyeball the table. Using the natural log for the calculus and differentiating
-          <span style="white-space:nowrap">$H(p) = -p\ln p - (1-p)\ln(1-p)$</span> with respect to
-          <span style="white-space:nowrap">$p$</span>:</p>
+          $H(p) = -p\ln p - (1-p)\ln(1-p)$ with respect to
+          $p$:</p>
           $$
           \begin{aligned}
           \frac{dH}{dp}
@@ -213,8 +222,8 @@ print(-torch.log(p_rare))     # tensor(6.9078)  same event, different unit</code
           \end{aligned}
           $$
           <p class="gloss"><b>In words:</b> the slope of the entropy curve is the log of “tails-odds over
-          heads-odds.” Set the slope to 0 to find the top of the hill: <span style="white-space:nowrap">$\ln\frac{1-p}{p}=0$</span> means <span style="white-space:nowrap">$\frac{1-p}{p}=1$</span>, i.e.
-          <span style="white-space:nowrap">$1-p=p$</span>, i.e. <span style="white-space:nowrap">$p=0.5$</span>.
+          heads-odds.” Set the slope to 0 to find the top of the hill: $\ln\frac{1-p}{p}=0$ means $\frac{1-p}{p}=1$, i.e.
+          $1-p=p$, i.e. $p=0.5$.
           The single flat point of the curve is dead centre — proving the fair coin is the most uncertain
           coin there is.</p>
 
@@ -223,7 +232,7 @@ print(-torch.log(p_rare))     # tensor(6.9078)  same event, different unit</code
             <p><dfn>Bits vs nats.</dfn> Entropy is the same quantity whichever log you use; only the unit
             changes. Base-2 log gives <strong>bits</strong> (natural for “yes/no questions” and file sizes);
             natural log gives <strong>nats</strong>. They differ only by a constant factor
-            (<span style="white-space:nowrap">$1\text{ nat} \approx 1.44\text{ bits}$</span>). Machine
+            ($1\text{ nat} \approx 1.44\text{ bits}$). Machine
             learning code uses nats, because the natural log is the one calculus likes.</p>
           </div>
 
@@ -241,7 +250,7 @@ for p in [0.0, 0.1, 0.5, 0.9, 1.0]:
 # p=0.0  H=0.000   p=0.1  H=0.469   p=0.5  H=1.000
 # p=0.9  H=0.469   p=1.0  H=0.000    -> peak in the middle</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -263,43 +272,43 @@ for p in [0.0, 0.1, 0.5, 0.9, 1.0]:
           <h2><span class="h-num">3</span>Cross-entropy: surprise under the wrong beliefs</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>Entropy assumed you <em>knew</em> the true probabilities <span style="white-space:nowrap">$p$</span>. But a model doesn't know them — it only has a <em>guess</em>, a predicted distribution we'll
-          call <span style="white-space:nowrap">$q$</span>. <strong>Cross-entropy</strong> asks the honest
-          question: <em>if the world really runs on <span style="white-space:nowrap">$p$</span>, but I plan
-          for it as if it runs on <span style="white-space:nowrap">$q$</span>, how surprised will I be on
-          average?</em> It is your average surprise when your beliefs are <span style="white-space:nowrap">$q$</span> but reality is <span style="white-space:nowrap">$p$</span>.</p>
+          <p>Entropy assumed you <em>knew</em> the true probabilities $p$. But a model doesn't know them — it only has a <em>guess</em>, a predicted distribution we'll
+          call $q$. <strong>Cross-entropy</strong> asks the honest
+          question: <em>if the world really runs on $p$, but I plan
+          for it as if it runs on $q$, how surprised will I be on
+          average?</em> It is your average surprise when your beliefs are $q$ but reality is $p$.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
             <p>You travel to a country and pack the <em>wrong</em> phrasebook — it's for a neighbouring
             language. You can still get by: many phrases overlap, so you're understood often enough. But
             every mismatch costs you extra effort — repeating yourself, pointing, guessing. The <em>true</em>
-            language is <span style="white-space:nowrap">$p$</span>; your phrasebook is
-            <span style="white-space:nowrap">$q$</span>. Cross-entropy is the total effort you spend
+            language is $p$; your phrasebook is
+            $q$. Cross-entropy is the total effort you spend
             speaking reality through the wrong book. Pack a better-matched book (a better
-            <span style="white-space:nowrap">$q$</span>) and the daily effort drops.</p>
+            $q$) and the daily effort drops.</p>
           </div>
 
           <p class="beat beat--math">Now the math</p>
           <p>The recipe is the same as entropy — average the surprise, weighted by how often each outcome
           happens — with <strong>one change</strong>. The outcomes still happen with the true frequency
-          <span style="white-space:nowrap">$p(x)$</span> (reality decides how often things occur). But the
+          $p(x)$ (reality decides how often things occur). But the
           surprise you actually <em>feel</em> is computed from your belief
-          <span style="white-space:nowrap">$q(x)$</span>, because that's the probability you assigned. So we
-          weight by <span style="white-space:nowrap">$p$</span> but take the log of
-          <span style="white-space:nowrap">$q$</span>:</p>
+          $q(x)$, because that's the probability you assigned. So we
+          weight by $p$ but take the log of
+          $q$:</p>
           $$ H(p, q) \;=\; \mathbb{E}_{x\sim p}\big[-\log q(x)\big] \;=\; -\sum_{x} p(x)\,\log q(x) $$
           <p class="gloss"><b>In words:</b> outcomes arrive at their real rate <b>p(x)</b>, but each one
-          startles you by <span style="white-space:nowrap">$-\log q(x)$</span> — the surprise <em>your</em>
+          startles you by $-\log q(x)$ — the surprise <em>your</em>
           model assigned it. If your guess <b>q</b> matched reality <b>p</b> perfectly, this would collapse
-          back into ordinary entropy <span style="white-space:nowrap">$H(p)$</span>. Any mismatch makes it
+          back into ordinary entropy $H(p)$. Any mismatch makes it
           bigger. Cross-entropy is never smaller than entropy — a fact we prove in the next section.</p>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> Read the two arguments carefully</div>
-            <p>The order matters: <span style="white-space:nowrap">$H(p,q)$</span> weights by the
-            <strong>first</strong> argument <span style="white-space:nowrap">$p$</span> (what's true) and
-            takes the log of the <strong>second</strong> argument <span style="white-space:nowrap">$q$</span>
+            <p>The order matters: $H(p,q)$ weights by the
+            <strong>first</strong> argument $p$ (what's true) and
+            takes the log of the <strong>second</strong> argument $q$
             (what you believe). Swap them and you get a different number. Keep saying it to yourself:
             <em>“weighted by truth, surprised by belief.”</em></p>
           </div>
@@ -320,7 +329,7 @@ print(cross_entropy(p, p))      # tensor(0.8018)  = H(p), the floor
 print(cross_entropy(p, q_ok))   # tensor(0.8286)  a little above the floor
 print(cross_entropy(p, q_bad))  # tensor(1.9694)  far above -> bad model</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -342,12 +351,12 @@ print(cross_entropy(p, q_bad))  # tensor(1.9694)  far above -> bad model</code><
           <h2><span class="h-num">4</span>KL divergence: the extra cost of being wrong</h2>
 
           <p class="beat beat--intuition">Intuition first</p>
-          <p>Cross-entropy <span style="white-space:nowrap">$H(p,q)$</span> is your total surprise with a
-          wrong belief. Entropy <span style="white-space:nowrap">$H(p)$</span> is the unavoidable surprise
+          <p>Cross-entropy $H(p,q)$ is your total surprise with a
+          wrong belief. Entropy $H(p)$ is the unavoidable surprise
           even with a perfect belief. The <em>difference</em> is the part you could have avoided — the pure
-          <strong>waste</strong> caused by believing <span style="white-space:nowrap">$q$</span> instead of
-          <span style="white-space:nowrap">$p$</span>. That waste is the <strong>Kullback–Leibler
-          divergence</strong>, written <span style="white-space:nowrap">$D_{\mathrm{KL}}(p\Vert q)$</span>.</p>
+          <strong>waste</strong> caused by believing $q$ instead of
+          $p$. That waste is the <strong>Kullback–Leibler
+          divergence</strong>, written $D_{\mathrm{KL}}(p\Vert q)$.</p>
 
           <div class="callout parallel">
             <div class="callout__label"><span class="ic">☂</span> Everyday parallel</div>
@@ -371,21 +380,21 @@ print(cross_entropy(p, q_bad))  # tensor(1.9694)  far above -> bad model</code><
           \end{aligned}
           $$
           <p class="gloss"><b>In words:</b> for each outcome, look at the ratio of what's true to what you
-          believed, <span style="white-space:nowrap">$p(x)/q(x)$</span>; take its log; weight by how often
+          believed, $p(x)/q(x)$; take its log; weight by how often
           the outcome happens, <b>p(x)</b>; sum up. Where your belief matched reality the ratio is 1 and its
           log is 0 — no penalty. Wherever you were wrong the ratio strays from 1 and adds a positive cost.</p>
 
           <h3>Why KL divergence is never negative (Gibbs' inequality)</h3>
           <p>We keep claiming “cross-entropy ≥ entropy” and “the extra cost is never negative.” Let's
           actually prove it, because the whole story hangs on it. The claim is
-          <span style="white-space:nowrap">$D_{\mathrm{KL}}(p\Vert q)\ge 0$</span>, known as
+          $D_{\mathrm{KL}}(p\Vert q)\ge 0$, known as
           <strong>Gibbs' inequality</strong>. The clean proof uses one fact about the logarithm and one
           fact about averages.</p>
-          <p>The fact about the logarithm: <span style="white-space:nowrap">$\log$</span> is a
+          <p>The fact about the logarithm: $\log$ is a
           <dfn>concave</dfn> function — it bulges upward, so any straight chord between two points on the
           curve lies <em>below</em> the curve. A concrete consequence we'll use is the simple bound
-          <span style="white-space:nowrap">$\log t \le t - 1$</span> for all <span style="white-space:nowrap">$t\gt 0$</span> (the line <span style="white-space:nowrap">$t-1$</span> is the tangent to
-          <span style="white-space:nowrap">$\log$</span> at <span style="white-space:nowrap">$t=1$</span>,
+          $\log t \le t - 1$ for all $t\gt 0$ (the line $t-1$ is the tangent to
+          $\log$ at $t=1$,
           and a concave curve never rises above its tangent). Now watch:</p>
           $$
           \begin{aligned}
@@ -398,33 +407,33 @@ print(cross_entropy(p, q_bad))  # tensor(1.9694)  far above -> bad model</code><
             &= \sum_x q(x) - \sum_x p(x) \;=\; 1 - 1 \;=\; 0.
           \end{aligned}
           $$
-          <p class="gloss"><b>In words:</b> we showed <span style="white-space:nowrap">$-D_{\mathrm{KL}} \le 0$</span>, which is the same as <span style="white-space:nowrap">$D_{\mathrm{KL}} \ge 0$</span>.
+          <p class="gloss"><b>In words:</b> we showed $-D_{\mathrm{KL}} \le 0$, which is the same as $D_{\mathrm{KL}} \ge 0$.
           The last line used the only thing we know for sure about probability distributions: they each sum
           to 1. So the extra cost of a wrong belief is <em>always</em> zero or positive — never a bonus.
-          And equality (<span style="white-space:nowrap">$D_{\mathrm{KL}}=0$</span>) holds only when the bound
-          <span style="white-space:nowrap">$\log t = t-1$</span> is tight for every term, which happens only at
-          <span style="white-space:nowrap">$t=1$</span>, i.e. only when <span style="white-space:nowrap">$q(x)=p(x)$</span> everywhere. Belief matches reality exactly, or you pay.</p>
+          And equality ($D_{\mathrm{KL}}=0$) holds only when the bound
+          $\log t = t-1$ is tight for every term, which happens only at
+          $t=1$, i.e. only when $q(x)=p(x)$ everywhere. Belief matches reality exactly, or you pay.</p>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> This is the pillar</div>
             <p>Gibbs' inequality is <em>why</em> minimising cross-entropy is a sensible goal.
-            Since <span style="white-space:nowrap">$H(p,q) = H(p) + D_{\mathrm{KL}}(p\Vert q)$</span> and
-            <span style="white-space:nowrap">$H(p)$</span> is a fixed constant the model cannot change,
+            Since $H(p,q) = H(p) + D_{\mathrm{KL}}(p\Vert q)$ and
+            $H(p)$ is a fixed constant the model cannot change,
             pushing cross-entropy down is <strong>exactly</strong> pushing
-            <span style="white-space:nowrap">$D_{\mathrm{KL}}$</span> down — dragging your predicted
-            distribution <span style="white-space:nowrap">$q$</span> toward the truth
-            <span style="white-space:nowrap">$p$</span>. The lowest it can go is zero, reached only when
-            <span style="white-space:nowrap">$q=p$</span>.</p>
+            $D_{\mathrm{KL}}$ down — dragging your predicted
+            distribution $q$ toward the truth
+            $p$. The lowest it can go is zero, reached only when
+            $q=p$.</p>
           </div>
 
           <div class="callout pitfall">
             <div class="callout__label"><span class="ic">▲</span> Watch out: KL is not a distance</div>
             <p>KL divergence is <strong>asymmetric</strong>: in general
-            <span style="white-space:nowrap">$D_{\mathrm{KL}}(p\Vert q) \ne D_{\mathrm{KL}}(q\Vert p)$</span>.
+            $D_{\mathrm{KL}}(p\Vert q) \ne D_{\mathrm{KL}}(q\Vert p)$.
             The cost of using the wrong phrasebook depends on which language is actually being spoken. So
             never call KL a “distance” — a real distance is symmetric, and this is not. It's a directed
-            measure of “extra surprise if the truth is <span style="white-space:nowrap">$p$</span> and you
-            planned for <span style="white-space:nowrap">$q$</span>.”</p>
+            measure of “extra surprise if the truth is $p$ and you
+            planned for $q$.”</p>
           </div>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
@@ -445,7 +454,7 @@ print(kl_pq)   # tensor(0.1838)
 print(kl_qp)   # tensor(0.1920)  -> different number: KL is asymmetric
 print(kl_pq >= 0, kl_qp >= 0)  # tensor(True) tensor(True) -> Gibbs holds</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -484,11 +493,11 @@ print(kl_pq >= 0, kl_qp >= 0)  # tensor(True) tensor(True) -> Gibbs holds</code>
           </div>
 
           <p class="beat beat--math">Now the math — the collapse</p>
-          <p>In classification the true distribution <span style="white-space:nowrap">$p$</span> for a single
+          <p>In classification the true distribution $p$ for a single
           example is <strong>one-hot</strong>: it puts probability 1 on the correct class
-          <span style="white-space:nowrap">$c$</span> and 0 on every other class. That is,
-          <span style="white-space:nowrap">$p(c)=1$</span> and <span style="white-space:nowrap">$p(x)=0$</span>
-          for <span style="white-space:nowrap">$x\ne c$</span>. (“One-hot” = a vector that is all zeros except
+          $c$ and 0 on every other class. That is,
+          $p(c)=1$ and $p(x)=0$
+          for $x\ne c$. (“One-hot” = a vector that is all zeros except
           a single 1 marking the right answer.) Substitute that into the cross-entropy sum and watch every
           term but one vanish:</p>
           $$
@@ -503,11 +512,11 @@ print(kl_pq >= 0, kl_qp >= 0)  # tensor(True) tensor(True) -> Gibbs holds</code>
           <p class="gloss"><b>In words:</b> because the truth is 1 for the correct class and 0 everywhere
           else, every wrong-class term is multiplied by 0 and disappears. What survives is a single term:
           <em>minus the log of the probability your model assigned to the correct class.</em> That's it. The
-          whole cross-entropy of a labelled example is just <span style="white-space:nowrap">$-\log q(\text{correct class})$</span> — the surprise of the right answer under your model.</p>
+          whole cross-entropy of a labelled example is just $-\log q(\text{correct class})$ — the surprise of the right answer under your model.</p>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> Cross-entropy = negative log-likelihood</div>
-            <p><span style="white-space:nowrap">$-\log q(c)$</span> is precisely the
+            <p>$-\log q(c)$ is precisely the
             <strong>negative log-likelihood</strong> of the correct label. The <em>likelihood</em> is how
             probable the model thinks the true answer is; the loss is minus its log. So minimising
             cross-entropy is <strong>maximising the likelihood</strong> of the correct answers — the very
@@ -516,33 +525,33 @@ print(kl_pq >= 0, kl_qp >= 0)  # tensor(True) tensor(True) -> Gibbs holds</code>
             from information theory and “most probable model” from statistics — turn out to be the same loss.</p>
           </div>
 
-          <p>Over a whole dataset of <span style="white-space:nowrap">$N$</span> independent examples, the
+          <p>Over a whole dataset of $N$ independent examples, the
           likelihoods multiply, so the log-likelihoods add, and the training loss is the <em>average</em>
           negative log-likelihood — one cross-entropy term per example:</p>
           $$ L \;=\; \frac{1}{N}\sum_{i=1}^{N} -\log q_i(c_i) $$
-          <p class="gloss"><b>In words:</b> for each training example <span style="white-space:nowrap">$i$</span> take the model's probability on that example's true class <span style="white-space:nowrap">$c_i$</span>, take its negative log (the surprise), and average over all
+          <p class="gloss"><b>In words:</b> for each training example $i$ take the model's probability on that example's true class $c_i$, take its negative log (the surprise), and average over all
           <b>N</b> examples. Drive this down and you are, example by example, making the model less surprised
           by the right answers.</p>
 
-          <h3>Where do the probabilities <span style="white-space:nowrap">$q$</span> come from? The softmax</h3>
+          <h3>Where do the probabilities $q$ come from? The softmax</h3>
           <p>A neural network's last layer doesn't output probabilities — it outputs a vector of raw,
           unbounded real numbers called <strong>logits</strong> (one score per class; they can be negative,
-          huge, anything). To turn logits <span style="white-space:nowrap">$z_1,\dots,z_K$</span> into a
-          valid probability distribution <span style="white-space:nowrap">$q$</span>, we pass them through the
+          huge, anything). To turn logits $z_1,\dots,z_K$ into a
+          valid probability distribution $q$, we pass them through the
           <strong>softmax</strong> function — exponentiate each score (making it positive) and divide by the
           total (making the whole set sum to 1):</p>
           $$ q_k \;=\; \operatorname{softmax}(z)_k \;=\; \frac{e^{z_k}}{\sum_{j=1}^{K} e^{z_j}} $$
-          <p class="gloss"><b>In words:</b> <span style="white-space:nowrap">$e^{z_k}$</span> makes every
+          <p class="gloss"><b>In words:</b> $e^{z_k}$ makes every
           score positive and blows up the gaps so the largest logit dominates; dividing by the sum
           normalises them into probabilities that add to 1. The class with the biggest logit gets the
           biggest probability. Softmax is the bridge from “raw network scores” to “a distribution
-          <span style="white-space:nowrap">$q$</span> you can feed to cross-entropy.”</p>
+          $q$ you can feed to cross-entropy.”</p>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> Softmax + cross-entropy: the standard pairing</div>
-            <p>Feed the network's logits through softmax to get <span style="white-space:nowrap">$q$</span>,
-            then score <span style="white-space:nowrap">$q$</span> with cross-entropy
-            <span style="white-space:nowrap">$-\log q(c)$</span>. This softmax-then-cross-entropy pair is
+            <p>Feed the network's logits through softmax to get $q$,
+            then score $q$ with cross-entropy
+            $-\log q(c)$. This softmax-then-cross-entropy pair is
             the default output of virtually every classifier. It's so common — and so much more numerically
             stable when fused — that PyTorch bundles both into a single function,
             <code>nn.CrossEntropyLoss</code>, which takes the <em>raw logits</em> directly. You almost never
@@ -577,7 +586,7 @@ print(builtin)                              # tensor(0.1755)  -> identical</code
             feed <strong>raw logits</strong> to the loss, never pre-softmaxed probabilities.</p>
           </div>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -601,11 +610,11 @@ print(builtin)                              # tensor(0.1755)  -> identical</code
 
           <h2><span class="h-num">6</span>What to carry forward</h2>
           <ul>
-            <li><strong>Information / surprise</strong> is <span style="white-space:nowrap">$-\log p(x)$</span>: rare events carry more, and the log makes independent surprises add up.</li>
-            <li><strong>Entropy</strong> <span style="white-space:nowrap">$H(p) = -\sum p\log p$</span> is your average surprise — uncertainty in “yes/no questions,” maximal when outcomes are equally likely.</li>
-            <li><strong>Cross-entropy</strong> <span style="white-space:nowrap">$H(p,q) = -\sum p\log q$</span> is your average surprise when reality is <span style="white-space:nowrap">$p$</span> but you believed <span style="white-space:nowrap">$q$</span>: weighted by truth, surprised by belief.</li>
-            <li><strong>KL divergence</strong> <span style="white-space:nowrap">$D_{\mathrm{KL}}(p\Vert q) = H(p,q) - H(p) \ge 0$</span> is the pure extra cost of a wrong belief (Gibbs' inequality, proved via <span style="white-space:nowrap">$\log t \le t-1$</span>) — and it is asymmetric, so not a distance.</li>
-            <li><strong>The punchline:</strong> for one-hot labels cross-entropy collapses to <span style="white-space:nowrap">$-\log q(\text{correct class})$</span> = negative log-likelihood, so minimising it <em>is</em> maximum likelihood (<a href="03-probability.html">Section 3</a>). Softmax turns logits into <span style="white-space:nowrap">$q$</span>; cross-entropy reappears in its binary form in <a href="06-logistic-regression.html">Section 6</a>, and the full softmax + cross-entropy pair in <a href="11-mlp-numpy.html">Section 11</a> and <a href="19-language-modeling.html">Section 19</a>.</li>
+            <li><strong>Information / surprise</strong> is $-\log p(x)$: rare events carry more, and the log makes independent surprises add up.</li>
+            <li><strong>Entropy</strong> $H(p) = -\sum p\log p$ is your average surprise — uncertainty in “yes/no questions,” maximal when outcomes are equally likely.</li>
+            <li><strong>Cross-entropy</strong> $H(p,q) = -\sum p\log q$ is your average surprise when reality is $p$ but you believed $q$: weighted by truth, surprised by belief.</li>
+            <li><strong>KL divergence</strong> $D_{\mathrm{KL}}(p\Vert q) = H(p,q) - H(p) \ge 0$ is the pure extra cost of a wrong belief (Gibbs' inequality, proved via $\log t \le t-1$) — and it is asymmetric, so not a distance.</li>
+            <li><strong>The punchline:</strong> for one-hot labels cross-entropy collapses to $-\log q(\text{correct class})$ = negative log-likelihood, so minimising it <em>is</em> maximum likelihood (<a href="03-probability.html">Section 3</a>). Softmax turns logits into $q$; cross-entropy reappears in its binary form in <a href="06-logistic-regression.html">Section 6</a>, and the full softmax + cross-entropy pair in <a href="11-mlp-numpy.html">Section 11</a> and <a href="19-language-modeling.html">Section 19</a>.</li>
           </ul>
           <p>You now hold the loss function that trains nearly every classifier ever built — and you
           <em>derived</em> it, from “why is snow in the desert surprising?” all the way to

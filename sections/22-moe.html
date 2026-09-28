@@ -41,7 +41,15 @@
           <p class="lesson-standfirst">The technique behind today's biggest models — build the router, derive the balancing loss, and swap it into the transformer you already understand.</p>
           <div class="lesson-meta">
             <span><b>46 min</b> read</span>
-            <span><b>You'll learn:</b> conditional computation · top-k router math · the load-balancing auxiliary loss (derived) · a full annotated MoE transformer, dense vs MoE</span>
+          </div>
+          <div class="objectives">
+            <div class="objectives__label">You'll learn</div>
+            <ul>
+              <li>conditional computation</li>
+              <li>top-k router math</li>
+              <li>the load-balancing auxiliary loss (derived)</li>
+              <li>a full annotated MoE transformer, dense vs MoE</li>
+            </ul>
           </div>
         </header>
 
@@ -92,10 +100,10 @@
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>Let a single expert sub-network cost <span style="white-space:nowrap">$C$</span> units of
-          compute to run on one token. Put <span style="white-space:nowrap">$N$</span> of these experts
-          side by side and let the router send each token to <span style="white-space:nowrap">$k$</span>
-          of them (with <span style="white-space:nowrap">$k \ll N$</span>, read "k is much smaller than
+          <p>Let a single expert sub-network cost $C$ units of
+          compute to run on one token. Put $N$ of these experts
+          side by side and let the router send each token to $k$
+          of them (with $k \ll N$, read "k is much smaller than
           N"). Then:</p>
           $$ \text{Total parameters} \;\propto\; N\,C, \qquad
              \text{Compute per token} \;\propto\; k\,C $$
@@ -121,7 +129,7 @@
             the mechanism that makes that possible.</p>
           </div>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -202,7 +210,7 @@ class Expert(nn.Module):
           activation function; see <a href="09-neurons.html">Section 9</a>), and a projection back to
           <code>d_model</code>. An MoE layer will hold <code>N</code> of these in a list.</p>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -242,11 +250,11 @@ class Expert(nn.Module):
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>Take a single token's vector <span style="white-space:nowrap">$\mathbf{x}_t \in \mathbb{R}^{d}$</span>
-          (here <span style="white-space:nowrap">$d = d_{\text{model}}$</span>, and <span style="white-space:nowrap">$t$</span>
+          <p>Take a single token's vector $\mathbf{x}_t \in \mathbb{R}^{d}$
+          (here $d = d_{\text{model}}$, and $t$
           indexes the token). The router owns one weight matrix
-          <span style="white-space:nowrap">$\mathbf{W}_g \in \mathbb{R}^{d \times N}$</span>, where
-          <span style="white-space:nowrap">$N$</span> is the number of experts. <strong>Step 1 — gate
+          $\mathbf{W}_g \in \mathbb{R}^{d \times N}$, where
+          $N$ is the number of experts. <strong>Step 1 — gate
           logits.</strong> Multiply to get one raw score per expert:</p>
           $$ \mathbf{g}_t \;=\; \mathbf{x}_t\,\mathbf{W}_g \;\in\; \mathbb{R}^{N} $$
           <p class="gloss"><b>In words:</b> <b>g</b><sub>t</sub> is a list of <b>N</b> numbers, one per
@@ -266,9 +274,9 @@ class Expert(nn.Module):
           distribution, e.g. <b>[0.6, 0.25, 0.1, 0.05, …]</b>.</p>
 
           <p><strong>Step 3 — top-k selection.</strong> Running <em>all</em> N experts would defeat the
-          purpose. So we keep only the <span style="white-space:nowrap">$k$</span> experts with the highest
+          purpose. So we keep only the $k$ experts with the highest
           probabilities. Write that chosen set as
-          <span style="white-space:nowrap">$\mathcal{S}_t$</span>:</p>
+          $\mathcal{S}_t$:</p>
           $$ \mathcal{S}_t \;=\; \operatorname*{top\text{-}k}_{\,i}\; p_{t,i}
              \quad\text{(the } k \text{ experts with the largest } p_{t,i}) $$
           <p class="gloss"><b>In words:</b> <b>S</b><sub>t</sub> is the short list — for <b>k = 2</b>, the
@@ -287,7 +295,7 @@ class Expert(nn.Module):
           <b>0.25</b>, the renormalized weights are <b>0.6 / 0.85 ≈ 0.706</b> and <b>0.25 / 0.85 ≈ 0.294</b>.</p>
 
           <p><strong>Step 5 — combine.</strong> Run the token through each chosen expert and add up their
-          outputs, weighted by <span style="white-space:nowrap">$w_{t,i}$</span>:</p>
+          outputs, weighted by $w_{t,i}$:</p>
           $$ \mathbf{y}_t \;=\; \sum_{i \in \mathcal{S}_t} w_{t,i}\;\, E_i(\mathbf{x}_t) $$
           <p class="gloss"><b>In words:</b> <b>E</b><sub>i</sub> is expert <b>i</b> (an FFN). The output
           <b>y</b><sub>t</sub> is a weighted average of just the <b>k</b> chosen experts' answers. Experts
@@ -296,10 +304,10 @@ class Expert(nn.Module):
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> Why the router can learn at all</div>
-            <p>The weights <span style="white-space:nowrap">$w_{t,i}$</span> multiply the experts' outputs,
+            <p>The weights $w_{t,i}$ multiply the experts' outputs,
             so gradients (from <a href="10-backprop.html">backprop</a>) flow back through them into
-            <span style="white-space:nowrap">$\mathbf{W}_g$</span>. If sending a token to expert 3 lowered
-            the loss, the router is nudged to raise <span style="white-space:nowrap">$p_{t,3}$</span> next
+            $\mathbf{W}_g$. If sending a token to expert 3 lowered
+            the loss, the router is nudged to raise $p_{t,3}$ next
             time. The hard "pick the top k" step itself is not differentiable, but because the kept experts
             are weighted by their <em>soft</em> probabilities, the router still gets a gradient signal
             through the survivors. That is why top-k gating trains end-to-end with plain gradient descent.</p>
@@ -333,7 +341,7 @@ class Expert(nn.Module):
           to. Dividing by <code>topk_probs.sum(...)</code> is the renormalize step. We defer the
           <code>aux_loss</code> helper to the next section, where we derive exactly what it computes.</p>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -381,8 +389,8 @@ class Expert(nn.Module):
 
           <p class="beat beat--math">Now the math</p>
           <p>We want to measure, and then punish, imbalance. Over a batch of
-          <span style="white-space:nowrap">$T$</span> tokens we define two quantities per expert
-          <span style="white-space:nowrap">$i$</span>. The first is a <strong>hard</strong> count — what
+          $T$ tokens we define two quantities per expert
+          $i$. The first is a <strong>hard</strong> count — what
           actually got routed:</p>
           $$ f_i \;=\; \frac{1}{T} \sum_{t=1}^{T} \mathbb{1}\big[\, i \in \mathcal{S}_t \,\big] $$
           <p class="gloss"><b>In words:</b> <b>f</b><sub>i</sub> is the <em>fraction of tokens routed to
@@ -408,19 +416,19 @@ class Expert(nn.Module):
           shrink as you add experts. The heart of it is <b>Σ f<sub>i</sub> P<sub>i</sub></b>: a dot product
           between the hard load and the soft preference. We now show why minimizing it forces balance.</p>
 
-          <h3>Why minimizing <span style="white-space:nowrap">$\sum_i f_i P_i$</span> spreads the load</h3>
+          <h3>Why minimizing $\sum_i f_i P_i$ spreads the load</h3>
           <p>Two facts pin it down. First, both quantities are (near) probability distributions over the
-          experts. For <span style="white-space:nowrap">$k = 1$</span> each token picks exactly one expert,
+          experts. For $k = 1$ each token picks exactly one expert,
           so the fractions sum to one, and the probabilities always do:</p>
           $$ \sum_{i=1}^{N} f_i \;=\; 1, \qquad \sum_{i=1}^{N} P_i \;=\; 1 $$
           <p>Second, on average a token that the router <em>prefers</em> (high
-          <span style="white-space:nowrap">$P_i$</span>) is also a token it <em>routes</em> there (high
-          <span style="white-space:nowrap">$f_i$</span>) — the count is just the hard version of the
-          preference. Treat them as tracking each other, <span style="white-space:nowrap">$f_i \approx P_i$</span>,
+          $P_i$) is also a token it <em>routes</em> there (high
+          $f_i$) — the count is just the hard version of the
+          preference. Treat them as tracking each other, $f_i \approx P_i$,
           for the purpose of seeing what we are minimizing. Then the objective becomes:</p>
           $$ \sum_{i=1}^{N} f_i \, P_i \;\approx\; \sum_{i=1}^{N} P_i^{\,2} $$
-          <p>Now we minimize <span style="white-space:nowrap">$\sum_i P_i^2$</span> subject to
-          <span style="white-space:nowrap">$\sum_i P_i = 1$</span>. By the Cauchy–Schwarz inequality (or
+          <p>Now we minimize $\sum_i P_i^2$ subject to
+          $\sum_i P_i = 1$. By the Cauchy–Schwarz inequality (or
           just the fact that spreading mass reduces the sum of squares):</p>
           $$ \Big(\sum_{i=1}^{N} P_i \cdot 1\Big)^{2} \;\le\; \Big(\sum_{i=1}^{N} P_i^{2}\Big)\Big(\sum_{i=1}^{N} 1^{2}\Big)
              \;\;\Longrightarrow\;\; 1 \;\le\; N \sum_{i=1}^{N} P_i^{2} $$
@@ -436,23 +444,23 @@ class Expert(nn.Module):
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> The clever part: which factor gets the gradient</div>
-            <p>The count <span style="white-space:nowrap">$f_i$</span> comes from a hard top-k pick, so it
+            <p>The count $f_i$ comes from a hard top-k pick, so it
             has no usable gradient — you cannot smoothly differentiate "was this token in the top 2?". The
-            probability <span style="white-space:nowrap">$P_i$</span> is a smooth softmax average, so it
-            <em>does</em>. In the product <span style="white-space:nowrap">$f_i P_i$</span>, the gradient
-            flows through <span style="white-space:nowrap">$P_i$</span> while
-            <span style="white-space:nowrap">$f_i$</span> acts as a fixed weight. The effect: experts that
-            are <em>currently overloaded</em> (big <span style="white-space:nowrap">$f_i$</span>) get their
-            probability <span style="white-space:nowrap">$P_i$</span> pushed <em>down</em> hardest, which
+            probability $P_i$ is a smooth softmax average, so it
+            <em>does</em>. In the product $f_i P_i$, the gradient
+            flows through $P_i$ while
+            $f_i$ acts as a fixed weight. The effect: experts that
+            are <em>currently overloaded</em> (big $f_i$) get their
+            probability $P_i$ pushed <em>down</em> hardest, which
             steers the next batch's tokens toward the quiet experts. The hard count decides <em>who</em>
             gets penalized; the soft probability is <em>how</em> the penalty is applied.</p>
           </div>
 
-          <p>The coefficient <span style="white-space:nowrap">$\alpha$</span> is a dial with a real
+          <p>The coefficient $\alpha$ is a dial with a real
           trade-off. Too small and the balancing force is too weak to stop collapse — you drift back to a
           few favourite experts. Too large and you overpower the task loss: the router is forced to spread
           tokens <em>uniformly regardless of whether that is good for the actual prediction</em>, which
-          hurts quality. The standard value <span style="white-space:nowrap">$\alpha = 0.01$</span> keeps
+          hurts quality. The standard value $\alpha = 0.01$ keeps
           balance without drowning out the thing you actually care about.</p>
 
           <p class="beat beat--code">The same thing in PyTorch</p>
@@ -480,14 +488,14 @@ class Expert(nn.Module):
           <div class="callout pitfall">
             <div class="callout__label"><span class="ic">▲</span> Watch out</div>
             <p>Do not detach or <code>torch.no_grad()</code> the <code>P = probs.mean(0)</code> line — the
-            whole point is that gradients flow through <span style="white-space:nowrap">$P_i$</span> back
-            into the router. It is fine that <span style="white-space:nowrap">$f_i$</span> (built from the
+            whole point is that gradients flow through $P_i$ back
+            into the router. It is fine that $f_i$ (built from the
             hard <code>topk_idx</code>) carries no gradient; that is by design. If you accidentally block
-            the gradient on <span style="white-space:nowrap">$P_i$</span>, the auxiliary loss becomes a
+            the gradient on $P_i$, the auxiliary loss becomes a
             constant and does nothing, and your experts will quietly collapse.</p>
           </div>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -526,7 +534,7 @@ class Expert(nn.Module):
 
           <p class="beat beat--math">Now the math</p>
           <p>The per-expert budget is set by a <dfn>capacity factor</dfn>
-          <span style="white-space:nowrap">$c$</span> (a small multiplier, usually between 1.0 and 2.0):</p>
+          $c$ (a small multiplier, usually between 1.0 and 2.0):</p>
           $$ \text{capacity} \;=\; c \cdot \frac{T \cdot k}{N} $$
           <p class="gloss"><b>In words:</b> <b>T·k / N</b> is the number of tokens each expert would get if
           the <b>T</b> tokens (each sent to <b>k</b> experts) were split perfectly evenly. The factor
@@ -599,7 +607,7 @@ class Expert(nn.Module):
           by their weights, and <code>index_add_</code> the results back into the right rows. Because a
           token that chose two experts shows up in two different loop iterations, <code>index_add_</code>
           accumulates both weighted outputs — which is exactly the sum
-          <span style="white-space:nowrap">$\sum_{i \in \mathcal{S}_t} w_{t,i} E_i(\mathbf{x}_t)$</span>
+          $\sum_{i \in \mathcal{S}_t} w_{t,i} E_i(\mathbf{x}_t)$
           from the router math above. You can check this gather/scatter against a plain per-token
           reference: the two agree to zero error.</p>
 
@@ -607,8 +615,8 @@ class Expert(nn.Module):
             <div class="callout__label"><span class="ic">◆</span> Why loop over experts, not over tokens</div>
             <p>The naive version loops over tokens and calls each token's experts one at a time — thousands
             of tiny matrix multiplies, which is painfully slow. Looping over <em>experts</em> instead lets
-            us batch: every token headed for expert <span style="white-space:nowrap">$e$</span> goes through
-            it in a single matrix multiply. There are only <span style="white-space:nowrap">$N$</span>
+            us batch: every token headed for expert $e$ goes through
+            it in a single matrix multiply. There are only $N$
             iterations no matter how many tokens you have. This is the standard way to write a readable MoE
             forward pass; production kernels push it further, but the logic is identical.</p>
           </div>
@@ -693,7 +701,7 @@ for step in range(300):
           makes this an MoE run is <code>total_loss = task_loss + aux_loss</code>: we optimize the task and
           the load balance <em>together</em>. As training proceeds the task loss falls toward zero (the
           increment rule is easy to learn) while the auxiliary loss settles near its floor of
-          <span style="white-space:nowrap">$\alpha = 0.01$</span> as the router learns to keep all eight
+          $\alpha = 0.01$ as the router learns to keep all eight
           experts busy. A typical trace looks like:</p>
           <pre><code class="language-python"># step   0 | task 3.512 | aux 0.0114 | total 3.523
 # step  60 | task 0.489 | aux 0.0103 | total 0.499
@@ -702,12 +710,12 @@ for step in range(300):
 # step 240 | task 0.019 | aux 0.0100 | total 0.029
 # step 300 | task 0.011 | aux 0.0100 | total 0.021</code></pre>
           <p class="gloss"><b>In words:</b> task loss collapses from ~3.5 (random guessing over 32 tokens is
-          <span style="white-space:nowrap">$\ln 32 \approx 3.47$</span>) down toward zero, confirming the
+          $\ln 32 \approx 3.47$) down toward zero, confirming the
           MoE block learns the task; the auxiliary loss hovers just above
-          <span style="white-space:nowrap">$\alpha$</span>, confirming the router stays balanced instead of
+          $\alpha$, confirming the router stays balanced instead of
           collapsing onto one expert. Both falling together is the whole system working.</p>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -721,7 +729,7 @@ for step in range(300):
                 again and <code>0.3·E₅(x)</code> is <em>added</em> into the same row. Because
                 <code>index_add_</code> accumulates rather than overwrites, the row ends up holding
                 <code>0.7·E₃(x) + 0.3·E₅(x)</code> — exactly the weighted blend
-                <span style="white-space:nowrap">$\sum_{i} w_{t,i} E_i(x)$</span> from the router math. The
+                $\sum_{i} w_{t,i} E_i(x)$ from the router math. The
                 two separate iterations sum into one correct output.</p>
               </div>
             </details>
@@ -732,13 +740,13 @@ for step in range(300):
 
           <p class="beat beat--intuition">Intuition first</p>
           <p>Let's make the trade concrete. Take one transformer layer with
-          <span style="white-space:nowrap">$d_{\text{model}} = 512$</span> and
-          <span style="white-space:nowrap">$d_{\text{ff}} = 2048$</span>. A dense FFN has about
-          <span style="white-space:nowrap">$2 \cdot d_{\text{model}} \cdot d_{\text{ff}} \approx 2.1$</span>
-          million parameters. Swap in an MoE with <span style="white-space:nowrap">$N = 8$</span> experts
-          and <span style="white-space:nowrap">$k = 2$</span>: you now store eight copies (~16.8M
+          $d_{\text{model}} = 512$ and
+          $d_{\text{ff}} = 2048$. A dense FFN has about
+          $2 \cdot d_{\text{model}} \cdot d_{\text{ff}} \approx 2.1$
+          million parameters. Swap in an MoE with $N = 8$ experts
+          and $k = 2$: you now store eight copies (~16.8M
           parameters) but each token still only runs two of them (~4.2M of active work), plus a router of
-          just <span style="white-space:nowrap">$512 \times 8 \approx 4$</span>k parameters.</p>
+          just $512 \times 8 \approx 4$k parameters.</p>
 
           <div class="scroll-x">
           <table>
@@ -758,13 +766,13 @@ for step in range(300):
                 <td>1× : 1×</td>
               </tr>
               <tr>
-                <td>MoE, <span style="white-space:nowrap">$N{=}8,\ k{=}2$</span></td>
+                <td>MoE, $N{=}8,\ k{=}2$</td>
                 <td>~16.8M (8 experts + router)</td>
                 <td>~4.2M (2 experts + router)</td>
                 <td>8× : 2×</td>
               </tr>
               <tr>
-                <td>MoE, <span style="white-space:nowrap">$N{=}64,\ k{=}2$</span></td>
+                <td>MoE, $N{=}64,\ k{=}2$</td>
                 <td>~134M</td>
                 <td>~4.2M</td>
                 <td>64× : 2×</td>
@@ -813,7 +821,7 @@ for step in range(300):
             the cost curve, not a miracle. Measure quality per active-FLOP, not per stored parameter.</p>
           </div>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -837,17 +845,17 @@ for step in range(300):
           <h2><span class="h-num">8</span>What to carry forward</h2>
           <ul>
             <li><strong>Conditional computation</strong> decouples knowledge from cost: total parameters
-            scale with the number of experts <span style="white-space:nowrap">$N$</span>, compute per token
-            scales only with how many you use, <span style="white-space:nowrap">$k$</span>.</li>
+            scale with the number of experts $N$, compute per token
+            scales only with how many you use, $k$.</li>
             <li>An MoE layer <strong>replaces the FFN sub-layer</strong> of a transformer block with N
             expert FFNs and a router; attention is untouched.</li>
             <li>The <strong>router</strong> is one small matrix: gate logits →
             softmax → top-k → renormalize, giving
-            <span style="white-space:nowrap">$\mathbf{y}_t = \sum_{i \in \mathcal{S}_t} w_{t,i} E_i(\mathbf{x}_t)$</span>.</li>
+            $\mathbf{y}_t = \sum_{i \in \mathcal{S}_t} w_{t,i} E_i(\mathbf{x}_t)$.</li>
             <li>The <strong>auxiliary loss</strong>
-            <span style="white-space:nowrap">$\alpha N \sum_i f_i P_i$</span> stops routing collapse; it is
-            minimized at the uniform <span style="white-space:nowrap">$1/N$</span> split, and gradients flow
-            through the soft <span style="white-space:nowrap">$P_i$</span> to steer tokens away from
+            $\alpha N \sum_i f_i P_i$ stops routing collapse; it is
+            minimized at the uniform $1/N$ split, and gradients flow
+            through the soft $P_i$ to steer tokens away from
             overloaded experts.</li>
             <li>The MoE forward pass <strong>loops over experts</strong>, gathering each expert's tokens and
             scatter-adding weighted outputs back with <code>index_add_</code> — verified to match a

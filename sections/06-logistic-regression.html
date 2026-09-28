@@ -41,7 +41,15 @@
           <p class="lesson-standfirst">One S-shaped curve turns a raw number into a probability, and one loss function turns wrong probabilities into a clean, learnable signal.</p>
           <div class="lesson-meta">
             <span><b>24 min</b> read</span>
-            <span><b>You'll learn:</b> sigmoid · probabilities · decision boundaries · binary cross-entropy</span>
+          </div>
+          <div class="objectives">
+            <div class="objectives__label">You'll learn</div>
+            <ul>
+              <li>sigmoid</li>
+              <li>probabilities</li>
+              <li>decision boundaries</li>
+              <li>binary cross-entropy</li>
+            </ul>
           </div>
         </header>
 
@@ -77,7 +85,7 @@
             more likely.</p>
           </div>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -147,7 +155,7 @@
 z = torch.tensor([-5.0, 0.0, 5.0])
 print(torch.sigmoid(z))   # tensor([0.0067, 0.5000, 0.9933])</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -197,7 +205,7 @@ print(torch.sigmoid(z))   # tensor([0.0067, 0.5000, 0.9933])</code></pre>
           line; with more, a flat <em>hyperplane</em> — but always flat, never curved, no matter how
           curved the probability surface around it looks.</p>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -277,7 +285,7 @@ print(torch.sigmoid(z))   # tensor([0.0067, 0.5000, 0.9933])</code></pre>
           though we started from a completely different loss. This is why logistic regression's
           training loop looks almost identical to linear regression's.</p>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>

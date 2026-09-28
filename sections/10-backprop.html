@@ -41,7 +41,15 @@
           <p class="lesson-standfirst">Backprop is just the chain rule with good bookkeeping. We'll compute every gradient in a real network by hand, with actual numbers — nothing left as “it can be shown.”</p>
           <div class="lesson-meta">
             <span><b>34 min</b> read</span>
-            <span><b>You'll learn:</b> the computational graph · the chain rule flowing backward · a full worked numerical example · the local-gradient rule</span>
+          </div>
+          <div class="objectives">
+            <div class="objectives__label">You'll learn</div>
+            <ul>
+              <li>the computational graph</li>
+              <li>the chain rule flowing backward</li>
+              <li>a full worked numerical example</li>
+              <li>the local-gradient rule</li>
+            </ul>
           </div>
         </header>
 
@@ -108,7 +116,7 @@
             problem by storing and reusing the answers to smaller overlapping pieces).</p>
           </div>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -176,7 +184,7 @@
             that is exactly where the speed comes from.</p>
           </div>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -250,7 +258,7 @@
           sigmoid's local gradient is just $a(1-a)$ — computed straight from the activation $a$ we already
           stored on the forward pass. No re-evaluating exponentials on the way back.</p>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -475,7 +483,7 @@ w2, b2 = w2 - alpha*dL_dw2, b2 - alpha*dL_db2
 a2_new = sigmoid(w2 * sigmoid(w1*x + b1) + b2)
 print(0.5 * (a2_new - y)**2)    # 0.0905  -> loss dropped</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -615,7 +623,7 @@ print(num_grad_w1)   # tensor(-0.0350)  -- matches our hand-computed delta1 * x<
             magic — only the bookkeeping you now understand.</p>
           </div>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>

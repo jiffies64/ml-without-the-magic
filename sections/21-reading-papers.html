@@ -41,7 +41,15 @@
           <p class="lesson-standfirst">You don't need to read every word of a research paper to steal everything useful from it — you need a method, and about twenty minutes.</p>
           <div class="lesson-meta">
             <span><b>22 min</b> read</span>
-            <span><b>You'll learn:</b> the three-pass reading method · what to extract from any paper · dissecting an MoE / Switch Transformer paper · habits that make it stick</span>
+          </div>
+          <div class="objectives">
+            <div class="objectives__label">You'll learn</div>
+            <ul>
+              <li>the three-pass reading method</li>
+              <li>what to extract from any paper</li>
+              <li>dissecting an MoE / Switch Transformer paper</li>
+              <li>habits that make it stick</li>
+            </ul>
           </div>
         </header>
 
@@ -104,7 +112,7 @@
             code and math don't let you fool yourself the way a nodding-along read-through does.</li>
           </ol>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -175,7 +183,7 @@
             the released code.</p>
           </div>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -245,19 +253,19 @@
           minimizing imbalance.</p>
 
           <p>You can see why with two clean cases. With 4 experts and perfectly even routing,
-          <span style="white-space:nowrap">$f_i = P_i = 0.25$</span> for every expert:
-          <span style="white-space:nowrap">$\sum f_iP_i = 4\times(0.25\times0.25)=0.25$</span>, so
-          <span style="white-space:nowrap">$L_{\text{aux}} = \alpha\times4\times0.25 = \alpha$</span>.
+          $f_i = P_i = 0.25$ for every expert:
+          $\sum f_iP_i = 4\times(0.25\times0.25)=0.25$, so
+          $L_{\text{aux}} = \alpha\times4\times0.25 = \alpha$.
           If instead everything piles onto expert 1
-          (<span style="white-space:nowrap">$f_1=P_1=1$</span>, the rest zero):
-          <span style="white-space:nowrap">$\sum f_iP_i = 1$</span>, so
-          <span style="white-space:nowrap">$L_{\text{aux}} = \alpha\times4\times1 = 4\alpha$</span>
+          ($f_1=P_1=1$, the rest zero):
+          $\sum f_iP_i = 1$, so
+          $L_{\text{aux}} = \alpha\times4\times1 = 4\alpha$
           — four times higher, purely as a penalty for imbalance.</p>
 
           <div class="callout definition">
             <div class="callout__label">Definition</div>
             <p>The <dfn>capacity factor</dfn> sets how many tokens each expert is allowed to
-            process in one batch: <span style="white-space:nowrap">expert capacity = (tokens per batch × experts-per-token k ÷ number of experts) × capacity factor</span>.
+            process in one batch: expert capacity = (tokens per batch × experts-per-token k ÷ number of experts) × capacity factor.
             A factor of 1.0 gives each expert exactly its fair share with no slack; tokens that
             arrive after an expert is full <em>overflow</em> — they skip that expert and pass
             through unchanged via a residual connection instead. A higher factor (say 1.25) buys
@@ -293,7 +301,7 @@
           PyTorch — so keep these six questions close, because the next section answers each one
           in code.</p>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>

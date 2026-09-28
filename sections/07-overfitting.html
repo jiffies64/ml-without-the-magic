@@ -41,7 +41,16 @@
           <p class="lesson-standfirst">A model that scores 100% on its training data has told you nothing yet — this section is about the honest number, the one measured on data the model has never seen, and how to protect it.</p>
           <div class="lesson-meta">
             <span><b>26 min</b> read</span>
-            <span><b>You'll learn:</b> generalization · bias–variance · L1/L2 regularization · train/val/test · cross-validation</span>
+          </div>
+          <div class="objectives">
+            <div class="objectives__label">You'll learn</div>
+            <ul>
+              <li>generalization</li>
+              <li>bias–variance</li>
+              <li>L1/L2 regularization</li>
+              <li>train/val/test</li>
+              <li>cross-validation</li>
+            </ul>
           </div>
         </header>
 
@@ -113,7 +122,7 @@ for degree in (1, 2, 15):
 # degree 15: bends through nearly every noisy point -> train error near zero, test error much worse
 #            than degree 2 -- it learned the noise, not the pattern (overfit)</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -185,7 +194,7 @@ for fold, (train_idx, val_idx) in enumerate(kf.split(X)):
 # 5 folds of 10 rows -> each validation fold has 2 rows, each training fold has the other 8.
 # By the end, every one of the 10 rows has served as validation data exactly once.</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -233,12 +242,12 @@ for fold, (train_idx, val_idx) in enumerate(kf.split(X)):
           </div>
 
           <p class="beat beat--math">Now the math</p>
-          <p>Suppose the true relationship is <span style="white-space:nowrap">$y = f(x) + \epsilon$</span>, where
-          <span style="white-space:nowrap">$\epsilon$</span> is random noise with mean 0 and variance
-          <span style="white-space:nowrap">$\sigma^2$</span> (irreducible — no model can predict pure noise).
+          <p>Suppose the true relationship is $y = f(x) + \epsilon$, where
+          $\epsilon$ is random noise with mean 0 and variance
+          $\sigma^2$ (irreducible — no model can predict pure noise).
           We train a model on a random training set <b>D</b>, getting a prediction
-          <span style="white-space:nowrap">$\hat f_D(x)$</span> at some test point <b>x</b>. Let
-          <span style="white-space:nowrap">$\bar f(x) = \mathbb{E}_D[\hat f_D(x)]$</span> be the <em>average</em>
+          $\hat f_D(x)$ at some test point <b>x</b>. Let
+          $\bar f(x) = \mathbb{E}_D[\hat f_D(x)]$ be the <em>average</em>
           prediction you'd get if you retrained on many different random training sets. Then the expected squared
           error at <b>x</b>, averaged over training sets, splits cleanly into three pieces:</p>
           $$ \begin{aligned}
@@ -247,9 +256,9 @@ for fold, (train_idx, val_idx) in enumerate(kf.split(X)):
           &= \underbrace{(f(x)-\bar f(x))^2}_{\text{Bias}^2} \;+\; \underbrace{\mathbb{E}_D\big[(\bar f(x)-\hat f_D(x))^2\big]}_{\text{Variance}} \;+\; \underbrace{\sigma^2}_{\text{irreducible noise}}
           \end{aligned} $$
           <p class="gloss"><b>In words:</b> the cross terms vanish when you average over many retrainings, because
-          the noise <span style="white-space:nowrap">$\epsilon$</span> has mean zero and is independent of the
-          data, and <span style="white-space:nowrap">$\hat f_D(x)$</span> deviates from its own average
-          <span style="white-space:nowrap">$\bar f(x)$</span> in both directions equally. What's left is three
+          the noise $\epsilon$ has mean zero and is independent of the
+          data, and $\hat f_D(x)$ deviates from its own average
+          $\bar f(x)$ in both directions equally. What's left is three
           additive pieces: how far off-center your average prediction is (<b>bias²</b>), how much predictions
           swing between different training sets (<b>variance</b>), and noise you could never predict no matter
           how good the model is (<b>σ²</b>). Total test error is the sum of all three — you can trade bias for
@@ -265,7 +274,7 @@ for fold, (train_idx, val_idx) in enumerate(kf.split(X)):
             Regularization, up next, is a way to buy back some of that variance without fully giving up capacity.</p>
           </div>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -308,11 +317,11 @@ for fold, (train_idx, val_idx) in enumerate(kf.split(X)):
           <p><strong>L2 regularization</strong> (also called <dfn>ridge</dfn>, or <dfn>weight decay</dfn> when
           used with gradient descent) adds the squared L2 norm of the weights to the loss:</p>
           $$ L_{\text{ridge}}(\boldsymbol\theta) = L_{\text{data}}(\boldsymbol\theta) + \lambda \lVert\boldsymbol\theta\rVert_2^2 = L_{\text{data}}(\boldsymbol\theta) + \lambda\sum_i \theta_i^2 $$
-          <p class="gloss"><b>In words:</b> <span style="white-space:nowrap">$L_{\text{data}}$</span> is
-          the ordinary loss measuring wrong predictions; <span style="white-space:nowrap">$\lambda$</span>
+          <p class="gloss"><b>In words:</b> $L_{\text{data}}$ is
+          the ordinary loss measuring wrong predictions; $\lambda$
           (lambda, a hyperparameter you choose) controls how strongly we punish large weights. Take the gradient
-          of this loss with respect to one weight <span style="white-space:nowrap">$\theta_i$</span> and plug it
-          into a gradient descent step with learning rate <span style="white-space:nowrap">$\alpha$</span>:</p>
+          of this loss with respect to one weight $\theta_i$ and plug it
+          into a gradient descent step with learning rate $\alpha$:</p>
           $$ \theta_i \leftarrow \theta_i - \alpha\Big(\frac{\partial L_{\text{data}}}{\partial \theta_i} + 2\lambda\theta_i\Big) = \underbrace{(1 - 2\alpha\lambda)}_{\text{shrink factor} \lt 1}\,\theta_i \;-\; \alpha\frac{\partial L_{\text{data}}}{\partial \theta_i} $$
           <p class="gloss"><b>In words:</b> every single update multiplies the weight by a shrink factor slightly
           less than 1, <em>before</em> applying the usual data-driven update. That's why L2 is nicknamed "weight
@@ -322,8 +331,8 @@ for fold, (train_idx, val_idx) in enumerate(kf.split(X)):
 
           <p><strong>L1 regularization</strong> (also called <dfn>lasso</dfn>) instead adds the L1 norm:</p>
           $$ L_{\text{lasso}}(\boldsymbol\theta) = L_{\text{data}}(\boldsymbol\theta) + \lambda \lVert\boldsymbol\theta\rVert_1 = L_{\text{data}}(\boldsymbol\theta) + \lambda\sum_i |\theta_i| $$
-          <p class="gloss"><b>In words:</b> the penalty's gradient with respect to <span style="white-space:nowrap">$\theta_i$</span>
-          is just <span style="white-space:nowrap">$\lambda\cdot\text{sign}(\theta_i)$</span> — a <em>constant</em>
+          <p class="gloss"><b>In words:</b> the penalty's gradient with respect to $\theta_i$
+          is just $\lambda\cdot\text{sign}(\theta_i)$ — a <em>constant</em>
           push toward zero, the same size whether the weight is huge or tiny. Unlike L2's shrink-by-a-fraction,
           this is shrink-by-a-fixed-amount every step, so a small weight can get pushed straight through zero and
           the optimizer sets it to exactly zero and leaves it there. That's L1 doing <dfn>feature selection</dfn>:
@@ -332,9 +341,9 @@ for fold, (train_idx, val_idx) in enumerate(kf.split(X)):
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> Why L1 zeroes weights and L2 doesn't: the geometric reason</div>
             <p>Both penalties can be viewed as a budget: keep the total penalty under some limit <b>t</b> while
-            minimizing the data loss. The L2 budget <span style="white-space:nowrap">$\sum\theta_i^2 \le t$</span>
+            minimizing the data loss. The L2 budget $\sum\theta_i^2 \le t$
             traces out a smooth <strong>circle</strong> (or sphere, in higher dimensions) around the origin. The
-            L1 budget <span style="white-space:nowrap">$\sum|\theta_i| \le t$</span> traces out a
+            L1 budget $\sum|\theta_i| \le t$ traces out a
             <strong>diamond</strong> — a shape with sharp corners that sit exactly on the axes (where one weight
             is zero and the rest aren't). As the loss's contour lines expand outward from their unconstrained
             best point, the first place they touch the constraint region is, for a smooth circle, almost never
@@ -368,7 +377,7 @@ loss = criterion(model(x), y) + 1e-4 * l1_penalty
 loss.backward()
 optimizer.step()</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>

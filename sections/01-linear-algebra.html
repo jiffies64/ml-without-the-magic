@@ -41,7 +41,16 @@
           <p class="lesson-standfirst">A neural network is, underneath, a stack of vectors being pushed through matrices. Learn to read that sentence and you can read almost anything in ML.</p>
           <div class="lesson-meta">
             <span><b>28 min</b> read</span>
-            <span><b>You'll learn:</b> vectors · dot products · matrices as transformations · norms · eigenvalues</span>
+          </div>
+          <div class="objectives">
+            <div class="objectives__label">You'll learn</div>
+            <ul>
+              <li>vectors</li>
+              <li>dot products</li>
+              <li>matrices as transformations</li>
+              <li>norms</li>
+              <li>eigenvalues</li>
+            </ul>
           </div>
         </header>
 
@@ -146,7 +155,7 @@ print((a * b).sum())        # tensor(32.)   = 1*4 + 2*5 + 3*6
 # the idiomatic one-liner every codebase uses
 print(torch.dot(a, b))      # tensor(32.)</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -199,7 +208,7 @@ print(torch.dot(a, b))      # tensor(32.)</code></pre>
 
           <div class="callout keyidea">
             <div class="callout__label"><span class="ic">◆</span> Why this is the whole of deep learning</div>
-            <p>A single layer of a neural network is exactly <span style="white-space:nowrap">$\mathbf{y} = \mathbf{W}\mathbf{x} + \mathbf{b}$</span>
+            <p>A single layer of a neural network is exactly $\mathbf{y} = \mathbf{W}\mathbf{x} + \mathbf{b}$
             — transform the input with a matrix <b>W</b>, then shift it by a vector <b>b</b> (the
             <em>bias</em>). Stack a few of these with a bit of nonlinearity between them and you have a
             deep network — we build neurons, layers, and nonlinearity properly in
@@ -209,15 +218,15 @@ print(torch.dot(a, b))      # tensor(32.)</code></pre>
 
           <h3>Matrix × matrix = do one transformation, then the next</h3>
           <p>Multiplying two matrices means <em>composing</em> their transformations: apply the right
-          one first, then the left one. This is why order matters (<span style="white-space:nowrap">$\mathbf{AB}\neq\mathbf{BA}$</span> in general — rotating then
+          one first, then the left one. This is why order matters ($\mathbf{AB}\neq\mathbf{BA}$ in general — rotating then
           stretching is not the same as stretching then rotating). The shape rule is the one thing you
           must memorize, because 90% of real ML bugs are shape mismatches:</p>
 
           <div class="callout definition">
             <div class="callout__label">The shape rule</div>
-            <p>To multiply <span style="white-space:nowrap">$(m\times n)\times(n\times p)$</span> the
+            <p>To multiply $(m\times n)\times(n\times p)$ the
             <strong>inner numbers must match</strong> (both <b>n</b>). The result has the shape of the
-            <strong>outer numbers</strong>: <span style="white-space:nowrap">$(m\times p)$</span>. Read
+            <strong>outer numbers</strong>: $(m\times p)$. Read
             it as: “the middle two cancel, the outer two survive.”</p>
           </div>
 
@@ -245,7 +254,7 @@ print((A @ B).shape)      # torch.Size([2, 5])  -> outer numbers survive</code><
             inner dimensions line up. When in doubt, <code>print(tensor.shape)</code> on every line.</p>
           </div>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -352,7 +361,7 @@ print(vals)                            # tensor([2., 3.])  the two stretch facto
 v = torch.tensor([1.0, 0.0])
 print(A @ v)                           # tensor([2., 0.]) == 2 * v   -> eigenvalue 2</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -376,7 +385,7 @@ print(A @ v)                           # tensor([2., 0.]) == 2 * v   -> eigenval
           <ul>
             <li><strong>Vectors</strong> are lists of numbers you can picture as arrows; data becomes vectors.</li>
             <li>The <strong>dot product</strong> multiplies matching slots and sums them — an alignment meter that returns one number.</li>
-            <li>A <strong>matrix</strong> is a reusable transformation; matrix–vector multiply is just several dot products stacked. One neural layer is <span style="white-space:nowrap">$\mathbf{Wx}+\mathbf{b}$</span>.</li>
+            <li>A <strong>matrix</strong> is a reusable transformation; matrix–vector multiply is just several dot products stacked. One neural layer is $\mathbf{Wx}+\mathbf{b}$.</li>
             <li>The <strong>shape rule</strong>: inner dimensions must match, outer dimensions survive. Print shapes to kill bugs.</li>
             <li><strong>Norms</strong> measure vector size (L2 = straight line, L1 = taxicab); <strong>eigenvalues</strong> are the stretch factors along a matrix's favoured directions.</li>
           </ul>

@@ -41,7 +41,15 @@
           <p class="lesson-standfirst">No PyTorch yet — just NumPy and the backprop math from Section 10, assembled into a network that actually learns.</p>
           <div class="lesson-meta">
             <span><b>30 min</b> read</span>
-            <span><b>You'll learn:</b> forward pass · backward pass · the training loop · watching a real network learn</span>
+          </div>
+          <div class="objectives">
+            <div class="objectives__label">You'll learn</div>
+            <ul>
+              <li>forward pass</li>
+              <li>backward pass</li>
+              <li>the training loop</li>
+              <li>watching a real network learn</li>
+            </ul>
           </div>
         </header>
 
@@ -450,7 +458,7 @@ print("accuracy:", (pred == y).mean())   # accuracy: 1.0</code></pre>
             deep learning, demonstrated in code you can read top to bottom.</p>
           </div>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -566,7 +574,7 @@ print("accuracy:   ", (pred == y).mean())</code></pre>
             <li><strong>Softmax</strong> turns raw scores (logits) into probabilities;
             <strong>cross-entropy</strong> scores those probabilities against the one-hot truth.</li>
             <li>The <strong>backward pass</strong> is Section 10's chain rule, one line per operation. The
-            softmax+cross-entropy gradient is just <span style="white-space:nowrap">$\mathbf{p}-\mathbf{Y}$</span>,
+            softmax+cross-entropy gradient is just $\mathbf{p}-\mathbf{Y}$,
             and every gradient comes out the same shape as the weight it updates.</li>
             <li>Weights start <strong>small and random</strong> (never all zeros — that never breaks
             symmetry), and <strong>SGD</strong> nudges them downhill by the learning rate each step.</li>

@@ -41,7 +41,16 @@
           <p class="lesson-standfirst">The gap between a model that trains on paper and one that trains on real hardware, in real time, on real data — normalization, dropout, half-precision numbers, and splitting work across machines.</p>
           <div class="lesson-meta">
             <span><b>28 min</b> read</span>
-            <span><b>You'll learn:</b> batch norm vs layer norm · dropout · mixed precision · gradient accumulation · distributed training</span>
+          </div>
+          <div class="objectives">
+            <div class="objectives__label">You'll learn</div>
+            <ul>
+              <li>batch norm vs layer norm</li>
+              <li>dropout</li>
+              <li>mixed precision</li>
+              <li>gradient accumulation</li>
+              <li>distributed training</li>
+            </ul>
           </div>
         </header>
 
@@ -152,7 +161,7 @@ y_ln = ln(x)              # mean/var for each example, computed across its own 4
             time, train or eval, so there is nothing extra to get wrong.</p>
           </div>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -207,7 +216,7 @@ y = drop(x)     # roughly half the entries become 0; survivors are doubled (1/(1
 model.eval()
 y = drop(x)     # identity -- dropout does nothing at eval time, x passes through unchanged</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -272,7 +281,7 @@ for xb, yb in loader:
     scaler.step(optimizer)          # unscales gradients, then steps (skips the step if any are inf/NaN)
     scaler.update()                 # adjusts the scale factor for the next iteration</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -331,7 +340,7 @@ for i, (xb, yb) in enumerate(loader):
             destabilize training in a way that looks like an unrelated bug.</p>
           </div>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -400,7 +409,7 @@ for i, (xb, yb) in enumerate(loader):
           <h2><span class="h-num">7</span>What to carry forward</h2>
           <ul>
             <li>Every normalization layer is <strong>normalize, then scale-and-shift</strong>:
-            <span style="white-space:nowrap">$y = \gamma(x-\mu)/\sqrt{\sigma^2+\epsilon} + \beta$</span>. The
+            $y = \gamma(x-\mu)/\sqrt{\sigma^2+\epsilon} + \beta$. The
             only difference between variants is which numbers <b>μ</b> and <b>σ²</b> are computed over.</li>
             <li><strong>Batch norm</strong> normalizes each feature across the batch (depends on other
             examples); <strong>layer norm</strong> normalizes each example across its own features

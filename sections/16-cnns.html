@@ -41,7 +41,15 @@
           <p class="lesson-standfirst">A convolution is a dot product wearing a sliding-window costume — see that clearly, and you can derive the shape of every layer in a CNN by hand.</p>
           <div class="lesson-meta">
             <span><b>30 min</b> read</span>
-            <span><b>You'll learn:</b> convolution as an operation · output-shape math · pooling · ResNets &amp; skip connections</span>
+          </div>
+          <div class="objectives">
+            <div class="objectives__label">You'll learn</div>
+            <ul>
+              <li>convolution as an operation</li>
+              <li>output-shape math</li>
+              <li>pooling</li>
+              <li>ResNets &amp; skip connections</li>
+            </ul>
           </div>
         </header>
 
@@ -96,7 +104,7 @@
           pixel once, use a <em>tiny</em> matrix (the kernel) that touches every pixel <em>many times</em>,
           once per position it slides to. The next section makes that precise.</p>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -198,7 +206,7 @@
             invariance</strong> — a pattern the kernel learned to detect in one corner is automatically
             detected anywhere else, since it's the same weights doing the checking. And it slashes the
             parameter count: a 3×3 kernel over 3 input channels producing 64 output feature maps needs
-            <span style="white-space:nowrap">$3\times3\times3\times64 = 1{,}728$</span> weights —
+            $3\times3\times3\times64 = 1{,}728$ weights —
             regardless of whether the image is 32×32 or 3200×3200. Compare that to the 150-million-weight
             fully-connected layer from the start of this section: convolution is doing more useful work with four orders
             of magnitude fewer numbers.</p>
@@ -226,7 +234,7 @@ down = nn.Conv2d(3, 16, kernel_size=3, stride=2, padding=0)
 print(down(x).shape)  # torch.Size([8, 16, 15, 15])
 # floor((32 - 3 + 0)/2) + 1 = floor(29/2) + 1 = 14 + 1 = 15</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -283,7 +291,7 @@ y = pool(x)
 print(y.shape)  # torch.Size([8, 16, 16, 16])
 # floor((32 - 2 + 0)/2) + 1 = 15 + 1 = 16, applied to height and width</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -346,8 +354,8 @@ print(y.shape)  # torch.Size([8, 16, 16, 16])
           <b>identity</b> path (<b>I</b>, exactly 1 — the derivative of <b>x</b> with respect to itself)
           and whatever the convolutions inside <b>F</b> contribute. Stack many residual blocks and the
           gradient through the whole stack is a product of terms that each look like
-          <span style="white-space:nowrap">$(I + \partial F/\partial x)$</span>. Even if every
-          <span style="white-space:nowrap">$\partial F/\partial x$</span> is tiny or poorly scaled, the
+          $(I + \partial F/\partial x)$. Even if every
+          $\partial F/\partial x$ is tiny or poorly scaled, the
           “<b>1 +</b>” guarantees each factor stays close to 1 instead of collapsing toward 0 — so the
           gradient signal reaches early layers largely intact. This is the same shrink-or-explode story
           as repeated matrix multiplication in <a href="01-linear-algebra.html">Section 1</a>'s
@@ -376,7 +384,7 @@ x = torch.randn(8, 16, 32, 32)
 y = block(x)
 print(y.shape)  # torch.Size([8, 16, 32, 32]) -> padding=1, kernel=3 keeps size unchanged</code></pre>
 
-          <div class="check">
+          <div class="check-wrap">
             <details class="check">
               <summary>
                 <span class="check__tag">Check yourself</span>
@@ -400,10 +408,10 @@ print(y.shape)  # torch.Size([8, 16, 32, 32]) -> padding=1, kernel=3 keeps size 
           <h2><span class="h-num">5</span>What to carry forward</h2>
           <ul>
             <li>Fully-connected layers give images too many parameters and no reuse of learned patterns across positions; convolution fixes both.</li>
-            <li>A <strong>convolution</strong> slides a small kernel over the input, computing a dot product at each position; output size follows <span style="white-space:nowrap">$\lfloor (W-K+2P)/S \rfloor + 1$</span> — derive it, don't memorize it.</li>
+            <li>A <strong>convolution</strong> slides a small kernel over the input, computing a dot product at each position; output size follows $\lfloor (W-K+2P)/S \rfloor + 1$ — derive it, don't memorize it.</li>
             <li><strong>Parameter sharing</strong> (the same kernel reused everywhere) gives translation invariance and cuts parameter counts by orders of magnitude versus a fully-connected layer.</li>
             <li><strong>Pooling</strong> downsamples with no learned weights, using the same sliding-window formula, and adds a little shift tolerance.</li>
-            <li><strong>Skip connections</strong> (<span style="white-space:nowrap">$y = x + F(x)$</span>) keep gradients flowing in very deep networks because the identity path contributes a "+1" that a shrinking <span style="white-space:nowrap">$\partial F/\partial x$</span> can't cancel out.</li>
+            <li><strong>Skip connections</strong> ($y = x + F(x)$) keep gradients flowing in very deep networks because the identity path contributes a "+1" that a shrinking $\partial F/\partial x$ can't cancel out.</li>
           </ul>
           <p>Convolutions assume a grid with local structure — great for images, but text and audio have a
           different structure: order along a single sequence. Next we'll see how networks handle that.</p>
